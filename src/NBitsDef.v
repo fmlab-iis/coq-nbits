@@ -27,7 +27,7 @@ Section Definitions.
 
   (* Generating bits *)
 
-  Definition copy (n : nat) (b : bool) : bits := nseq n b.
+  Definition copy := @nseq.
   Definition zeros (n : nat) : bits := copy n b0.
   Definition ones (n : nat) : bits := copy n b1.
 
