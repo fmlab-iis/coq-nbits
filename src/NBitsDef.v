@@ -7,6 +7,46 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Import Prenex Implicits.
 
+
+
+Section Split.
+
+  Context (A : Type).
+  Context (d : A).
+
+  Definition split_head (ls : seq A) : (A * seq A) := (head d ls, behead ls).
+  Definition split_last (ls : seq A) : (seq A * A) :=
+    match ls with
+    | [::] => ([::], d)
+    | hd::tl => (belast hd tl, last hd ls)
+    end.
+  Definition lastd (ls : seq A) := (split_last ls).2.
+  Definition belastd (ls : seq A) := (split_last ls).1.
+
+  Lemma split_head_cons (l : A) (ls : seq A) : split_head (cons l ls) = (l, ls).
+  Proof. reflexivity. Qed.
+
+  Lemma split_last_rcons ls l : split_last (rcons ls l) = (ls, l).
+  Proof.
+    case: ls => //=. move=> hd tl. rewrite belast_rcons last_rcons. reflexivity.
+  Qed.
+
+  Lemma lastd_rcons ls l : lastd (rcons ls l) = l.
+  Proof. by rewrite /lastd split_last_rcons. Qed.
+
+  Lemma belastd_rcons ls l : belastd (rcons ls l) = ls.
+  Proof. by rewrite /belastd split_last_rcons. Qed.
+
+  Lemma split_last_nonempty (ls : seq A) :
+    0 < size ls ->
+    split_last ls = (belast (split_head ls).1 (split_head ls).2,
+                     last (split_head ls).1 ls).
+  Proof. by case: ls. Qed.
+
+End Split.
+
+
+
 Section Definitions.
 
   (* A bit-vector with LSB at the head and MSB at the last *)
@@ -33,16 +73,12 @@ Section Definitions.
 
   (* LSB and MSB *)
 
-  Definition splitlsb (bs : bits) : (bool * bits) := (head b0 bs, behead bs).
-  Definition splitmsb (bs : bits) : (bits * bool) :=
-    match bs with
-    | [::] => ([::], b0)
-    | hd::tl => (belast hd tl, last hd bs)
-    end.
+  Definition splitlsb (bs : bits) : (bool * bits) := split_head b0 bs.
+  Definition splitmsb (bs : bits) : (bits * bool) := split_last b0 bs.
   Definition droplsb (bs : bits) : bits := (splitlsb bs).2.
   Definition dropmsb (bs : bits) : bits := (splitmsb bs).1.
-  Definition joinlsb (lsb : bool) (bs : bits) := lsb::bs.
-  Definition joinmsb (bs : bits) (msb : bool) := rcons bs msb.
+  Definition joinlsb := @cons.
+  Definition joinmsb := @rcons.
   Definition lsb (bs : bits) : bool := (splitlsb bs).1.
   Definition msb (bs : bits) : bool := (splitmsb bs).2.
 
@@ -276,6 +312,38 @@ Section Lemmas.
     - move: (ltnW H) => Hle. rewrite -subn_eq0 in Hle. rewrite (eqP Hle) addn0.
       exact: (subnKC (ltnW H)).
     - rewrite (subnKC H). rewrite -subn_eq0 in H. rewrite (eqP H) addn0. reflexivity.
+  Qed.
+
+  (* Lemmas about splitlsb, lsb, droplsb, splitmsb, msb, and dropmsb *)
+
+  Lemma splitlsb_joinlsb b bs : splitlsb (joinlsb b bs) = (b, bs).
+  Proof. exact: split_head_cons. Qed.
+
+  Lemma splitmsb_joinmsb bs b : splitmsb (joinmsb bs b) = (bs, b).
+  Proof. exact: split_last_rcons. Qed.
+
+  Lemma droplsb_joinlsb b bs : droplsb (joinlsb b bs) = bs.
+  Proof. reflexivity. Qed.
+
+  Lemma dropmsb_joinmsb bs b : dropmsb (joinmsb bs b) = bs.
+  Proof. by rewrite /dropmsb splitmsb_joinmsb. Qed.
+
+  Lemma lsb_joinlsb b bs : lsb (joinlsb b bs) = b.
+  Proof. reflexivity. Qed.
+
+  Lemma msb_joinmsb bs b : msb (joinmsb bs b) = b.
+  Proof. by rewrite /msb splitmsb_joinmsb. Qed.
+
+  Lemma joinlsb_splitlsb bs :
+    0 < size bs ->
+    joinlsb (splitlsb bs).1 (splitlsb bs).2 = bs.
+  Proof. by case: bs => //=. Qed.
+
+  Lemma joinmsb_splitmsb bs :
+    0 < size bs ->
+    joinmsb (splitmsb bs).1 (splitmsb bs).2 = bs.
+  Proof.
+    case: bs => //=. move=> hd tl _. rewrite /joinmsb. rewrite -lastI. reflexivity.
   Qed.
 
   (* Lemmas about zeros and ones *)
