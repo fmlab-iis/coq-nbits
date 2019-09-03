@@ -15,27 +15,29 @@ Section Split.
   Context (d : A).
 
   Definition split_head (ls : seq A) : (A * seq A) := (head d ls, behead ls).
-  Definition split_last (ls : seq A) : (seq A * A) :=
+  Definition lastd (ls : seq A) :=
     match ls with
-    | [::] => ([::], d)
-    | hd::tl => (belast hd tl, last hd ls)
+    | [::] => d
+    | hd::tl => last hd tl
     end.
-  Definition lastd (ls : seq A) := (split_last ls).2.
-  Definition belastd (ls : seq A) := (split_last ls).1.
+  Definition belastd (ls : seq A) :=
+    match ls with
+    | [::] => [::]
+    | hd::tl => belast hd tl
+    end.
+  Definition split_last (ls : seq A) : (seq A * A) := (belastd ls, lastd ls).
 
   Lemma split_head_cons (l : A) (ls : seq A) : split_head (cons l ls) = (l, ls).
   Proof. reflexivity. Qed.
 
-  Lemma split_last_rcons ls l : split_last (rcons ls l) = (ls, l).
-  Proof.
-    case: ls => //=. move=> hd tl. rewrite belast_rcons last_rcons. reflexivity.
-  Qed.
-
   Lemma lastd_rcons ls l : lastd (rcons ls l) = l.
-  Proof. by rewrite /lastd split_last_rcons. Qed.
+  Proof. case: ls => [| hd tl] //=. by rewrite last_rcons. Qed.
 
   Lemma belastd_rcons ls l : belastd (rcons ls l) = ls.
-  Proof. by rewrite /belastd split_last_rcons. Qed.
+  Proof. case: ls => [| hd tl] //=. by rewrite belast_rcons. Qed.
+
+  Lemma split_last_rcons ls l : split_last (rcons ls l) = (ls, l).
+  Proof. rewrite /split_last. by rewrite lastd_rcons belastd_rcons. Qed.
 
   Lemma split_last_nonempty (ls : seq A) :
     0 < size ls ->
@@ -426,6 +428,12 @@ Section Lemmas.
     - move=> hd tl IH. rewrite /from_nat -/from_nat. rewrite half_bit_double.
       rewrite IH. rewrite odd_add odd_double. by case hd.
   Qed.
+
+  Lemma from_natn0 n : from_nat n 0  = zeros n.
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+  Lemma from_nat0n n : from_nat 0 n = [::].
+  Proof. reflexivity. Qed.
 
   Lemma to_nat_bounded bs : to_nat bs < 2 ^ (size bs).
   Proof.
