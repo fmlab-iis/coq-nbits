@@ -61,15 +61,9 @@ Section Definitions.
 
   Notation size := (@size bool).
 
-  (* Concate two bit-vectors *)
-
-  Notation cat := (@cat bool).
-
-  Notation "lo ++# hi" := (cat lo hi) (at level 60, right associativity).
-
   (* Generating bits *)
 
-  Definition copy := @nseq.
+  Notation copy := nseq.
   Definition zeros (n : nat) : bits := copy n b0.
   Definition ones (n : nat) : bits := copy n b1.
 
@@ -95,8 +89,8 @@ Section Definitions.
 
   (* Zero extension and sign extension *)
 
-  Definition zext (n : nat) (bs : bits) : bits := bs ++# zeros n.
-  Definition sext (n : nat) (bs : bits) : bits := bs ++# copy n (msb bs).
+  Definition zext (n : nat) (bs : bits) : bits := bs ++ zeros n.
+  Definition sext (n : nat) (bs : bits) : bits := bs ++ copy n (msb bs).
 
   (* Conversion from bits to nat, N, and Z. *)
 
@@ -166,12 +160,12 @@ Section Definitions.
   Fixpoint from_hex (s : string) : bits :=
     match s with
     | EmptyString => [::]
-    | String c s => (char_to_nibble c) ++# (from_hex s)
+    | String c s => (char_to_nibble c) ++ (from_hex s)
     end.
   Fixpoint from_string (s : string) : bits :=
     match s with
     | EmptyString => [::]
-    | String c s => from_string s ++# (from_nat 8 (nat_of_ascii c))
+    | String c s => from_string s ++ (from_nat 8 (nat_of_ascii c))
     end.
   Definition nibble_to_char (n : bits) :=
     match String.get (to_nat n) "0123456789ABCDEF" with
@@ -183,9 +177,9 @@ Section Definitions.
   Fixpoint to_hex (bs : bits) : string :=
     match bs with
     | [::] => EmptyString
-    | b1::[::] => append_nibble_on_string (zeros 3 ++# bs) EmptyString
-    | b1::b2::[::] => append_nibble_on_string (zeros 2 ++# bs) EmptyString
-    | b1::b2::b3::[::] => append_nibble_on_string (zeros 1 ++# bs) EmptyString
+    | b1::[::] => append_nibble_on_string (zeros 3 ++ bs) EmptyString
+    | b1::b2::[::] => append_nibble_on_string (zeros 2 ++ bs) EmptyString
+    | b1::b2::b3::[::] => append_nibble_on_string (zeros 1 ++ bs) EmptyString
     | b1::b2::b3::b4::tl => append_nibble_on_string (b1::b2::b3::b4::[::]) (@to_hex tl)
     end.
 
@@ -193,7 +187,7 @@ End Definitions.
 
 Delimit Scope bits_scope with bits.
 
-Notation "lo ++# hi" := (cat lo hi) (at level 60, right associativity) : bits_scope.
+Notation copy := nseq.
 Notation "n '-bits' 'of' m" := (from_nat n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'N' m" := (from_N n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'Z' m" := (from_Z n m) (at level 0) : bits_scope.
@@ -444,7 +438,7 @@ Section Lemmas.
       + rewrite ltn_double. by apply.
   Qed.
 
-  Lemma to_nat_cat lo hi : to_nat (lo ++# hi) = to_nat lo + to_nat hi * 2 ^ (size lo).
+  Lemma to_nat_cat lo hi : to_nat (lo ++ hi) = to_nat lo + to_nat hi * 2 ^ (size lo).
   Proof.
     elim: lo => /=.
     - rewrite add0n expn0 muln1. reflexivity.

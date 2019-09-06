@@ -75,6 +75,9 @@ Section ExtZip.
       rewrite (IHs _ Hs). rewrite subnDr. reflexivity.
   Qed.
 
+  Lemma unzip1_extzip_ss ss ts : size ss = size ts -> unzip1 (extzip ss ts) = ss.
+  Proof. move=> Hs. apply: unzip1_extzip_ll. by rewrite Hs. Qed.
+
   Lemma unzip1_extzip ss ts :
     unzip1 (extzip ss ts) = ss ++ nseq (size ts - size ss) sd.
   Proof.
@@ -99,6 +102,9 @@ Section ExtZip.
     - move=> _. rewrite unzip2_zip; first reflexivity. rewrite size_nseq. exact: leqnn.
     - rewrite ltnS => Hs. rewrite (IHs _ Hs). reflexivity.
   Qed.
+
+  Lemma unzip2_extzip_ss ss ts : size ss = size ts -> unzip2 (extzip ss ts) = ts.
+  Proof. move=> Hs. apply: unzip2_extzip_rl. by rewrite Hs. Qed.
 
   Lemma unzip2_extzip ss ts :
     unzip2 (extzip ss ts) = ts ++ nseq (size ss - size ts) td.
