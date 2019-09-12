@@ -540,6 +540,22 @@ Section Lemmas.
     rewrite !to_nat_zext. reflexivity.
   Qed.
 
+  Lemma ltB_msb_to_nat (bs1 bs2 : bits) : ltB_msb bs1 bs2 = (to_nat bs1 < to_nat bs2).
+  Admitted.
+
+  Lemma ltB_msb_ltB (bs1 bs2: bits): ltB_msb bs1 bs2 = ltB bs1 bs2.
+  Proof.
+    rewrite ltB_msb_to_nat ltB_to_nat. reflexivity.
+  Qed.
+
+  Lemma ltB_rev_ltB_msb (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB_msb bs1 bs2.
+  Admitted.
+
+  Lemma ltB_rev_ltB (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB bs1 bs2.
+  Proof.
+    rewrite ltB_rev_ltB_msb ltB_msb_ltB. reflexivity.
+  Qed.
+
   Lemma ltB_trans (bs1 bs2 bs3 : bits) : ltB bs1 bs2 -> ltB bs2 bs3 -> ltB bs1 bs3.
   Proof. rewrite !ltB_to_nat. exact: ltn_trans. Qed.
 
