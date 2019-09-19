@@ -80,12 +80,15 @@ Section Definitions.
 
   (* High and low *)
 
-  Definition high (n : nat) (bs : bits) : bits := drop (size bs - n) bs.
-  Definition low (n : nat) (bs : bits) : bits := take n bs.
+  Definition high (n : nat) (bs : bits) : bits :=
+    drop (size bs - n) bs ++ zeros (n - size bs).
+  Definition low (n : nat) (bs : bits) : bits :=
+    take n bs ++ zeros (n - size bs).
 
   (* Extract a bit sequence from i to j where i >= j *)
 
-  Definition extract (i j : nat) (bs : bits) : bits := high (i - j + 1) (low (i + 1) bs).
+  Definition extract (i j : nat) (bs : bits) : bits :=
+    high (i - j + 1) (low (i + 1) bs).
 
   (* Zero extension and sign extension *)
 
@@ -233,37 +236,26 @@ Section Lemmas.
   Lemma size_dropmsb bs : size (dropmsb bs) = size bs - 1.
   Proof. exact: size_splitmsb. Qed.
 
-  Lemma size_high bs n : n <= size bs -> size (high n bs) = n.
+  Lemma size_high n bs : size (high n bs) = n.
+  Proof. by rewrite /high size_cat size_drop size_zeros sub_diff_add_rdiff. Qed.
+
+  Lemma size_low n bs : size (low n bs) = n.
   Proof.
-    move=> H. rewrite /high size_drop. rewrite (subKn H). reflexivity.
+    rewrite /low size_cat size_take size_zeros.
+    case/orP: (ltn_geq_total n (size bs)) => H.
+    - rewrite H. move: (ltnW H) => {H} H. rewrite -subn_eq0 in H.
+      by rewrite (eqP H) addn0.
+    - rewrite (leq_gtF H). by rewrite (subnKC H).
   Qed.
 
-  Lemma size_low bs n : n <= size bs -> size (low n bs) = n.
-  Proof.
-    move=> H. rewrite /low size_take. rewrite leq_eqVlt in H. case/orP: H.
-    - move/eqP => <-. rewrite ltnn. reflexivity.
-    - move=> ->. reflexivity.
-  Qed.
+  Lemma size_extract i j bs : size (extract i j bs) = i - j + 1.
+  Proof. by rewrite /extract size_high. Qed.
 
-  Lemma size_extract bs i j :
-    j <= i -> i < size bs -> size (extract i j bs) = i - j + 1.
-  Proof.
-    rewrite /extract => Hj Hi. rewrite size_high; first by reflexivity.
-    rewrite size_low.
-    - rewrite (addnBAC _ Hj). exact: leq_subr.
-    - rewrite leqNgt. apply/negP => H. rewrite addn1 ltnS in H.
-      move: (ltn_leq_trans Hi H). rewrite ltnn => Hfalse. discriminate.
-  Qed.
+  Lemma size_zext n bs : size (zext n bs) = size bs + n.
+  Proof. rewrite /zext size_cat size_zeros. reflexivity. Qed.
 
-  Lemma size_zext bs n : size (zext n bs) = size bs + n.
-  Proof.
-    rewrite /zext size_cat size_zeros. reflexivity.
-  Qed.
-
-  Lemma size_sext bs n : size (sext n bs) = size bs + n.
-  Proof.
-    rewrite /sext size_cat size_copy. reflexivity.
-  Qed.
+  Lemma size_sext n bs : size (sext n bs) = size bs + n.
+  Proof. rewrite /sext size_cat size_copy. reflexivity. Qed.
 
   Lemma size_from_nat n x : size (from_nat n x) = n.
   Proof.

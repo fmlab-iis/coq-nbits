@@ -37,6 +37,15 @@ Proof.
   exact: (Lt.lt_le_trans _ _ _ Hmn Hnp).
 Qed.
 
+Lemma sub_diff_add_rdiff m n : n - (n - m) + (m - n) = m.
+Proof.
+  case/orP: (leq_total n m) => H.
+  - rewrite -subn_eq0 in H. rewrite (eqP H) subn0. rewrite subn_eq0 in H.
+    exact: (subnKC H).
+  - rewrite -subn_eq0 in H. rewrite (eqP H) addn0. rewrite subn_eq0 in H.
+    exact: (subKn H).
+Qed.
+
 
 
 Lemma b2n_cons (b1 : bool) (n1 : nat) (b2 : bool) (n2 : nat) :
