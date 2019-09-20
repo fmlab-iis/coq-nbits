@@ -577,4 +577,13 @@ Section Lemmas.
     move=> Hs. move: (eqB_ltB_gtB_cases bs1 bs2). rewrite Hs subnn !zext0. by apply.
   Qed.
 
+  Lemma ltBNle (bs1 bs2: bits) : ltB bs1 bs2 = ~~ leB bs2 bs1.
+  Admitted.
+
+  Lemma leBNlt (bs1 bs2: bits) : leB bs1 bs2 = ~~ ltB bs2 bs1.
+  Admitted.
+
+  Corollary sbbB_ltB_leB (bs1 bs2: bits):
+    if (sbbB false bs1 bs2).1 then ltB bs1 bs2 else leB bs2 bs1.
+  Admitted.
 End Lemmas.
