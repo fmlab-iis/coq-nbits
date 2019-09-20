@@ -191,6 +191,7 @@ Notation copy := nseq.
 Notation "n '-bits' 'of' m" := (from_nat n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'N' m" := (from_N n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'Z' m" := (from_Z n m) (at level 0) : bits_scope.
+Notation eta_expand x := (fst x, snd x).
 
 Section Lemmas.
 
