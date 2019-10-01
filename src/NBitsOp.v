@@ -276,33 +276,16 @@ Section Ops.
   Definition geB (bs1 bs2 : bits) : bool := leB bs2 bs1.
 
   (* Rotate from high to low *)
-  Definition rorB (bs : bits) : bits :=
-    match bs with
-    | [::] => [::]
-    | hd::tl => joinmsb tl hd
-    end.
+  Definition rorB (bs : bits) : bits := rotr 1 bs.
 
   (* Rotate from low to high *)
-  Definition rolB (bs : bits) : bits :=
-    match bs with
-    | [::] => [::]
-    | _ => let (bs, msb) := splitmsb bs in
-           joinlsb msb bs
-    end.
+  Definition rolB (bs : bits) : bits := rot 1 bs.
 
-  Definition shrB1 (bs : bits) : bits :=
-    match bs with
-    | [::] => [::]
-    | hd::tl => joinmsb tl b0
-    end.
+  Definition shrB1 (bs : bits) : bits := droplsb (joinmsb bs b0).
 
   Definition shrB (n : nat) (bs : bits) : bits := iter n shrB1 bs.
 
-  Definition sarB1 (bs : bits) : bits :=
-    match bs with
-    | [::] => [::]
-    | _ => joinmsb (droplsb bs) (msb bs)
-    end.
+  Definition sarB1 (bs : bits) : bits := droplsb (joinmsb bs (msb bs)).
 
   Definition sarB (n : nat) (bs : bits) : bits := iter n sarB1 bs.
 
@@ -586,4 +569,5 @@ Section Lemmas.
   Corollary sbbB_ltB_leB (bs1 bs2: bits):
     if (sbbB false bs1 bs2).1 then ltB bs1 bs2 else leB bs2 bs1.
   Admitted.
+
 End Lemmas.
