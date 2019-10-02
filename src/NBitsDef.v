@@ -90,6 +90,11 @@ Section Definitions.
   Definition extract (i j : nat) (bs : bits) : bits :=
     high (i - j + 1) (low (i + 1) bs).
 
+  (* Slice m bits from a bit sequence from i *)
+
+  Definition slice (i m : nat) (bs : bits) : bits :=
+    extract i (i + m - 1) bs .
+
   (* Zero extension and sign extension *)
 
   Definition zext (n : nat) (bs : bits) : bits := bs ++ zeros n.

@@ -225,6 +225,20 @@ Section Ops.
 
   Definition borrow_subB (bs1 bs2 : bits) : bool := (sbbB false bs1 bs2).1.
 
+  Definition Saddo (bs1 bs2: bits) :=
+    let (tbs1, sign1) := eta_expand (splitmsb bs1) in
+    let (tbs2, sign2) := eta_expand (splitmsb bs2) in
+    let b_add := addB bs1 bs2 in
+    let (u_fa, sign_fa) := eta_expand (splitmsb b_add) in
+    (sign1 && sign2 && ~~sign_fa) || (~~sign1 && ~~sign2 && sign_fa).
+
+  Definition Ssubo (bs1 bs2: bits) :=
+    let (tbs1, sign1) := eta_expand (splitmsb bs1) in
+    let (tbs2, sign2) := eta_expand (splitmsb bs2) in
+    let b_sub := subB bs1 bs2 in
+    let (t_sub, sign_sub) := eta_expand (splitmsb b_sub) in
+    (~~sign1 && sign2 && sign_sub) || (sign1 && ~~sign2 && ~~sign_sub).
+
   Fixpoint full_mul (bs1 bs2 : bits) : bits :=
     match bs1 with
     | [::] => from_nat (size bs1 + size bs2) 0
@@ -274,6 +288,21 @@ Section Ops.
   Definition gtB (bs1 bs2 : bits) : bool := ltB bs2 bs1.
 
   Definition geB (bs1 bs2 : bits) : bool := leB bs2 bs1.
+
+  (* signed comparison *)
+  (* TODO: semantic properties of signed comparison *)
+
+  Definition sltB (bs1 bs2: bits) :=
+    let (tbs1, sign1) := eta_expand (splitmsb bs1) in
+    let (tbs2, sign2) := eta_expand (splitmsb bs2) in
+    let ult_tl := ltB tbs1 tbs2 in
+    ((sign1 == sign2) && ult_tl) || (sign1 && ~~sign2).
+
+  Definition sleB (bs1 bs2: bits) := (bs1 == bs2) || (sltB bs1 bs2).
+
+  Definition sgtB (bs1 bs2: bits) := sltB bs2 bs1.
+
+  Definition sgeB (bs1 bs2: bits) := sleB bs2 bs1.
 
   (* Rotate from high to low *)
   Definition rorB (bs : bits) : bits := rotr 1 bs.
