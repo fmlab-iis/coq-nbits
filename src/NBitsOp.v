@@ -191,6 +191,25 @@ Section Ops.
 
   Definition negB (bs : bits) : bits := succB (invB bs).
 
+  Fixpoint orb_all (bs: bits): bool :=
+    match bs with
+    | [::] => false
+    | hd::tl =>
+      let result_tl := orb_all tl in
+      orb result_tl hd
+    end.
+
+  Fixpoint andb_orb_all_zip (bsp: seq(bool * bool)) : bool :=
+    match bsp with
+    | [::] => false
+    | (ls1_low, ls2_high)::bsp_tl =>
+      let result_tl := andb_orb_all_zip bsp_tl in
+      let result_or := orb_all (unzip1 bsp) in
+      orb result_tl (andb result_or ls2_high)
+    end.
+
+  Definition andb_orb_all (bs1 bs2 : bits) : bool := andb_orb_all_zip (extzip0 bs1 (rev bs2)).
+
   Definition bool_adder (c b1 b2 : bool) : bool * bool :=
     match c, b1, b2 with
     | false, false, false => (false, false)
@@ -248,6 +267,15 @@ Section Ops.
     end.
 
   Definition mulB (bs1 bs2 : bits) : bits := low (size bs1) (full_mul bs1 bs2).
+
+  Definition Umulo bs1 bs2 : bool :=
+    let (bs1_low, bs1_hightl) := eta_expand (splitlsb bs1) in
+    let (bs2_low, bs2_hightl) := eta_expand (splitlsb bs2) in
+    let wbs1 := zext 1 bs1 in
+    let wbs2 := zext 1 bs2 in
+    let mul := mulB wbs1 wbs2 in
+    let mul_high := msb mul in
+    orb (andb_orb_all bs1_hightl bs2_hightl) mul_high.
 
   Fixpoint ltB_lsb_zip (zip : seq (bool * bool)) : bool :=
     match zip with
