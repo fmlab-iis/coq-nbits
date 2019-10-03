@@ -277,6 +277,24 @@ Section Ops.
     let mul_high := msb mul in
     orb (andb_orb_all bs1_hightl bs2_hightl) mul_high.
 
+
+  Definition Smulo bs1 bs2 : bool :=
+    let (bs1_tl, bs1_sign) := eta_expand (splitmsb bs1) in
+    let (bs2_tl, bs2_sign) := eta_expand (splitmsb bs2) in
+    let wsign1 := copy (size bs1_tl) bs1_sign in
+    let wsign2 := copy (size bs2_tl) bs2_sign in
+    let xbs1 := xorB bs1_tl wsign1 in
+    let xbs2 := xorB bs2_tl wsign2 in
+    let (xbs1_low, xbs1_hightl) := eta_expand (splitlsb xbs1) in
+    let (xbs2_low, xbs2_hightl) := eta_expand (splitlsb xbs2) in
+    let and_or := andb_orb_all xbs1_hightl xbs2_hightl in
+    let wbs1 := sext 1 bs1 in
+    let wbs2 := sext 1 bs2 in
+    let mul := mulB wbs1 wbs2 in
+    let (mul_tl, mul_n) := eta_expand (splitmsb mul) in
+    let (_, mul_n_minus1) := eta_expand (splitmsb mul_tl) in
+    orb and_or (xorb mul_n mul_n_minus1).
+
   Fixpoint ltB_lsb_zip (zip : seq (bool * bool)) : bool :=
     match zip with
     | [::] => false
