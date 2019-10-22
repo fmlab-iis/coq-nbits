@@ -368,6 +368,18 @@ Section Ops.
 
   Definition shlB (n : nat) (bs : bits) : bits := iter n shlB1 bs.
 
+  (* Cast an unsigned bits to an unsigned/signed bits of another size *)
+  Definition ucastB (bs : bits) (n : nat) :=
+    if n == size bs then bs
+    else if n < size bs then low n bs
+         else zext (n - size bs) bs.
+
+  (* Cast a signed bits to an unsigned/signed bits of another size *)
+  Definition scastB (bs : bits) (n : nat) :=
+    if n == size bs then bs
+    else if n < size bs then low n bs
+         else sext (n - size bs) bs.
+
 End Ops.
 
 Notation ltB := ltB_lsb.
