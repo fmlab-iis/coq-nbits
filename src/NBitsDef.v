@@ -120,6 +120,8 @@ Section Definitions.
     | O => [::]
     | S m => joinlsb (odd x) (from_nat m x./2)
     end.
+  Definition from_bool (n : nat) (b : bool) : bits := from_nat n b.
+  Definition to_bool (bs : bits) : bool := ~~ is_zero bs.
   Definition to_N (bs : bits) : N :=
     foldr (fun b res => (N_of_bool b + res * 2)%num) 0%num bs.
   Fixpoint from_N (n : nat) (x : N) : bits :=
@@ -153,6 +155,7 @@ Section Definitions.
     | Zneg _ => from_Zneg n (Z.pred (Z.opp x))
     | _ => zeros n
     end.
+  Arguments from_bool n b : simpl never.
   Arguments from_nat n x : simpl never.
   Arguments from_N n x : simpl never.
   Arguments from_Zpos n x : simpl never.
@@ -200,9 +203,11 @@ End Definitions.
 Delimit Scope bits_scope with bits.
 
 Notation copy := nseq.
-Notation "n '-bits' 'of' m" := (from_nat n m) (at level 0) : bits_scope.
+Notation "n '-bits' 'of' 'bool' b" := (from_bool n b) (at level 0) : bits_scope.
+Notation "n '-bits' 'of' 'nat' m" := (from_nat n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'N' m" := (from_N n m) (at level 0) : bits_scope.
 Notation "n '-bits' 'of' 'Z' m" := (from_Z n m) (at level 0) : bits_scope.
+Notation "n '-bits' 'of' m" := (from_nat n m) (at level 0) : bits_scope.
 Notation eta_expand x := (fst x, snd x).
 
 Section Lemmas.
@@ -361,6 +366,9 @@ Section Lemmas.
     case: bs => //=. move=> hd tl _. rewrite /joinmsb. rewrite -lastI. reflexivity.
   Qed.
 
+  Lemma size1_lsb bs : size bs = 1 -> bs = [:: lsb bs].
+  Proof. case: bs => [| b bs] //=. by case: bs => //=. Qed.
+
   (* Lemmas about zeros and ones *)
 
   Lemma zeros0 : zeros 0 = [::].
@@ -389,6 +397,32 @@ Section Lemmas.
     elim: n => //=. move=> n ->. rewrite doubleB addnBA.
     - rewrite addnC -subnBA; last by done. rewrite expnSr muln2. reflexivity.
     - rewrite leq_double expn_gt0. done.
+  Qed.
+
+  Lemma zeros_from_nat n : zeros n = from_nat n b0.
+  Proof. elim: n => [| n IH] //=. rewrite -IH. reflexivity. Qed.
+
+  Lemma zeros_from_bool n : zeros n = from_bool n b0.
+  Proof. exact: zeros_from_nat. Qed.
+
+  Lemma zeros_from_N n : zeros n = from_N n 0%num.
+  Proof. elim: n => [| n IH] //=. rewrite -IH. reflexivity. Qed.
+
+  Lemma zeros_from_Z n : zeros n = from_Z n 0%Z.
+  Proof. by elim: n => [| n IH] //=. Qed.
+
+  Lemma zeros_from_Zpos n : zeros n = from_Zpos n 0%Z.
+  Proof. elim: n => [| n IH] //=. rewrite -IH. reflexivity. Qed.
+
+  (* from_bool *)
+
+  Lemma from_bool_cat n b : from_bool n b = drop (n - 1) (copy n b) ++ zeros (n - 1).
+  Proof.
+    case: n => [| n] //=. rewrite subn1 -pred_Sn /from_bool.
+    rewrite /from_nat -/from_nat /joinlsb. have ->: (b./2 = 0) by case: b.
+    have ->: odd b = b by case: b. elim: n => [| n IH] //=.
+    rewrite zeros_cons -zeros_rcons -cats1 catA -IH. rewrite -zeros_from_nat /joinlsb.
+    rewrite zeros_cons -zeros_rcons -cats1 cat_cons. reflexivity.
   Qed.
 
   (* to_Zpos is always non-negative *)
@@ -463,6 +497,12 @@ Section Lemmas.
     rewrite is_zero_rcons in IH. move/andP: IH => [Hbs Hb]. rewrite (eqP Hb).
     exact: (is_zero_to_Zpos Hbs).
   Qed.
+
+  Lemma is_zero_singleton b : is_zero [:: b] = ~~ b.
+  Proof. by case: b. Qed.
+
+  Lemma not_is_zero_singleton b : ~~ is_zero [::b] = b.
+  Proof. by case: b. Qed.
 
   (* Lemmas about zext *)
 
