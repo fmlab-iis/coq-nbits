@@ -100,6 +100,10 @@ Section Definitions.
   Definition zext (n : nat) (bs : bits) : bits := bs ++ zeros n.
   Definition sext (n : nat) (bs : bits) : bits := bs ++ copy n (msb bs).
 
+  (* All bits are 0 *)
+
+  Definition is_zero (bs : bits) : bool := all (fun b => b == false) bs.
+
   (* Conversion from bits to nat, N, and Z. *)
 
   Definition N_of_bool (b : bool) : N := if b then Npos xH
@@ -330,6 +334,9 @@ Section Lemmas.
   Lemma splitmsb_joinmsb bs b : splitmsb (joinmsb bs b) = (bs, b).
   Proof. exact: split_last_rcons. Qed.
 
+  Lemma splitmsb_rcons bs b : splitmsb (rcons bs b) = (bs, b).
+  Proof. exact: split_last_rcons. Qed.
+
   Lemma droplsb_joinlsb b bs : droplsb (joinlsb b bs) = bs.
   Proof. reflexivity. Qed.
 
@@ -382,6 +389,79 @@ Section Lemmas.
     elim: n => //=. move=> n ->. rewrite doubleB addnBA.
     - rewrite addnC -subnBA; last by done. rewrite expnSr muln2. reflexivity.
     - rewrite leq_double expn_gt0. done.
+  Qed.
+
+  (* to_Zpos is always non-negative *)
+
+  Lemma to_Zpos_ge0 bs : (0 <= to_Zpos bs)%Z.
+  Proof.
+    elim: bs => [| hd tl IH] //=. apply: Z.add_nonneg_nonneg.
+    - by case: hd.
+    - by apply: Z.mul_nonneg_nonneg.
+  Qed.
+
+  (* Relate to_nat, to_N, and to_PosZ *)
+
+  Lemma to_nat_N bs : to_nat bs = N.to_nat (to_N bs).
+  Proof.
+    elim: bs => [| hd tl IH] //=. rewrite Nnat.N2Nat.inj_add  Nnat.N2Nat.inj_mul.
+    rewrite -IH. replace (N.to_nat 2) with 2%N by reflexivity. rewrite -muln2.
+    by case: hd.
+  Qed.
+
+  Lemma to_N_nat bs : to_N bs = N.of_nat (to_nat bs).
+  Proof.
+    elim: bs => [| hd tl IH] //=. rewrite Nnat.Nat2N.inj_add -muln2 Nnat.Nat2N.inj_mul.
+    rewrite -IH. replace (N.of_nat 2) with 2%num by reflexivity. by case: hd.
+  Qed.
+
+  Lemma to_N_Zpos bs : to_N bs = Z.to_N (to_Zpos bs).
+  Proof.
+    elim: bs => [| hd tl IH] //=. have Hhd: (0 <= hd)%Z by case: hd.
+    move: (@to_Zpos_ge0 tl) => Htl.
+    have Htl2: (0 <= to_Zpos tl * 2)%Z by apply: (Z.mul_nonneg_nonneg _ _ Htl).
+    rewrite (Z2N.inj_add _ _ Hhd Htl2). rewrite (Z2N.inj_mul _ _ Htl); [| by done].
+    rewrite -IH /=. clear Hhd. by case: hd.
+  Qed.
+
+  Lemma to_Zpos_N bs : to_Zpos bs = Z.of_N (to_N bs).
+  Proof.
+    elim: bs => [| hd tl IH] //=. rewrite N2Z.inj_add N2Z.inj_mul -IH /=. by case: hd.
+  Qed.
+
+  Lemma to_nat_Zpos bs : to_nat bs = Z.to_nat (to_Zpos bs).
+  Proof. by rewrite to_nat_N to_N_Zpos Z_N_nat. Qed.
+
+  Lemma to_Zpos_nat bs : to_Zpos bs = Z.of_nat (to_nat bs).
+  Proof. by rewrite to_Zpos_N to_N_nat nat_N_Z. Qed.
+
+  (* Lemmas about is_zero *)
+
+  Lemma is_zero_cons b bs : is_zero (b::bs) = ((b == false) && is_zero bs).
+  Proof. reflexivity. Qed.
+
+  Lemma is_zero_cat bs1 bs2 : is_zero (bs1 ++ bs2) = is_zero bs1 && is_zero bs2.
+  Proof. by rewrite /is_zero all_cat. Qed.
+
+  Lemma is_zero_rcons bs b : is_zero (rcons bs b) = (is_zero bs && (b == false)).
+  Proof. by rewrite /is_zero all_rcons Bool.andb_comm. Qed.
+
+  Lemma is_zero_to_nat bs : is_zero bs -> to_nat bs = 0.
+  Proof.
+    elim: bs => [| hd tl IH] //=. move/andP=> [H1 H2]. by rewrite (eqP H1) (IH H2).
+  Qed.
+
+  Lemma is_zero_to_N bs : is_zero bs -> to_N bs = 0%num.
+  Proof. rewrite to_N_nat => H. by rewrite (is_zero_to_nat H). Qed.
+
+  Lemma is_zero_to_Zpos bs : is_zero bs -> to_Zpos bs = 0%Z.
+  Proof. rewrite to_Zpos_N => H. by rewrite (is_zero_to_N H). Qed.
+
+  Lemma is_zero_to_Z bs : is_zero bs -> to_Z bs = 0%Z.
+  Proof.
+    case: (lastP bs) => {bs} [| bs b IH] //=. rewrite /to_Z splitmsb_rcons.
+    rewrite is_zero_rcons in IH. move/andP: IH => [Hbs Hb]. rewrite (eqP Hb).
+    exact: (is_zero_to_Zpos Hbs).
   Qed.
 
   (* Lemmas about zext *)
