@@ -245,11 +245,7 @@ Section Lemmas.
   Proof. exact: size_nseq. Qed.
 
   Lemma size_splitlsb bs : size (splitlsb bs).2 = size bs - 1.
-  Proof.
-    destruct bs => /=.
-    - reflexivity.
-    - rewrite subn1 -pred_Sn. reflexivity.
-  Qed.
+  Proof. rewrite /splitlsb /=. rewrite size_behead. by rewrite subn1. Qed.
 
   Lemma size_splitmsb bs : size (splitmsb bs).1 = size bs - 1.
   Proof.
@@ -257,6 +253,12 @@ Section Lemmas.
     - reflexivity.
     - rewrite subn1 -pred_Sn. rewrite size_belast. reflexivity.
   Qed.
+
+  Lemma size_joinlsb b bs : size (joinlsb b bs) = size bs + 1.
+  Proof. rewrite /joinlsb /=. by rewrite addn1. Qed.
+
+  Lemma size_joinmsb bs b : size (joinmsb bs b) = size bs + 1.
+  Proof. rewrite /joinmsb. rewrite size_rcons. by rewrite addn1. Qed.
 
   Lemma size_droplsb bs : size (droplsb bs) = size bs - 1.
   Proof. exact: size_splitlsb. Qed.

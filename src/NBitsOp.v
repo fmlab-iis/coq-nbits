@@ -403,6 +403,41 @@ Section Lemmas.
 
   Local Open Scope bits_scope.
 
+  (* size after operations *)
+
+  Lemma size_rorB bs : size (rorB bs) = size bs.
+  Proof. rewrite /rorB. rewrite size_rotr. reflexivity. Qed.
+
+  Lemma size_rolB bs : size (rolB bs) = size bs.
+  Proof. rewrite /rolB. rewrite size_rot. reflexivity. Qed.
+
+  Lemma size_shrB1 bs : size (shrB1 bs) = size bs.
+  Proof.
+    rewrite /shrB1. rewrite size_droplsb size_joinmsb. rewrite addn1 subn1.
+    exact: Nat.pred_succ.
+  Qed.
+
+  Lemma size_shrB n bs : size (shrB n bs) = size bs.
+  Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shrB1 IH. Qed.
+
+  Lemma size_sarB1 bs : size (sarB1 bs) = size bs.
+  Proof.
+    rewrite /sarB1. rewrite size_droplsb size_joinmsb. rewrite addn1 subn1.
+    exact: Nat.pred_succ.
+  Qed.
+
+  Lemma size_sarB n bs : size (sarB n bs) = size bs.
+  Proof. elim: n bs => [| n IH] bs //=. by rewrite size_sarB1 IH. Qed.
+
+  Lemma size_shlB1 bs : size (shlB1 bs) = size bs.
+  Proof.
+    rewrite /shlB1. rewrite size_dropmsb size_joinlsb. rewrite addn1 subn1.
+    exact: PeanoNat.Nat.pred_succ.
+  Qed.
+
+  Lemma size_shlB n bs : size (shlB n bs) = size bs.
+  Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shlB1 IH. Qed.
+
   (* Lemma about comparison operations *)
 
   Lemma ltB_cons (hd1 : bool) (tl1 : bits) (hd2 : bool) (tl2 : bits) :
