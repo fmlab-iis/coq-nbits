@@ -401,9 +401,53 @@ Notation "bs <<# n" := (shlB n bs) (at level 40, left associativity) : bits_scop
 
 Section Lemmas.
 
+  Ltac dcase t := move: (refl_equal t); generalize t at -1.
+
   Local Open Scope bits_scope.
 
   (* size after operations *)
+
+  Lemma size_succB bs : size (succB bs) = size bs.
+  Proof.
+    elim: bs => [|b bs IH]; first done. rewrite /succB -/succB.
+    case: b; rewrite /= IH //.
+  Qed.
+
+  Lemma size_full_adder_zip c bs0 bs1 :
+    size (full_adder_zip c (zip bs0 bs1)).2 = minn (size bs0) (size bs1).
+  Proof.
+    dcase (zip bs0 bs1) => [zs Hzip]. rewrite -(size_zip bs0 bs1) Hzip.
+    elim: zs bs0 bs1 Hzip c => [|z zs IH] bs0 bs1 Hzip c //=.
+    dcase z => [[hd1 hd2] Hz]. rewrite Hz in Hzip => {Hz z}.
+    dcase (bool_adder c hd1 hd2) => [[c0 hd] Hadder].
+    dcase (full_adder_zip c0 zs) => [[c1 tl] Hfull]. move: Hzip.
+    case: bs0; case: bs1 => //=. move=> b bs d ds Hzs. case: Hzs => H1 H2 H3.
+    move: (IH _ _ H3 c0). rewrite Hfull /=. by move=> ->.
+  Qed.
+
+  Lemma size_addB bs0 bs1 : size (addB bs0 bs1) = minn (size bs0) (size bs1).
+  Proof. exact: size_full_adder_zip. Qed.
+
+  Lemma size_subB bs0 bs1 : size (subB bs0 bs1) = minn (size bs0) (size bs1).
+  Proof.
+    rewrite /subB /sbbB /adcB /full_adder.
+    dcase (full_adder_zip (~~false) (zip bs0 (~~# bs1)%bits)) => [[c res] Hfull].
+    move : (size_full_adder_zip (~~false) bs0 (~~#bs1)%bits).
+    rewrite Hfull /=. by rewrite /invB size_map.
+  Qed.
+
+  Lemma size_full_mul bs0 bs1 : size (full_mul bs0 bs1) = (size bs0) + (size bs1).
+  Proof.
+    elim: bs0 => [| b bs0 IH] /=.
+    - by rewrite /full_mul add0n size_from_nat.
+    - case b.
+      + rewrite size_addB size_zext size_joinlsb IH.
+        rewrite addn1 addSn addnS addnC minnE. by rewrite subnn subn0.
+      + by rewrite size_joinlsb IH addSn addn1.
+  Qed.
+
+  Lemma size_mulB bs0 bs1 : size (mulB bs0 bs1) = size bs0.
+  Proof. by rewrite /mulB size_low. Qed.
 
   Lemma size_rorB bs : size (rorB bs) = size bs.
   Proof. rewrite /rorB. rewrite size_rotr. reflexivity. Qed.
