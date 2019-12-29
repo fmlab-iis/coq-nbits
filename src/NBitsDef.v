@@ -1,12 +1,11 @@
 
 From Coq Require Import ZArith Arith List Ascii String.
-From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq.
+From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq div.
 From nbits Require Import AuxLemmas.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Import Prenex Implicits.
-
 
 
 Section Split.
@@ -643,5 +642,110 @@ Section Lemmas.
     - rewrite zext_Sn cats1. rewrite to_nat_rcons IHn. rewrite mul0n addn0.
       reflexivity.
   Qed.
+
+  Lemma to_nat_joinlsb a n : to_nat (joinlsb a n) = (to_nat n).*2 + a.
+  Proof. by rewrite addnC. Qed.
+  
+  Lemma to_nat_droplsb n: to_nat (droplsb n) = (to_nat n)./2.
+  Proof. elim n=>[|nhd ntl IH]/=. done.
+         rewrite -div.divn2 div.divnDr. case nhd ; (rewrite/= div.divn_small; last done).
+         rewrite add0n; by rewrite -!muln2 div.mulnK. 
+         rewrite add0n; by rewrite -!muln2 div.mulnK.
+         rewrite div.dvdn2 odd_double; done.
+  Qed.       
+  
+  Lemma to_nat_joinmsb a n : to_nat (joinmsb n a) = a * 2^(size n) + to_nat n.
+  Proof.
+    move : a. elim n=>[|nhd ntl IH]a/=. by rewrite -muln2 mul0n !addn0 expn0 muln1. 
+    rewrite (IH a) -!muln2 mulnDl expnS; ring. 
+  Qed.
+
+  Lemma to_nat_dropmsb n : to_nat (dropmsb (n)) = div.modn (to_nat n) (2^(size n).-1).
+  Proof.
+    rewrite-(revK n). case (rev n); first by rewrite/= div.modn1.
+    intros. rewrite/dropmsb/splitmsb/=rev_cons belastd_rcons size_rcons.
+    have->:((size (rev l)).+1.-1=size (rev l)) by rewrite-addn1-subn1 addnK.
+    case b; rewrite to_nat_rcons.
+    - by rewrite mul1n-div.modnDmr div.modnn addn0 (div.modn_small (to_nat_bounded (rev l))).
+    - by rewrite mul0n addn0 (div.modn_small (to_nat_bounded (rev l))).
+  Qed.
+
+Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0.
+Proof. intros. induction n; try done.
+Qed.
+
+  Lemma to_nat_from_nat_bounded : forall n m, m < 2^n -> to_nat (from_nat n m) = m.
+  Proof.
+    elim => [|ns IH] m /=. rewrite expn0. symmetry. exact : lt1_eq0.
+    move: (IH m./2) => IHm. intros. rewrite IHm. apply odd_double_half.
+    rewrite-ltn_double. rewrite-divn2-2!muln2. rewrite expnSr in H.
+    exact : (leq_ltn_trans (leq_trunc_div m 2) H).
+  Qed.
+
+  Lemma from_nat_bounded_eq m1 m2 n : m1 < 2^n -> m2 < 2^n ->
+                                      (m1==m2) = (from_nat n m1 == from_nat n m2).
+  Proof.
+    move => Hlt1 Hlt2. case E: (m1 == m2); case E': (from_nat n m1 == from_nat n m2) => //.
+      by rewrite (eqP E) eq_refl in E'.
+      rewrite -(to_nat_from_nat_bounded Hlt1) -(to_nat_from_nat_bounded Hlt2) in E.
+        by rewrite (eqP E') eq_refl in E.
+  Qed.
+
+  Lemma from_nat_dhalf n m : joinlsb (odd m) (from_nat n m./2) = from_nat n.+1 m.
+  Proof. done. Qed.
+
+  Lemma from_nat_wrap n : forall m, from_nat n m = from_nat n (m + 2^n).
+  Proof. induction n => //.
+         rewrite expnS.
+         move => m.
+         case ODD: (odd m); rewrite /from_nat-/from_nat /=ODD odd_add odd_mul/=ODD/= halfD ODD/=.
+         specialize (IHn m./2). by rewrite odd_mul/= add0n mul2n doubleK IHn.
+         specialize (IHn m./2). by rewrite add0n mul2n doubleK IHn.
+  Qed.
+
+  Lemma from_nat_wrapMany n c : forall m, from_nat n m = from_nat n (m + c * 2^n).
+  Proof. induction c => m. by rewrite mul0n addn0.
+         rewrite mulSn (addnC (2^n)) addnA from_nat_wrap. rewrite IHc.
+           by rewrite -addnA (addnC (2^n)) addnA.
+  Qed.
+
+  Lemma to_nat_mod p: to_nat p = div.modn (to_nat p) (2^(size p)).
+  Proof. rewrite div.modn_small => //. apply to_nat_bounded. Qed.
+
+  Lemma to_nat_from_nat n m : to_nat (from_nat n m) = div.modn m (2^n).
+  Proof. have H:= div.divn_eq m (2^n). rewrite {1}H.
+         have HH:= from_nat_wrapMany n (div.divn m (2^n)) (div.modn m (2^n)). rewrite addnC in HH. rewrite -HH.
+         rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0. Qed.
+
+
+(*---------------------------------------------------------------------------
+    Lemmas of take
+  ---------------------------------------------------------------------------*)
+
+
+Lemma to_nat_take : forall n p, to_nat ((take n) p) = if n < size p then to_nat (from_nat n (to_nat p)) else to_nat p.
+  elim => [| ns IH] p.
+  rewrite take0/=.
+  elim p => [| phd ptl IHm]; done.
+  elim p => [| phd ptl IHm]; first done.
+  rewrite to_nat_cons/=.
+  case Hlt : (ns.+1 < (size ptl).+1); rewrite ltnS in Hlt. 
+  rewrite odd_add odd_double oddb. rewrite (IH ptl) Hlt.
+  case phd; first by rewrite/=uphalf_double. 
+  by (rewrite/=3!add0n-3!muln2-div.divn2 div.mulnK; last done).
+  by rewrite IH Hlt.
+Qed.
+
+(*---------------------------------------------------------------------------
+    Lemmas of most/last significant bit
+  ---------------------------------------------------------------------------*)
+
+Lemma dropmsb_zeros : forall n, dropmsb (zeros n) = zeros n.-1.
+Proof.
+  move => n. case n. done.
+  move => n0. have->:(zeros n0.+1.-1=zeros n0) by rewrite-addn1-subn1 addnK.
+  by rewrite-zeros_rcons/dropmsb/=belastd_rcons. 
+Qed.
+
 
 End Lemmas.
