@@ -409,7 +409,7 @@ Section Lemmas.
   Lemma size_succB bs : size (succB bs) = size bs.
   Proof.
     elim: bs => [|b bs IH]; first done. rewrite /succB -/succB.
-    case: b; rewrite /= IH //.
+    case: b. rewrite /= IH //. by done.
   Qed.
 
   Lemma size_full_adder_zip c bs0 bs1 :
@@ -495,7 +495,7 @@ Section Lemmas.
     elim : bs; first done .
     move => b bs IH .
     rewrite /negB /= .
-    case b; rewrite /= !size_succB size_inv_same // .
+    case b; rewrite /= size_inv_same // . by rewrite size_succB.
   Qed .
 
   Lemma size_sbbB b bs0 bs1 : 
