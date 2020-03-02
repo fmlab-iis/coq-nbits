@@ -1437,6 +1437,16 @@ Section Lemmas.
       + rewrite 2!ltB_to_nat /= to_nat_rcons mul0n 2!to_nat_joinmsb 2!to_nat_zeros 2!size_zeros 3!addn0 2!mul1n subn1. auto.
   Qed.
 
+  Lemma lower_bound : forall bs,
+      0 < sig_bits bs -> ltB (joinmsb (zeros (sig_bits bs).-1) b1) bs.
+  Proof.
+    rewrite/sig_bits; move =>bs.
+    move : (revK bs) => Hrev. rewrite -Hrev. move: Hrev; set bsr := rev bs.
+    move => Hrev. rewrite revK size_rev.
+    elim bsr => [|bsrhd bsrtl IH] ; first done. 
+    rewrite ltB_to_nat/=subn1/= to_nat_joinmsb size_zeros rev_cons to_nat_rcons.
+    case bsrhd. rewrite/= to_nat_zeros addn0 2!mul1n.
+  Admitted.    
     
   Lemma from_nat_exp_joinmsb0 : forall n, from_nat (n+1) (2^n) == joinmsb (zeros n) b1.
   Proof.
@@ -1476,17 +1486,17 @@ Admitted.
 
   Lemma andb_orb_all_zip11 : forall bsptl , andb_orb_all_zip ((b1, b1)::bsptl) = true.
   Proof.
-    intros. by rewrite/=andbT !orbT.
+    intros. by rewrite/= andbT !orbT.
   Qed.
 
-  Lemma andb_orb_all_zip10 : forall bsptl, andb_orb_all_zip ((b1, b0)::bsptl) = andb_orb_all_zip bsptl.
+  Lemma andb_orb_all_zipb0 : forall bsptl b, andb_orb_all_zip ((b, b0)::bsptl) = andb_orb_all_zip bsptl.
   Proof.
     intros. by rewrite/=andbF orbF.
   Qed.
 
-  Lemma andb_orb_all_zip01 : forall bsptl, orb_all (unzip1 bsptl) -> andb_orb_all_zip ((b0, b1)::bsptl) = true.
+  Lemma andb_orb_all_zip01 : forall bsptl, andb_orb_all_zip ((b0, b1)::bsptl) = if (andb_orb_all_zip bsptl) then true else orb_all (unzip1 bsptl).
   Proof.
-    intros. by rewrite/=andbT orbF H orbT. 
+    intros. rewrite/=andbT orbF. case (andb_orb_all_zip bsptl); try done.
   Qed.
 
   Lemma rev_behead : forall bs, zext (size bs - (size bs - 1)) (rev (behead bs)) = rev bs.
@@ -1511,12 +1521,12 @@ Admitted.
   Lemma sig_bits_nil : sig_bits nil = 0.
   Proof. done. Qed.
 
-  Lemma sig_bits_cons0 bs : sig_bits (rcons bs b0) = sig_bits bs.
+  Lemma sig_bits_rcons0 bs : sig_bits (rcons bs b0) = sig_bits bs.
   Proof.
     by rewrite/sig_bits rev_rcons/= size_rcons -addn1 addnK. 
   Qed.
 
-  Lemma sig_bits_cons1 bs : sig_bits (rcons bs b1) = (size bs).+1.
+  Lemma sig_bits_rcons1 bs : sig_bits (rcons bs b1) = (size bs).+1.
   Proof.
     by rewrite/sig_bits rev_rcons/=size_rcons.
   Qed.
@@ -1539,22 +1549,7 @@ Admitted.
     - rewrite/=; exact : (ltn_trans (ltnSn (size l)) (ltnSn (size l).+1)). 
     - by rewrite/=!subn1/=. 
   Qed.
-  
-  Lemma get_sig_bit bs: 0 < sig_bits bs -> nth b1 bs (sig_bits bs - 1).
-  Proof.
-    rewrite/sig_bits -(size_rev bs) -{3}(revK bs). set bsr := rev bs.
-    elim bsr => [|bsrhd bsrtl IH] ; first done.
-    case bsrhd. Local Opaque nth.
-    - by rewrite rev_cons nth_rcons/=subn1/= size_rev eq_refl ltnn.
-    - rewrite /=rev_cons 2!subn1/= nth_rcons. 
-      rewrite -(revK bsrtl) size_rev -/(sig_bits (rev bsrtl)) revK size_rev.
-      move : (sig_bits_le (rev bsrtl))=> Hle. rewrite leq_eqVlt size_rev in Hle.
-      move/orP : Hle => [Heq|Hlt].
-      + rewrite (eqP Heq)/=-subn1. rewrite -(revK bsrtl) size_rev-/(sig_bits (rev bsrtl)) revK (eqP Heq) in IH.
-        case Hsz : (size bsrtl - 1 < size bsrtl); first exact IH.
-        move => Hgt0. rewrite -subn_gt0 (subKn Hgt0) in Hsz; discriminate.
-      + rewrite-subn1. move => Hgt0. rewrite -subn_gt0 (subnBA _ Hgt0)-(addnBAC _ (ltnW Hlt)) addn1 ltn0Sn. move : Hgt0. rewrite/sig_bits revK size_rev. exact : IH.
-  Qed.
+
     
   Lemma sig_bits_zero_cat bs : bs = low (sig_bits bs) bs ++ zeros (size bs - (sig_bits bs)).
   Proof.
@@ -1581,10 +1576,46 @@ Admitted.
     by rewrite to_nat_zext.
   Qed.
 
-  (*Lemma zip_copyr: forall bs n (a b: bool) bsptl, zip bs (copy n b).
+
+  Lemma sig_bits_is0 bs :  (sig_bits bs = 0) <-> (bs = zeros (size bs)).
   Proof.
-    elim => [| bshd bstl IH] n a b bsptl.
-   *)
+    elim bs. by rewrite sig_bits_nil/=.
+    intros. split. move => Heq0. move : (sig_bits_cons a l). 
+    rewrite Heq0 leqn0. move/eqP => Heq0'. apply ->H in Heq0'. move : Heq0. rewrite Heq0' /= size_zeros.
+    case a; last done. have {1}-> : (true :: zeros (size l)) = zext (size l) (true ::nil) by done.
+    move : (sig_bits_zext [::true] (size l))=> H1. by rewrite H1/sig_bits/=. 
+    move => Hal. by rewrite Hal sig_bits_zeros.
+  Qed.
+  
+  Lemma sig_bits_consb: forall (bs : seq bool) (b:bool),
+      sig_bits bs = 0 -> (sig_bits bs) + b = (sig_bits (b :: bs)). 
+  Proof.
+    intros. case b. rewrite addn1/=. rewrite-> sig_bits_is0 in H.
+    rewrite H sig_bits_zeros. have ->:((true :: zeros (size bs)) = zext ( (size bs)) [::true]) by done.
+      by rewrite sig_bits_zext/sig_bits/=.
+    rewrite addn0 H. rewrite-> sig_bits_is0 in H. by rewrite H zeros_cons sig_bits_zeros.
+  Qed.
+  
+  Lemma sig_bits_cons1: forall (bs : seq bool) b, 0 < sig_bits bs -> (sig_bits bs).+1 = (sig_bits (b :: bs)).
+  Proof.
+  Admitted.
+    
+  Lemma get_sig_bit bs: 0 < sig_bits bs-> nth b1 bs (sig_bits bs - 1).
+  Proof.
+    rewrite/sig_bits -(size_rev bs) -{1 3}(revK bs). set bsr := rev bs.
+    rewrite -{2 4 5}(revK bsr) size_rev -/(sig_bits (rev bsr)).
+    elim bsr => [|bsrhd bsrtl IH]; first done.
+    case bsrhd. Local Opaque nth.
+    - by rewrite /sig_bits revK rev_cons size_rcons !size_rev nth_rcons /=subn1/= size_rev eq_refl ltnn.
+    - rewrite /sig_bits/=revK size_rev/= rev_cons 2!subn1/= nth_rcons. 
+      rewrite -{1 2 3 4 7 8 9 10}(revK bsrtl) size_rev -/(sig_bits (rev bsrtl)). 
+      move : (sig_bits_le (rev bsrtl))=> Hle. rewrite leq_eqVlt size_rev in Hle.
+      move/orP : Hle => [Heq|Hlt]. 
+      + rewrite size_rev-(eqP Heq) -subn1. 
+        case Hsz : (sig_bits (rev bsrtl) - 1 < sig_bits (rev bsrtl)); first exact IH.
+        move => Hgt0. rewrite -subn_gt0 (subKn Hgt0) in Hsz; discriminate.
+      + rewrite-subn1. move => Hgt0. rewrite -subn_gt0 (subnBA _ Hgt0) size_rev -(addnBAC _ (ltnW Hlt)) addn1 ltn0Sn. move : Hgt0. exact : IH.
+  Qed.
 
   Lemma andb_orb_all_0s : forall n , andb_orb_all (zeros n) (zeros n) = false.
   Proof.
@@ -1626,64 +1657,169 @@ Admitted.
     
   Lemma andb_orb_all_0l : forall bs n, andb_orb_all (zeros n) bs = false.
   Proof.
-    elim => [|bshd bstl IH]; elim => [|ns IHm].
-    - by rewrite (andb_orb_all_0s 0).
-    - by rewrite (andb_orb_all_0nm ns.+1 0).
-    -  rewrite/=/andb_orb_all /extzip0.
-       rewrite extzip_zip/= subn0 cats0 size_rev -rev_copy-/(zeros (size bstl).+1) -zeros_cons/=.
+    intros. rewrite/andb_orb_all /extzip0 extzip_zip size_rev size_zeros zeros_cats. 
   Admitted.
 
-  Lemma sig_bits_cons1l : forall bs, sig_bits (b1::bs) = sig_bits bs +1.
+
+  Lemma size_unzip (bsp: seq (bool*bool)) : size (unzip1 bsp) = size (unzip2 bsp).
   Proof.
-  Admitted.
+    elim bsp; first done. intros. by rewrite/=H.
+  Qed.
 
-  Lemma sig_bits_cons0l : forall bs, 0 < sig_bits bs -> sig_bits (b0::bs) = sig_bits bs +1.
+  Lemma orb_all_rev bsp : orb_all (rev bsp) = orb_all bsp.
+  Proof.
+    elim bsp => [| bsphd bsptl IH]; first done.
+    elim bsphd.
+    - rewrite !orb_all_true rev_cons to_nat_rcons mul1n/=.
+      case bsptl.
+      + by rewrite/=expn0 -muln2 mul0n.
+      + intros; by rewrite size_rev/=2!addn_gt0/= expn_gt0/= orbT. 
+    - rewrite !orb_all_true rev_cons to_nat_rcons mul0n /= add0n addn0. 
+      elim bsptl; first done.
+      intros. rewrite rev_cons to_nat_rcons/=.
+      rewrite size_rev -2!muln2 mulnDl 2!addn_gt0 H -muln2.
+      by rewrite !muln_gt0 !andbT expn_gt0/= andbT Bool.orb_comm. 
+  Qed.
+
+  Lemma head_rev : forall bs b, head b0 (rev (b::bs)) = head b (rev bs).
+  Proof.
+    intros.
+    rewrite -nth0 nth_rev/=; last done. rewrite subn1/= -last_nth.
+    rewrite -nth0. 
+    move : bs b.
+    elim => [ | bshd bstl IH] b; first done.
+    rewrite nth_rev/=; last done. by rewrite subn1/=-last_nth.
+  Qed.
+
+  Lemma andb_orb_all_true : forall bs1 bs2, andb_orb_all bs1 bs2 -> (0 < sig_bits bs1) /\ (0 < sig_bits bs2).
   Proof.
   Admitted.
 
   Lemma andb_orb_all_sig_bits : forall bs1 bs2,
-      size bs1 = size bs2 -> andb_orb_all bs1 bs2 -> size bs1 <= (sig_bits bs1) + (sig_bits bs2).
+      size bs1 = size bs2 -> andb_orb_all bs1 bs2 -> size bs1 < (sig_bits bs1) + (sig_bits bs2).
   Proof.
-    rewrite/andb_orb_all/sig_bits. move => bs1 bs2.
-    rewrite -(revK bs2) (*-(revK bs2)*).
-    set bs2r := rev bs2(*; set bs2r := rev bs2*).
-    elim bs1 => [|bs1hd bs1tl IH]; elim bs2r => [|bs2hd bs2tl IHm]; try done.
-    rewrite revK/= size_rev/=.
-    move => Hszeq.
-    case Hbs1hd: bs1hd; case Hbs2hd: bs2hd.
-    - move => Haoa. rewrite-/(sig_bits (true:: bs1tl)) (sig_bits_cons1l bs1tl) -Hszeq -addSnnS -subn_gt0-addnBA; last done. by rewrite subnn.
-    - rewrite andbF orbF. rewrite revK in IH.
-      move => Haoa. 
-      rewrite-/(sig_bits (true:: bs1tl)) (sig_bits_cons1l bs1tl) subn1/=. admit.
-    - rewrite andbT orbF /extzip0 extzip_zip_ss; last by rewrite (eq_add_S _ _ Hszeq).
-      move : (eq_add_S _ _ Hszeq) => Heq'. rewrite unzip1_zip; last by rewrite Heq'.
-  Admitted.
-    
-  Lemma sum_sig_bits : forall bs1 bs2, sig_bits bs1 + (sig_bits bs2) <= sig_bits (full_mul bs1 bs2) -> Umulo bs1 bs2 = false.
-  Proof.
-    elim => [| bs1hd bs1tl IH] ; elim => [| bs2hd bs2tl IH2]. rewrite sig_bits_nil/Umulo/=. rewrite mulB0 size_zext/= /joinlsb/=. done.
-    - rewrite sig_bits_nil -zeros0 full_mul0B !add0n sig_bits_zeros.
-      by rewrite/Umulo zeros0 zext_nil mul0B/=/msb/=orbF (andb_orb_all_0l bs2tl 0).
-    - rewrite sig_bits_nil -zeros0 full_mulB0 !addn0 sig_bits_zeros.
-      rewrite/Umulo/zext zeros_cats add0n mulB0' size_cat size_zeros /msb. 
-      rewrite (andb_orb_all_0r bs1tl 0) orFb addn1/=. rewrite /zeros -rev_copy.
-      case (size bs1tl); first done.
-      move => n. by rewrite/= rev_cons last_rcons.
-    - rewrite/=.
-      case Hbs1hd : bs1hd; case Hbs2hd : bs2hd.
-      rewrite !sig_bits_cons1l 2!addn1. move => Hszeq.
-      assert ((sig_bits bs1tl) + (sig_bits bs2tl) <=
-          sig_bits
-            (joinlsb false (full_mul bs1tl (true :: bs2tl)) +#
-             zext (size bs1tl).+1 (true :: bs2tl))). admit.
-      rewrite/Umulo. rewrite/zext/msb/=/lastd.  case ((true :: bs1tl ++ [:: b0]) *# (true :: bs2tl ++ [:: b0])). 
-  Admitted.
-      
-      
-  Lemma mul_overflow :
-    forall bs1 bs2 , (sig_bits (full_mul bs1 bs2) <= (sig_bits bs1) + (sig_bits bs2)  - 2) -> Umulo bs1 bs2.
+    rewrite /andb_orb_all. move => bs1 bs2.
+    rewrite -{1 3}(revK bs2). set bs2r :=rev bs2. rewrite size_rev.
+    move : bs1 bs2r.
+    elim => [| bs1hd bs1tl IH]; elim => [| bs2rhd bs2rtl IHm]; try done.
+    move => Hszcons. generalize Hszcons. move => Hsz; rewrite /=-addn1 in Hsz; symmetry in Hsz; rewrite -addn1 in Hsz.
+    move : (addIn Hsz) => Hsz'; rewrite 2!addn1 in Hsz.
+    case Hbs1tl0 :  (sig_bits bs1tl) => [| nsbbs1tl].
+    - move:(sig_bits_consb bs1hd Hbs1tl0) => Hconsbs1hd. 
+      rewrite-Hconsbs1hd rev_cons. rewrite /extzip0 extzip_zip_ss ; last by rewrite /=-Hsz.
+      have Hzip : (zip (bs1hd :: bs1tl) (bs2rhd :: bs2rtl)) = (bs1hd, bs2rhd) :: (zip bs1tl bs2rtl) by done. 
+      move :Hszcons; case bs2rhd.
+      + move=> Hszcons. rewrite sig_bits_rcons1 size_rev Hsz (Hbs1tl0) (add0n)(*leq_addl*).
+        move => Handb. generalize Handb.
+        rewrite-(extzip_zip_ss b0 b0 Hszcons) -/extzip0 -(revK (true :: bs2rtl))-/(andb_orb_all (bs1hd :: bs1tl) (rev (true :: bs2rtl))).
+        move => Handb'. move : (andb_orb_all_true Handb') => [Hgt1 Hgt2].
+        move : Hgt1. case bs1hd. by rewrite -(sig_bits_consb true Hbs1tl0) addn1 ltnSn.
+        by rewrite -(sig_bits_consb false Hbs1tl0) Hbs1tl0 addn0. 
+      + rewrite sig_bits_rcons0/=andbF orbF. symmetry in Hsz'; rewrite-(extzip_zip_ss b0 b0 Hsz') -/extzip0.
+        rewrite->sig_bits_is0 in Hbs1tl0. rewrite Hbs1tl0.
+        by rewrite -{2}(revK bs2rtl) -/(andb_orb_all (zeros (size bs1tl)) (rev bs2rtl)) andb_orb_all_0l.
+    - move: (ltn0Sn nsbbs1tl); rewrite -Hbs1tl0; move => Hgt0. move:(sig_bits_cons1 bs1hd Hgt0) => Hconsbs1hd. 
+      rewrite -Hconsbs1hd rev_cons. rewrite /extzip0 extzip_zip_ss ; last by rewrite /=-Hsz.
+      have -> : (zip (bs1hd :: bs1tl) (bs2rhd :: bs2rtl)) = (bs1hd, bs2rhd) :: (zip bs1tl bs2rtl) by done.
+      case bs2rhd.
+      + move => Handb. by rewrite sig_bits_rcons1 size_rev Hsz/= -{1}(add0n (size bs1tl).+1) ltn_add2r ltn0Sn.
+        (*exact : (ltn_addl (sig_bits bs1tl).+1 (ltnSn (size bs1tl))). *)
+      + rewrite sig_bits_rcons0 andb_orb_all_zipb0. symmetry in Hsz'.
+        rewrite-(extzip_zip_ss b0 b0 Hsz') -/extzip0. move => Handb.
+        move : (IH bs2rtl Hsz' Handb). by rewrite/=addSn.
+  Qed.
+
+  Lemma andb_orb_all_sig_bits_gt : forall bs1 bs2,
+      size bs1 = size bs2 -> andb_orb_all bs1 bs2 = false -> (sig_bits bs1) + (sig_bits bs2) <= size bs1.
   Proof.
   Admitted.
-    
   
+  Compute (sig_bits (zext 4 (b1::b1::b0::(b0::nil)))). (*2*)
+  Compute (to_nat (b1::b1::b0::(b0::nil))). (*3*)
+  Compute (msb (b1::b1::b0::(b0::nil))). (*0*)
+  Compute (lsb (b1::b1::b0::(b0::nil))). (*1*)
+
+  (*  
+fix andb_orb_all_zip (bsp : seq (bool * bool)) : bool :=
+  match bsp with
+  | [::] => false
+  | (_, ls2_high) :: bsp_tl =>
+      let result_tl := andb_orb_all_zip bsp_tl in
+      let result_or := orb_all (unzip1 bsp) in result_tl || result_or && ls2_high
+  end
+Definition Umulo bs1 bs2 : bool :=
+    let (_, bs1_hightl) := eta_expand (splitlsb bs1) in
+    let (_, bs2_hightl) := eta_expand (splitlsb bs2) in
+    let wbs1 := zext 1 bs1 in
+    let wbs2 := zext 1 bs2 in
+    let mul := mulB wbs1 wbs2 in
+    let mul_high := msb mul in
+    orb (andb_orb_all bs1_hightl bs2_hightl) mul_high.*)
+  Definition va1 := (b1::b1::(b0::nil)).
+  Definition va2 := (b0::b0::(b1::nil)).
+  Definition wva1 := (b1::b1::b0::(b0::nil)).
+  Definition wva2 := (b0::b0::b1::(b0::nil)).
+  Definition va1h := let (_, bh) := eta_expand (splitlsb va1) in bh.
+  Definition va2h := let (_, bh) := eta_expand (splitlsb va2) in bh.
+  Compute (msb (mulB wva1 wva1)).
+  Compute (msb (mulB wva2 wva2)).
+  Compute (Umulo va1 va1). (*1*)
+  Compute (Umulo va2 va2). (*1*)
+  Compute (andb_orb_all va2h va2h). 
+  Compute (andb_orb_all va1 va1). 
+  Compute (size va1). (*3*) Compute (sig_bits va1). (*2*)
+  Compute (nth b1 va1 (2-1)). (*1*) Compute (msb va1). (*0*)
+
+ 
+
+  Lemma msb_sig_bits bs : msb bs -> sig_bits bs = size bs.
+  Proof.
+    rewrite /msb /sig_bits.
+    elim bs; first done.
+  Admitted.
+
+  Lemma umulo_andb_orb_all : forall bs1 bs2, size bs1 = size bs2 -> andb_orb_all (splitlsb bs1).2 (splitlsb bs2).2 = true -> size bs1 <= (sig_bits bs1) + (sig_bits bs2) -2.
+  Proof.
+    move => bs1 bs2 Hsz Handbb. rewrite /Umulo. have Hszslsb : (size (splitlsb bs1).2  = size (splitlsb bs2).2) by rewrite 2!size_splitlsb Hsz.     
+    move : (andb_orb_all_sig_bits Hszslsb) => Handb.
+
+    move : (andb_orb_all_true Handbb) => [Hgt01 Hgt02].
+      move : (sig_bits_cons1 (splitlsb bs1).1 Hgt01) => Hh1.
+      move : (sig_bits_cons1 (splitlsb bs2).1 Hgt02) => Hh2.
+      have Hbs1 : (bs1 = joinlsb (splitlsb bs1).1 (splitlsb bs1).2). rewrite joinlsb_splitlsb; first done.
+      move : Hgt01. case bs1; done.
+      have Hbs2 : (bs2 = joinlsb (splitlsb bs2).1 (splitlsb bs2).2). rewrite joinlsb_splitlsb; first done.
+      move : Hgt02. case bs2; done. (*rewrite -addn1 in Hh1.*)
+      move : (Handb Handbb). rewrite size_splitlsb {4}Hbs1 {2}Hbs2 -Hh1 -Hh2/= addSn addnS subn2/=.
+      rewrite -(ltn_add2r 1) subnK.
+      by rewrite addn1 ltnS.
+      rewrite Hbs1. move : (sig_bits_le (joinlsb (splitlsb bs1).1 (splitlsb bs1).2)). rewrite -Hh1.
+      move => Hszj.
+      exact : (ltn_trans Hgt01 Hszj).
+  Qed.
+
+  Lemma andb_orb_all_sig_bits_n1 : forall bs1 bs2,
+      size bs1 = size bs2 -> andb_orb_all (splitlsb bs1).2 (splitlsb bs2).2 = false-> size bs1 + 1 = (sig_bits bs1) + (sig_bits bs2) -> msb (mulB (zext 1 bs1) (zext 1 bs2)) = true .
+  Proof.
+    move => bs1 bs2.
+    rewrite -(revK bs1)-(revK bs2). set bs1r := rev bs1. set bs2r := rev bs2.
+    move : bs1r bs2r.
+    elim  => [| bs1rhd bs1rtl IH]; elim  => [| bs2rhd bs2rtl IH2].
+    - rewrite /=; have -> : (zext 1 [::] = zeros 1) by done. by rewrite mul0B sig_bits_nil -zeros0 andb_orb_all_0l/msb/=.
+    - rewrite /=; have -> : (zext 1 [::] = zeros 1) by done. by rewrite size_rev/=.
+    - by rewrite !size_rev/=.
+    - move => Hszrev Handbf Hsigs.
+      have Hszsplrev : size (splitlsb (rev (bs1rhd :: bs1rtl))).2  = size (splitlsb (rev (bs2rhd :: bs2rtl))).2 by rewrite !size_splitlsb Hszrev.
+      move : (andb_orb_all_sig_bits_gt Hszsplrev Handbf) => Hsgspl.
+      have Hmk1 : (size (rev (bs1rhd :: bs1rtl)) -1 =
+                   (sig_bits (rev (bs1rhd :: bs1rtl))).-1 + (sig_bits (rev (bs2rhd :: bs2rtl))).-1).
+      admit.
+      have Hsgbrev1 : sig_bits (splitlsb (rev (bs1rhd :: bs1rtl))).2 = (sig_bits (rev (bs1rhd :: bs1rtl))).-1. admit.
+      have Hsgbrev2 : sig_bits (splitlsb (rev (bs2rhd :: bs2rtl))).2 = (sig_bits (rev (bs2rhd :: bs2rtl))).-1. admit.
+      rewrite Hsgbrev1 Hsgbrev2 -Hmk1 size_splitlsb leq_eqVlt Hmk1 in Hsgspl.
+      move/orP : Hsgspl => [Heq|Hlt].
+      admit. by rewrite ltnn in Hlt.
+  Admitted.
+      
+
 End Lemmas.
