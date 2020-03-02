@@ -1769,14 +1769,17 @@ Definition Umulo bs1 bs2 : bool :=
   Compute (andb_orb_all va1 va1). 
   Compute (size va1). (*3*) Compute (sig_bits va1). (*2*)
   Compute (nth b1 va1 (2-1)). (*1*) Compute (msb va1). (*0*)
-
  
 
   Lemma msb_sig_bits bs : msb bs -> sig_bits bs = size bs.
   Proof.
-    rewrite /msb /sig_bits.
-    elim bs; first done.
-  Admitted.
+    rewrite -(revK bs). set bsr := rev bs.
+    rewrite /msb.
+    elim bsr; first done.
+    move =>  bsrhd bsrtl IH.
+    rewrite /splitmsb/=rev_cons lastd_rcons.
+    case bsrhd; last done. by rewrite sig_bits_rcons1 size_rcons.
+  Qed.    
 
   Lemma umulo_andb_orb_all : forall bs1 bs2, size bs1 = size bs2 -> andb_orb_all (splitlsb bs1).2 (splitlsb bs2).2 = true -> size bs1 <= (sig_bits bs1) + (sig_bits bs2) -2.
   Proof.
