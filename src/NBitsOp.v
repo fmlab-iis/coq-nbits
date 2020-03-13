@@ -480,23 +480,16 @@ Section Lemmas.
 
   Lemma size_shlB n bs : size (shlB n bs) = size bs.
   Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shlB1 IH. Qed.
+
+  Lemma size_invB bs : size (invB bs)%bits = size bs.
+  Proof. elim: bs => [| b bs IH] //=. by rewrite IH. Qed.
   
-  Lemma size_inv_same bs :
-    size bs = size (~~# bs)%bits .
-  Proof .
-    elim : bs; first done .
-    move => b bs IH .
-    rewrite /= IH // .
-  Qed .  
-  
-  Lemma size_neg_same bs :
-    size bs = size (-# bs)%bits .
-  Proof .
-    elim : bs; first done .
-    move => b bs IH .
-    rewrite /negB /= .
-    case b; rewrite /= size_inv_same // . by rewrite size_succB.
-  Qed .
+  Lemma size_negB bs : size (negB bs)%bits = size bs.
+  Proof.
+    elim: bs => [| b bs IH] //=. rewrite /negB /=. case b; rewrite /=.
+    - by rewrite size_invB.
+    - by rewrite IH.
+  Qed.
 
   Lemma size_sbbB b bs0 bs1 : 
     size (sbbB b bs0 bs1).2 = minn (size bs0) (size bs1) .
@@ -505,10 +498,10 @@ Section Lemmas.
     dcase (full_adder_zip (~~ b) (zip bs0 (~~# bs1)%bits)) => [[c res] Hadder] => /= .
     have : res = (c, res).2 => // .
     rewrite -Hadder; case => -> .
-    rewrite size_full_adder_zip -size_inv_same // .
+    rewrite size_full_adder_zip size_invB // .
   Qed .
 
-  Lemma size_ucast bs n :
+  Lemma size_ucastB bs n :
     size (ucastB bs n) = n .
   Proof .
     rewrite /ucastB /= .
@@ -520,7 +513,7 @@ Section Lemmas.
         rewrite leqNgt Hlt // .
   Qed .
 
-  Lemma size_scast bs n :
+  Lemma size_scastB bs n :
     size (scastB bs n) = n .
   Proof .
     rewrite /scastB /= .
@@ -532,17 +525,24 @@ Section Lemmas.
         rewrite leqNgt Hlt // .
   Qed .
 
-  (*
-    Lemma size_tcast bs s t :
-    size (Typ.tcast bs s t) = Typ.sizeof_typ t .
-    Proof .
-    rewrite /Typ.tcast; case s => _;
-    [rewrite size_ucast // | rewrite size_scast //] .
-    Qed .
-   *)
+  (* Lemmas about invB *)
 
-  
-  
+  Lemma invB_zeros n : invB (zeros n) = ones n.
+  Proof.
+    elim: n => // n IH. by rewrite -zeros_cons -ones_cons /= IH.
+  Qed.
+
+  Lemma invB_ones n : invB (ones n) = zeros n.
+  Proof.
+    elim: n => // n IH. by rewrite -zeros_cons -ones_cons /= IH.
+  Qed.
+
+  Lemma invB_involutive bs : invB (invB bs) = bs.
+  Proof.
+    elim: bs => [| b bs IH] //=. rewrite IH. rewrite Bool.negb_involutive.
+    reflexivity.
+  Qed.
+
   (******************** Free Region Begin ********************)
 
   (* Lemma about comparison operations *)
@@ -1082,7 +1082,7 @@ Section Lemmas.
     case Hfaddzf : (full_adder_zip false (zip (zeros (size mtl)) (~~# mtl)%bits))=>[c res]/=.
     have -> : res = (full_adder_zip false (zip (zeros (size mtl)) (~~# mtl)%bits)).2
       by rewrite Hfaddzf.
-    rewrite full_adder_zip_0_l unzip2_zip ; last by rewrite size_zeros -size_inv_same. 
+    rewrite full_adder_zip_0_l unzip2_zip ; last by rewrite size_zeros size_invB. 
   Admitted.
   
   Lemma subB0: forall m n, subB m (zeros n) = m.
