@@ -166,21 +166,30 @@ Section Definitions.
   Definition char_to_nibble c : bits :=
     from_nat 4 (findex 0 (String c EmptyString) "0123456789ABCDEF0123456789abcdef").
   Definition char_to_bit c : bool := ascii_dec c "1".
+  (* Convert from binary string *)
   Fixpoint from_bin (s : string) : bits :=
     match s with
     | EmptyString => [::]
     | String c s => joinmsb (from_bin s) (char_to_bit c)
     end.
+  (* Convert from HEX string *)
   Fixpoint from_hex (s : string) : bits :=
     match s with
     | EmptyString => [::]
-    | String c s => (char_to_nibble c) ++ (from_hex s)
+    | String c s => (from_hex s) ++ (char_to_nibble c)
     end.
-  Fixpoint from_string (s : string) : bits :=
+  Fixpoint Zpos_of_num_string_rec (res : Z) (s : string) : Z :=
     match s with
-    | EmptyString => [::]
-    | String c s => from_string s ++ (from_nat 8 (nat_of_ascii c))
+    | EmptyString => res
+    | String c s =>
+      Zpos_of_num_string_rec
+        (res * 10 + Z.of_nat (nat_of_ascii c - nat_of_ascii "0"))%Z s
     end.
+  Definition Zpos_of_num_string (s : string) : Z := Zpos_of_num_string_rec 0%Z s.
+  (* Convert from (positive) number string *)
+  Definition from_string (s : string) : bits :=
+    let n := Zpos_of_num_string s in
+    from_Z (Z.to_nat (Z.log2 n) + 1) n.
   Definition nibble_to_char (n : bits) :=
     match String.get (to_nat n) "0123456789ABCDEF" with
     | None => " "%char
@@ -188,13 +197,20 @@ Section Definitions.
     end.
   Definition append_nibble_on_string (n : bits) (s : string) : string :=
     (s ++ String (nibble_to_char n) EmptyString)%string.
+  (* Convert to HEX string *)
   Fixpoint to_hex (bs : bits) : string :=
     match bs with
     | [::] => EmptyString
-    | b1::[::] => append_nibble_on_string (zeros 3 ++ bs) EmptyString
-    | b1::b2::[::] => append_nibble_on_string (zeros 2 ++ bs) EmptyString
-    | b1::b2::b3::[::] => append_nibble_on_string (zeros 1 ++ bs) EmptyString
+    | b1::[::] => append_nibble_on_string (bs ++ zeros 3) EmptyString
+    | b1::b2::[::] => append_nibble_on_string (bs ++ zeros 2) EmptyString
+    | b1::b2::b3::[::] => append_nibble_on_string (bs ++ zeros 1) EmptyString
     | b1::b2::b3::b4::tl => append_nibble_on_string (b1::b2::b3::b4::[::]) (@to_hex tl)
+    end.
+  (* Convert to binary string *)
+  Fixpoint to_bin (bs : bits) : string :=
+    match bs with
+    | [::] => EmptyString
+    | b::bs => to_bin bs ++ (if b then "1"%string else "0"%string)
     end.
 
 End Definitions.
