@@ -114,6 +114,18 @@ Section ExtZip.
     - rewrite (eqP Hs) cats0. exact: (unzip2_extzip_rl Hs).
   Qed.
 
+  Lemma unzip1_rev (ps : seq (S * T)) :
+    unzip1 (rev ps) = rev (unzip1 ps).
+  Proof.
+    elim ps => [| hd tl IH] //=. rewrite !rev_cons -IH /unzip1 map_rcons //=. 
+  Qed.
+
+  Lemma unzip2_rev (ps : seq (S * T)) :
+    unzip2 (rev ps) = rev (unzip2 ps).
+  Proof.
+    elim ps => [| hd tl IH] //=. rewrite !rev_cons -IH /unzip2 map_rcons //=. 
+  Qed.
+
 End ExtZip.
 
 
@@ -303,6 +315,8 @@ Section Ops.
   (* Test if bs1 < bs2 where LSB is at the head *)
   Definition ltB_lsb (bs1 bs2 : bits) : bool := ltB_lsb_zip (extzip0 bs1 bs2).
 
+(* TODO: ltB_msb is incorrect. Fix it if needed. *)
+(*
   Fixpoint ltB_msb_zip (zip : seq (bool * bool)) :=
     match zip with
     | [::] => false
@@ -312,6 +326,7 @@ Section Ops.
   (* Test if bs1 < bs2 where MSB is at the head
      (the reverse of the usual representation) *)
   Definition ltB_msb (bs1 bs2 : bits) : bool := ltB_msb_zip (extzip0 bs1 bs2).
+*)
 
   Fixpoint ltB_rev_zip (zip : seq (bool * bool)) : bool :=
     match zip with
@@ -322,7 +337,7 @@ Section Ops.
   (* Test if bs1 < bs2 (where LSB is at the head) by reversing first
      and then applying ltB_msb. *)
   Definition ltB_rev (bs1 bs2 : bits) : bool :=
-    ltB_rev_zip (extzip0 (rev bs1) (rev bs2)).
+    ltB_rev_zip (rev (extzip0 bs1 bs2)).
 
   (* By default, the ltB operation is ltB_lsb, which makes us easy to prove lemmas.
      To have a better performance, use ltB_rev instead. *)
@@ -752,6 +767,8 @@ Section Lemmas.
     rewrite !to_nat_zext. reflexivity.
   Qed.
 
+  (* TODO: Fix it if ltB_msb is needed *)
+  (*
   Lemma ltB_msb_to_nat (bs1 bs2 : bits) : ltB_msb bs1 bs2 = (to_nat bs1 < to_nat bs2).
   Admitted.
 
@@ -762,11 +779,12 @@ Section Lemmas.
 
   Lemma ltB_rev_ltB_msb (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB_msb bs1 bs2.
   Admitted.
+   *)
 
   Lemma ltB_rev_ltB (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB bs1 bs2.
   Proof.
-    rewrite ltB_rev_ltB_msb ltB_msb_ltB. reflexivity.
-  Qed.
+    (* rewrite ltB_rev_ltB_msb ltB_msb_ltB. reflexivity. *)
+  Admitted.
 
   Lemma ltB_trans (bs1 bs2 bs3 : bits) : ltB bs1 bs2 -> ltB bs2 bs3 -> ltB bs1 bs3.
   Proof. rewrite !ltB_to_nat. exact: ltn_trans. Qed.
