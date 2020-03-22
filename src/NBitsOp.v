@@ -937,11 +937,21 @@ Section Lemmas.
   Lemma to_nat_shlBn:
     forall n k, k < n -> to_nat (shlB k (from_nat n 1) ) = 2 ^ k.
   Proof.
-  Admitted.
+    move=> n; elim => [| k IH] /=.
+    - move=> Hn. rewrite expn0 to_nat_from_nat_bounded //=.
+      by rewrite -{1}(expn0 2) ltn_exp2l. 
+    - move=> Hlt. rewrite to_nat_shlB1.
+      have Hkn : k < n by apply (ltn_trans (ltnSn k)).
+      rewrite (IH Hkn) shlB_size size_from_nat -muln2 -expnSr modn_small //=.
+      rewrite ltn_exp2l; done.
+  Qed.
 
   Lemma shlB_dropmsb n (p: bits) : shlB n (dropmsb p) = dropmsb (shlB n p).
   Proof.
-  Admitted.
+    elim: n p => [| n IHn] p /=; first done.
+    rewrite /shlB1 (IHn p). case (p <<# n); by rewrite /dropmsb.
+  Qed.
+
 
   (*---------------------------------------------------------------------------
     Properties of addition
