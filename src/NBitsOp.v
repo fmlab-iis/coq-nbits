@@ -1065,6 +1065,118 @@ Section Lemmas.
     rewrite/addB. rewrite to_nat_adcB => //. 
   Qed.  
 
+  Lemma to_nat_addB_zext1 p1 p2 :
+    size p1 == size p2 ->
+    to_nat (addB (zext 1 p1) (zext 1 p2)) == to_nat p1 + to_nat p2 .
+  Proof .
+    move => Hsz .
+    rewrite to_nat_addB /= size_addB .
+    rewrite !size_zext -(eqP Hsz) minnE .
+    rewrite subKn // .
+    rewrite (to_nat_zext 1 p1) (to_nat_zext 1 p2) .
+    rewrite to_nat_from_nat_bounded // .
+    rewrite addnS expnS mul2n addn0 /= -addnn .
+    move : (to_nat_bounded p2) .
+    rewrite -(ltn_add2l (2 ^ size p1)) .
+    move : (to_nat_bounded p1) .
+    rewrite -(ltn_add2r (to_nat p2)) .
+    rewrite (eqP Hsz) .
+    apply : ltn_trans .
+  Qed .
+
+  Lemma to_nat_addB_zext p1 p2 n :
+    size p1 == size p2 ->
+    to_nat (addB (zext n.+1 p1) (zext n.+1 p2)) == to_nat p1 + to_nat p2 .
+  Proof .
+    elim : n p1 p2 .
+    - apply : to_nat_addB_zext1 .
+    - move => n IH p1 p2 Hsz .
+      rewrite !(zext_Sn (n.+1)) .
+      rewrite to_nat_addB .
+      rewrite to_nat_from_nat .
+      rewrite (to_nat_cat (zext n.+1 p1)) (to_nat_cat (zext n.+1 p2))
+              (to_nat_zeros 1) !mul0n !addn0 .
+      rewrite size_addB !size_cat !size_zeros !(size_zeros 1) .
+      rewrite -(eqP Hsz) minnE subKn; last by apply leqnn .
+      rewrite modn_small; first by rewrite !to_nat_zext .
+      move : (to_nat_bounded (zext n.+1 p2)) .
+      rewrite -(ltn_add2l (2 ^ size (zext n.+1 p1))) .
+      move : (to_nat_bounded (zext n.+1 p1)) .
+      rewrite -(ltn_add2r (to_nat (zext n.+1 p2))) => Hlt0 Hlt1 .
+      move : (ltn_trans Hlt0 Hlt1) => { Hlt0 Hlt1 } .
+      rewrite !size_zext -(eqP Hsz) .
+      by rewrite addn1 expnS mul2n -addnn .
+  Qed .
+
+  Lemma adcB_zext1_catB p1 p2 c :
+    size p1 = size p2 ->
+    (adcB c (zext 1 p1) (zext 1 p2)).2 ==
+    joinmsb (adcB c p1 p2).2 (adcB c p1 p2).1 .
+  Proof .
+    move => Hsz .
+    move : p1 p2 Hsz c .
+    apply : seq_ind2 .
+    - case; by rewrite /zext /carry_addB /addB /= .
+    - move => q0 q1 p0 p1 Hsz Heq c .
+      rewrite /addB /carry_addB /adcB /full_adder /= .
+      case c; case q0; case q1;
+        rewrite /= -{1}(zext0 p0) -{1}(zext0 p1) -!zext_Sn;
+        [
+          dcase (full_adder_zip true (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip true (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip true (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip true (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip true (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip true (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip false (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip false (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip true (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip true (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip false (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip false (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip false (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip false (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        |
+          dcase (full_adder_zip false (zip (zext 1 p0) (zext 1 p1)))
+          => [[c0] tl0] Hzextadder /=;
+          dcase (full_adder_zip false (zip p0 p1))
+          => [[c1] tl1] Hadder /=
+        ];
+        rewrite eqseq_cons /=;
+        rewrite -[tl0]/((c0, tl0).2)
+        -[tl1]/((c1, tl1).2) -{2}[c1]/((c1, tl1).1);
+        rewrite -Hzextadder -Hadder;
+        exact : Heq .    
+  Qed .
+
+  Lemma addB_zext1_catB p1 p2 :
+    size p1 = size p2 ->
+    addB (zext 1 p1) (zext 1 p2) ==
+    joinmsb (adcB false p1 p2).2 (adcB false p1 p2).1 .
+  Proof .
+    by apply : adcB_zext1_catB .
+  Qed .
+
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
