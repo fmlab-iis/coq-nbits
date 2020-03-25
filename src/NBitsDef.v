@@ -734,6 +734,25 @@ Qed.
          rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0. Qed.
 
 
+  (* Lemmas about to_Zpos *)
+
+  Lemma to_Zpos_inj bs1 bs2 :
+    to_Zpos bs1 = to_Zpos bs2 ->
+    zext (size bs2 - size bs1) bs1 = zext (size bs1 - size bs2) bs2.
+  Proof.
+    rewrite 2!to_Zpos_nat. move=> Hn. move: (Nat2Z.inj _ _ Hn) => {Hn} /eqP Hn.
+    rewrite to_nat_inj in Hn. exact: (eqP Hn).
+  Qed.
+
+  Lemma to_Zpos_inj_ss bs1 bs2 :
+    size bs1 = size bs2 -> to_Zpos bs1 = to_Zpos bs2 -> bs1 = bs2.
+  Proof.
+    rewrite 2!to_Zpos_nat. move=> Hs Hn. move: (Nat2Z.inj _ _ Hn) => {Hn} Hn.
+    apply/eqP. rewrite -(to_nat_inj_ss Hs). apply/eqP. assumption.
+  Qed.
+
+
+
 (*---------------------------------------------------------------------------
     Lemmas of take
   ---------------------------------------------------------------------------*)
