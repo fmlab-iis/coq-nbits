@@ -807,11 +807,20 @@ Section Lemmas.
     move=> Hs. move: (eqB_ltB_gtB_cases bs1 bs2). rewrite Hs subnn !zext0. by apply.
   Qed.
 
-  Lemma ltBNle (bs1 bs2: bits) : ltB bs1 bs2 = ~~ leB bs2 bs1.
-  Admitted.
+  Lemma ltBNle (bs1 bs2: bits) : size bs1 = size bs2 -> ltB bs1 bs2 = ~~ leB bs2 bs1.
+  Proof.
+    rewrite /leB => Hs. apply Logic.eq_sym in Hs. move: (eqB_ltB_gtB_cases_ss Hs).
+    case Heq : (bs2 == bs1).
+    - move/eqP: Heq => <-. by rewrite ltBnn.
+    - rewrite orFb. case H21 : (bs2 <# bs1); case H12 : (bs1 <# bs2); try done.
+      move: (ltB_trans H21 H12). by rewrite ltBnn.
+  Qed.
 
-  Lemma leBNlt (bs1 bs2: bits) : leB bs1 bs2 = ~~ ltB bs2 bs1.
-  Admitted.
+  Lemma leBNlt (bs1 bs2: bits) : size bs1 = size bs2 -> leB bs1 bs2 = ~~ ltB bs2 bs1.
+  Proof.
+    move=> Hs; apply Logic.eq_sym in Hs. rewrite (ltBNle Hs).
+    by rewrite Bool.negb_involutive.
+  Qed.
 
   Corollary sbbB_ltB_leB (bs1 bs2: bits):
     if (sbbB false bs1 bs2).1 then ltB bs1 bs2 else leB bs2 bs1.
@@ -1186,29 +1195,36 @@ Section Lemmas.
   Admitted.
 
   Lemma ltB_borrow_subB bs1 bs2:
-    ltB bs1 bs2 <->
-    borrow_subB bs1 bs2.
+    size bs1 = size bs2 ->
+    (ltB bs1 bs2 <-> borrow_subB bs1 bs2).
   Proof.
-    split.
-    +
-      apply contrapositive.
-    - case: (borrow_subB bs1 bs2);  rewrite /Decidable.decidable. by left. by right.
-    - move => Hinv_carry.
-      move /negP /eqP /eqP: Hinv_carry.
-      rewrite Bool.negb_true_iff => H.
-      move: (sbbB_ltB_leB bs1 bs2).
-      rewrite /borrow_subB in H.
-      rewrite H /=.
-      move=> HleB HltB.
-      rewrite leBNlt in HleB.
-      move /negP : HleB => HleB.
-      rewrite HltB in HleB.
-      done.
-      +
-        move=> Hcarry.
+    move=> Hs. split.
+    - apply contrapositive.
+      + case: (borrow_subB bs1 bs2); rewrite /Decidable.decidable; by [left | right].
+      + move => Hinv_carry.
+        move /negP /eqP /eqP: Hinv_carry.
+        rewrite Bool.negb_true_iff => H.
         move: (sbbB_ltB_leB bs1 bs2).
-        rewrite /borrow_subB in Hcarry.
-          by rewrite Hcarry.
+        rewrite /borrow_subB in H.
+        rewrite H /=.
+        move=> HleB HltB.
+        apply Logic.eq_sym in Hs. rewrite (leBNlt Hs) in HleB.
+        move /negP : HleB => HleB.
+        rewrite HltB in HleB.
+        done.
+    - move=> Hcarry.
+      move: (sbbB_ltB_leB bs1 bs2).
+      rewrite /borrow_subB in Hcarry.
+      by rewrite Hcarry.
+  Qed.
+
+  Lemma ltB_equiv_borrow_subB bs1 bs2:
+    size bs1 = size bs2 ->
+    ltB bs1 bs2 = borrow_subB bs1 bs2.
+  Proof.
+    move=> Hs. case Hlt: (ltB bs1 bs2); case Hcarry: (borrow_subB bs1 bs2); try done.
+    - apply (ltB_borrow_subB Hs) in Hlt. by rewrite Hlt in Hcarry.
+    - apply (ltB_borrow_subB Hs) in Hcarry. by rewrite Hcarry in Hlt.
   Qed.
 
   Lemma subB_is_dropmsb_adcB_invB (p q: bits) : subB p q = dropmsb (adcB true p (invB q)).2.
