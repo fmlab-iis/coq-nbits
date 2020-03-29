@@ -114,16 +114,30 @@ Section ExtZip.
     - rewrite (eqP Hs) cats0. exact: (unzip2_extzip_rl Hs).
   Qed.
 
-  Lemma unzip1_rev (ps : seq (S * T)) :
-    unzip1 (rev ps) = rev (unzip1 ps).
-  Proof.
-    elim ps => [| hd tl IH] //=. rewrite !rev_cons -IH /unzip1 map_rcons //=. 
+  Lemma unzip1_rev (ps : seq (S * T)) : unzip1 (rev ps) = rev (unzip1 ps).
+  Proof. by rewrite /unzip1 map_rev. Qed.
+
+  Lemma unzip2_rev (ps : seq (S * T)) : unzip2 (rev ps) = rev (unzip2 ps).
+  Proof. by rewrite /unzip2 map_rev. Qed.
+
+  Lemma rev_nseq A n (x : A) : rev (nseq n x) = nseq n x.
+  Proof. 
+      by elim: n => [// | n IHn]; rewrite -{1}(addn1 n) copy_addn rev_cat IHn. 
   Qed.
 
-  Lemma unzip2_rev (ps : seq (S * T)) :
-    unzip2 (rev ps) = rev (unzip2 ps).
-  Proof.
-    elim ps => [| hd tl IH] //=. rewrite !rev_cons -IH /unzip2 map_rcons //=. 
+  Lemma rev_extzip ss ts : 
+    rev (extzip ss ts) = zip (nseq (size ts - size ss) sd ++ rev ss)
+                             (nseq (size ss - size ts) td ++ rev ts).
+  Proof. 
+    rewrite extzip_zip rev_zip;
+      last by rewrite !seq.size_cat !size_nseq -!maxnE maxnC.
+    by rewrite !rev_cat !rev_nseq.
+  Qed.
+
+  Lemma rev_extzip_ss ss ts : 
+    size ss = size ts -> rev (extzip ss ts) = extzip (rev ss) (rev ts).
+  Proof. 
+    move=> Hs. rewrite rev_extzip Hs subnn extzip_zip_ss //=. by rewrite !size_rev.
   Qed.
 
 End ExtZip.
@@ -781,10 +795,52 @@ Section Lemmas.
   Admitted.
    *)
 
-  Lemma ltB_rev_ltB (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB bs1 bs2.
+  Lemma ltB_rev_zext bs1 bs2 :
+    ltB_rev (zext (size bs2 - size bs1) bs1) (zext (size bs1 - size bs2) bs2) 
+    = ltB_rev bs1 bs2.
   Proof.
-    (* rewrite ltB_rev_ltB_msb ltB_msb_ltB. reflexivity. *)
-  Admitted.
+    rewrite /ltB_rev /extzip0 2!extzip_zip /zext /zeros. 
+    rewrite !size_cat -2!catA -2!copy_addn 2!size_nseq.
+    rewrite -!maxnE !(maxnC (size bs1) (size bs2)) subnn !addn0. reflexivity.
+  Qed.
+
+  Lemma ltn_gtF : forall m n : nat, m < n -> (n < m) = false.
+  Proof. move=> m n Hlt; by rewrite ltnNge (ltnW Hlt). Qed.
+
+  Lemma ltB_rev_to_nat_ss (bs1 bs2 : bits) :
+    size bs1 = size bs2 ->
+    ltB_rev bs1 bs2 = (to_nat bs1 < to_nat bs2).
+  Proof.
+    rewrite -(revK bs1) -(revK bs2). set bs1r := rev bs1; set bs2r := rev bs2.
+    elim: bs1r bs2r => [| hd1 tl1 IH1] [| hd2 tl2] /=;
+      [ done | by rewrite size_rev | by rewrite size_rev | idtac ].
+    move/eqP. rewrite !size_rev => /eqP Hs.
+    rewrite /ltB_rev /extzip0 -(rev_extzip_ss _ _ Hs) revK /=. 
+    rewrite !rev_cons !to_nat_rcons. 
+    move/eqP: Hs; rewrite /= eqSS => /eqP Hs.
+    move: (IH1 tl2). 
+    rewrite !size_rev /ltB_rev /extzip0 -(rev_extzip_ss _ _ Hs) revK => IHtl.
+    rewrite (IHtl Hs). case hd1; case hd2; rewrite /= -Hs.
+    - by rewrite ltn_add2r. 
+    - rewrite mul1n mul0n addn0 Hs. 
+      have Hlt : to_nat (rev tl2) < to_nat (rev tl1) + 2 ^ size tl2
+        by apply ltn_addl; rewrite -size_rev to_nat_bounded.
+      by rewrite (ltn_gtF Hlt).
+    - rewrite mul0n mul1n addn0.
+      have Hlt : to_nat (rev tl1) < to_nat (rev tl2) + 2 ^ size tl1
+        by apply ltn_addl; rewrite -size_rev to_nat_bounded.
+      by rewrite Hlt.
+    - by rewrite mul0n !addn0. 
+  Qed.
+
+  Lemma ltB_rev_to_nat bs1 bs2 : ltB_rev bs1 bs2 = (to_nat bs1 < to_nat bs2).
+  Proof.
+    rewrite -ltB_rev_zext. rewrite ltB_rev_to_nat_ss; last exact: size_zext_mkss.
+    rewrite !to_nat_zext. reflexivity.
+  Qed.
+  
+  Lemma ltB_rev_ltB (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB bs1 bs2.
+  Proof. rewrite ltB_rev_to_nat ltB_to_nat. reflexivity. Qed.
 
   Lemma ltB_trans (bs1 bs2 bs3 : bits) : ltB bs1 bs2 -> ltB bs2 bs3 -> ltB bs1 bs3.
   Proof. rewrite !ltB_to_nat. exact: ltn_trans. Qed.
