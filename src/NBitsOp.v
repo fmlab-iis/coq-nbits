@@ -1177,6 +1177,218 @@ Section Lemmas.
     by apply : adcB_zext1_catB .
   Qed .
 
+  Lemma bit_inj (bs : bitseq) :
+    size bs == 1 -> ((bs == [:: false]) + (bs == [:: true])) .
+  Proof .
+    case : bs .
+    - done .
+    - move => b bs /= .
+      rewrite eqSS => Hs0 .
+      move : (size0nil (eqP Hs0)) => Hbs .
+      rewrite Hbs .
+      case : b; [right | left]; done .
+  Qed .
+
+  Lemma zext_zeros_bit n b :
+    zext n [:: b] == b :: (zeros n) .
+  Proof .
+    elim n .
+    - by rewrite /zext /zeros /= .
+    - move => k IH .
+      by rewrite /zext /zeros /= .
+  Qed .
+
+  Lemma zip_cons A B c0 c1 cs0 cs1 :
+    @zip A B (c0::cs0) (c1::cs1) = (c0, c1)::(zip cs0 cs1) .
+  Proof .
+    by rewrite {1}/zip /= -/zip .
+  Qed .
+
+  Lemma adcB_carry_bitr_zext c bs :
+    adcB false (zext 1 bs) (zext (size bs) [:: c]) ==
+    adcB c (zext 1 bs) (zeros (size bs + 1)) .
+  Proof .
+    elim bs .
+    - case c; by rewrite /zext /adcB /full_adder /= .
+    - move => d ds IH .
+      case c; case d; rewrite /adcB /full_adder;
+      rewrite !size_joinlsb !addn1 zext_cons -zeros_cons !zip_cons;
+      by rewrite (lock zip) /= -(lock zip) .
+  Qed .
+
+  Lemma adcB_carry_bitr c bs :
+    size bs > 0 ->
+    adcB false bs (zext (size bs - 1) [:: c]) ==
+    adcB c bs (zeros (size bs)) .
+  Proof .
+    elim : bs .
+    - rewrite /size; done .
+    - move => b bs IH _ .
+      rewrite size_joinlsb addn1 subn1 -pred_Sn .
+      rewrite (eqP (zext_zeros_bit _ _)) -zeros_cons .
+      case c; case b; by rewrite /adcB /full_adder /= .
+  Qed .      
+
+  Lemma addB_addB_zext_adcB c bs0 bs1 :
+    size bs0 == size bs1 ->
+    addB (addB (zext 1 bs0) (zext 1 bs1)) (zext (size bs0) [:: c]) ==
+    (adcB c (zext 1 bs0) (zext 1 bs1)).2 .
+  Proof .
+    move => /eqP Hss .
+    move : bs0 bs1 Hss c .
+    apply : seq_ind2 .
+    - rewrite /addB /zext /=; by case => /= .
+    - move => c0 c1 cs0 cs1 Hss IH c .
+      rewrite size_joinlsb (eqP (zext_zeros_bit _ c)) .
+      case c0; case c1; case c .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, false::tl2).2]/(false::tl2)
+                -[(c2, true::tl2).2]/(true::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, false::tl2).2]/(false::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] Hadder2 .
+        rewrite -[(c2, false::tl2).2]/(false::tl2)
+                -[tl2]/((c2, tl2).2) -Hadder2 .
+        move : (IH true) .
+        rewrite /adcB /full_adder => /eqP <- .
+        rewrite {2}/addB /adcB /full_adder .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c3] tl3] Hadder3 .
+        rewrite -[(c3, true::tl3).2]/(true::tl3)
+                -[(c3, tl3).2]/(tl3) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip tl3 (zeros (size cs0 + 1))))
+        => [[c4] tl4] Hadder4 /= .
+        rewrite /addB .
+        have : (size cs0 = size tl3 - 1) .
+        { rewrite -[tl3]/((c3, tl3).2) -Hadder3 size_full_adder_zip .
+          rewrite !size_zext -Hss minnE subKn // .
+          by rewrite addn1 subn1 /= . }
+        case => ->; rewrite (eqP (adcB_carry_bitr _ _)) .
+        * rewrite -{2}[tl3]/((c3, tl3).2) -Hadder3 size_full_adder_zip
+                  !size_zext -Hss minnE subKn // .
+          by rewrite /adcB /full_adder Hadder4 .
+        * by rewrite -[tl3]/((c3,tl3).2) -Hadder3 size_full_adder_zip
+                     minnE subKn !size_zext -Hss !addn1;
+               [ apply lt0n | apply ltnSn ] . 
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, true::tl2).2]/(true::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn leqnn .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] Hadder2 .
+        rewrite -[(c2, false::tl2).2]/(false::tl2)
+                -[tl2]/((c2, tl2).2) -Hadder2 .
+        move : (IH true) .
+        rewrite /adcB /full_adder => /eqP <- .
+        rewrite {2}/addB /adcB /full_adder .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c3] tl3] Hadder3 .
+        rewrite -[(c3, true::tl3).2]/(true::tl3)
+                -[(c3, tl3).2]/(tl3) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip true (zip tl3 (zeros (size cs0 + 1))))
+        => [[c4] tl4] Hadder4 /= .
+        rewrite /addB .
+        have : (size cs0 = size tl3 - 1) .
+        { rewrite -[tl3]/((c3, tl3).2) -Hadder3 size_full_adder_zip .
+          rewrite !size_zext -Hss minnE subKn // .
+          by rewrite addn1 subn1 /= . }
+        case => ->; rewrite (eqP (adcB_carry_bitr _ _)) .
+        * rewrite -{2}[tl3]/((c3, tl3).2) -Hadder3 size_full_adder_zip
+                  !size_zext -Hss minnE subKn // .
+          by rewrite /adcB /full_adder Hadder4 .
+        * by rewrite -[tl3]/((c3,tl3).2) -Hadder3 size_full_adder_zip
+                     minnE subKn !size_zext -Hss !addn1;
+               [ apply lt0n | apply ltnSn ] . 
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, true::tl2).2]/(true::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn leqnn .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, true::tl2).2]/(true::tl2)
+                -[(c2, false::tl2).2]/(false::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn leqnn .
+      + rewrite !zext_cons /addB /adcB .
+        rewrite /full_adder zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip (zext 1 cs0) (zext 1 cs1)))
+        => [[c2] tl2] => Hadder2 .
+        rewrite -[(c2, false::tl2).2]/(false::tl2) .
+        rewrite zip_cons (lock zip) /= -(lock zip) .
+        dcase (full_adder_zip false (zip tl2 (zeros (size cs0 + 1))))
+        => [[c3] tl3] Hadder3 /= .
+        rewrite -[tl3]/((c3, tl3).2) -Hadder3 .
+        rewrite full_adder_zip_B0 unzip1_zip // .
+        rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
+        by rewrite size_full_adder_zip size_zeros !size_zext -Hss
+                   minnE subKn leqnn .
+Qed .
+
+  Lemma addB_addB_adcB c bs0 bs1 :
+    size bs0 == size bs1 ->
+    addB (addB (zext 1 bs0) (zext 1 bs1)) (zext (size bs0) [:: c]) ==
+    joinmsb (adcB c bs0 bs1).2 (adcB c bs0 bs1).1 .
+  Proof .
+    move => Hss .
+    rewrite (eqP (@addB_addB_zext_adcB c bs0 bs1 Hss)) .
+    apply : adcB_zext1_catB (eqP Hss) .
+  Qed .
+
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
