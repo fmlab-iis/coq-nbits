@@ -1,5 +1,5 @@
 
-From Coq Require Import ZArith Arith List.
+From Coq Require Import ZArith Arith Nat List.
 From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq.
 
 Set Implicit Arguments.
@@ -15,7 +15,36 @@ Proof. by case: b. Qed.
 Lemma nat_of_bool1 b : (nat_of_bool b == 1) = (b == true).
 Proof. by case: b. Qed.
 
+Lemma nat_of_bool_is_b2n b : nat_of_bool b = Nat.b2n b.
+Proof. reflexivity. Qed.
 
+
+Lemma negb_eq_negb (b1 b2 : bool) : (~~ b1 = ~~ b2) -> (b1 = b2).
+Proof. by case: b1; case: b2. Qed.
+
+
+Lemma expn_pow n m : n ^ m = Nat.pow n m.
+Proof.
+  elim: m.
+  - reflexivity.
+  - move=> m IH. rewrite expnS (Nat.pow_succ_r _ _ (Nat.le_0_l m)) IH.
+    reflexivity.
+Qed.
+
+Lemma exp2n_gt0 n : (0 < 2 ^ n).
+Proof.
+  elim: n => [| n IH] //=. rewrite -(addn1 n) expnD expn1.
+  apply: (ltn_trans IH). apply: (ltn_Pmulr _ IH). done.
+Qed.
+
+Lemma Nat2Z_inj_pow (n m : nat) :
+  Z.of_nat (Nat.pow n m) = Z.pow (Z.of_nat n) (Z.of_nat m).
+Proof.
+  elim: m n.
+  - reflexivity.
+  - move=> n IH m. rewrite Nat2Z.inj_mul IH -!Zpower_nat_Z -Zpower_nat_succ_r.
+    reflexivity.
+Qed.
 
 Lemma ltn_geq_total n m : (n < m) || (m <= n).
 Proof.
@@ -57,6 +86,35 @@ Proof.
     move/eqP/nat_of_bool_inj: H => H. by rewrite Hn H !eqxx.
   - symmetry. apply/negP => /andP [Hb Hn]. rewrite (eqP Hb) (eqP Hn) eqxx in H.
     discriminate.
+Qed.
+
+Lemma b2n_eq0 (b : bool) (n : nat) : (b + n * 2 = 0) -> (nat_of_bool b = 0) /\ n = 0.
+Proof.
+  rewrite /nat_of_bool. case: b.
+  - move=> H. apply: False_ind.
+    have: (odd (1 + n * 2) = odd 0)%Z by rewrite H.
+    rewrite odd_add. rewrite muln2 odd_double /=. discriminate.
+  - rewrite add0n => /eqP H. rewrite muln_eq0 in H. by case/orP: H => /eqP H.
+Qed.
+
+Lemma b2z_cons (b1 : bool) (n1 : Z) (b2 : bool) (n2 : Z) :
+  (Z.b2z b1 + n1 * 2 = Z.b2z b2 + n2 * 2)%Z -> (b1 = b2) /\ (n1 = n2).
+Proof.
+  move=> H. have: ((Z.b2z b1 + n1 * 2) / 2 = (Z.b2z b2 + n2 * 2) / 2)%Z by rewrite H.
+  rewrite Z_div_plus; last by done. rewrite Z_div_plus; last by done.
+  have: (Z.even (Z.b2z b1 + n1 * 2)%Z = Z.even (Z.b2z b2 + n2 * 2)%Z) by rewrite H.
+  clear H. rewrite (Z.mul_comm n1) (Z.mul_comm n2). rewrite 2!Z.even_add_mul_2. 
+  by case: b1; case: b2.
+Qed.
+
+Lemma b2z_eq0 (b : bool) (n : Z) :
+  (Z.b2z b + n * 2 = 0)%Z -> (Z.b2z b = 0 /\ n = 0)%Z.
+Proof.
+  rewrite /Z.b2z. case: b.
+  - move=> H. apply: False_ind.
+    have: (Z.even (1 + n * 2) = Z.even 0)%Z by rewrite H.
+    rewrite Z.mul_comm Z.even_add_mul_2. discriminate.
+  - rewrite Z.add_0_l => H. by case: (Zmult_integral _ _ H).
 Qed.
 
 Lemma double_gt1 (n : nat) : 0 < n -> 1 < n.*2.
