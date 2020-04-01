@@ -1021,11 +1021,66 @@ Section Lemmas.
   (*---------------------------------------------------------------------------
     Properties of addition
     ---------------------------------------------------------------------------*)
+
+  Lemma zip_cons A B c0 c1 cs0 cs1 :
+    @zip A B (c0::cs0) (c1::cs1) = (c0, c1)::(zip cs0 cs1) .
+  Proof .
+    by rewrite {1}/zip /= -/zip .
+  Qed .
+
+  Lemma full_adder_zip_B0 : forall p n, (full_adder_zip false (zip p (zeros n))).2 = unzip1 (zip p (zeros n)).
+  Proof.
+    elim => [|phd ptl IH] n. by rewrite zip_nil.
+    elim n =>[|ns IH1] /=. done.
+    case phd; case Hfadderz :(full_adder_zip false (zip ptl (zeros ns)))=>[c1 tl];
+                                                                            by rewrite -(IH ns) Hfadderz. 
+  Qed.
+
+  Lemma full_adder_B0 : forall p n, (full_adder false p (zeros n)).2 = unzip1 (zip p (zeros n)).
+  Proof. rewrite /full_adder. exact : full_adder_zip_B0. Qed.
+  
+  Lemma addB0 : forall p n, addB p (zeros n) = unzip1 (zip p (zeros n)).
+  Proof. rewrite /addB. exact : full_adder_B0. Qed.
+
+  Lemma full_adder_zip_B1 : forall p n,
+      (full_adder_zip true (zip p (zeros n))).2 =
+      succB (unzip1 (zip p (zeros n))) .
+  Proof .
+    elim => [ | phd ptl IH] n .
+    - by rewrite zip_nil .
+    - case n => [ | ns ] /=; first done .
+      case phd .
+      + dcase (full_adder_zip true (zip ptl (zeros ns)))
+        => [[c1] tl1] Hadder1 .
+        by rewrite -[(c1, false::tl1).2]/(false::tl1)
+                   -[tl1]/((c1, tl1).2) -Hadder1 IH /= .
+      + dcase (full_adder_zip false (zip ptl (zeros ns)))
+        => [[c1] tl1] Hadder1 .
+        by rewrite -[(c1, true::tl1).2]/(true::(c1,tl1).2) -Hadder1
+           full_adder_zip_B0 .
+  Qed .
+
   Lemma addB1 bs:
     addB bs (from_nat (size bs) 1) = succB bs.
   Proof.
-  Admitted.
-
+    elim : bs .
+    - by rewrite /addB /adcB /= .
+    - move => b bs IH .
+      rewrite size_joinlsb addn1 .
+      rewrite /from_nat /= -/from_nat -zeros_from_nat /joinlsb .
+      rewrite /addB /adcB /full_adder zip_cons (lock zip) /= -(lock zip) .
+      case : b => /= .
+      + dcase (full_adder_zip true (zip bs (zeros (size bs))))
+        => [[c1] tl1] Hadder1 .
+        rewrite -[(c1, false::tl1).2]/(false::(c1, tl1).2) -Hadder1 .
+        rewrite full_adder_zip_B1 unzip1_zip; first done .
+        by rewrite size_zeros .
+      + dcase (full_adder_zip false (zip bs (zeros (size bs))))
+        => [[c1] tl1] Hadder1 .
+        rewrite -[(c1, true::tl1).2]/(true::(c1, tl1).2) - Hadder1 .
+        rewrite full_adder_zip_B0 unzip1_zip; first done .
+        by rewrite size_zeros .
+  Qed .
  
   Lemma size_full_adder : forall p q c, size (full_adder c p q).2 = minn (size p) (size q).
   Proof.
@@ -1042,20 +1097,6 @@ Section Lemmas.
   Proof. intros; rewrite/addB; apply : (size_adcB p q false).
   Qed.
    *)
-
-  Lemma full_adder_zip_B0 : forall p n, (full_adder_zip false (zip p (zeros n))).2 = unzip1 (zip p (zeros n)).
-  Proof.
-    elim => [|phd ptl IH] n. by rewrite zip_nil.
-    elim n =>[|ns IH1] /=. done.
-    case phd; case Hfadderz :(full_adder_zip false (zip ptl (zeros ns)))=>[c1 tl];
-                                                                            by rewrite -(IH ns) Hfadderz. 
-  Qed.
-
-  Lemma full_adder_B0 : forall p n, (full_adder false p (zeros n)).2 = unzip1 (zip p (zeros n)).
-  Proof. rewrite /full_adder. exact : full_adder_zip_B0. Qed.
-  
-  Lemma addB0 : forall p n, addB p (zeros n) = unzip1 (zip p (zeros n)).
-  Proof. rewrite /addB. exact : full_adder_B0. Qed.
 
   Lemma bool_adderC c : commutative (bool_adder c).
   Proof. by (case ; case).
@@ -1075,15 +1116,498 @@ Section Lemmas.
   Proof. exact :full_adderC.
   Qed.
 
-  Lemma addBA : associative (@addB).
-  Proof.
-  Admitted.
-
-
   Lemma addBC : commutative (addB).
   Proof.
-  Admitted.
+    rewrite /commutative /addB .
+    move => x y; by rewrite (adcBC false x y) .
+  Qed .
 
+  Ltac dcase_full_adder_zip c xs ys :=
+    let Hc := fresh "c" in
+    let Htl := fresh "tl" in
+    let Hadder := fresh "Hadder" in                
+    dcase (full_adder_zip c (zip xs ys)) => [[Hc] Htl] Hadder .
+
+  Lemma full_adderA : forall x y z b c,
+    ((full_adder b x (full_adder c y z).2).2 ==
+     (full_adder b (full_adder c x y).2 z).2) &&
+    ((full_adder b x (full_adder c y z).2).2 ==
+     (full_adder c (full_adder b x y).2 z).2) .
+  Proof .
+    elim .
+    - move => y z b c; by rewrite /full_adder !zip_nil .
+    - move => x xs IH; case .
+      + move => z b c; by rewrite /full_adder !zip_nil !zip_nil_r .
+      + move => y ys; case .
+        * move => b c; by rewrite /full_adder !zip_nil_r .
+          move => z zs .
+          case z; case y; case x; case; case; 
+          rewrite /full_adder !zip_cons (lock zip) /= -(lock zip) .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, true::tl).2]/(true::(c,tl).2)
+                  -[(c0, true::tl0).2]/(true::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, false::tl).2]/(false::(c,tl).2)
+                  -[(c0, false::tl0).2]/(false::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, true::tl).2]/(true::(c,tl).2)
+                  -[(c0, true::tl0).2]/(true::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, false::tl).2]/(false::(c,tl).2)
+                  -[(c0, false::tl0).2]/(false::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, true::tl).2]/(true::(c,tl).2)
+                  -[(c0, false::tl0).2]/(false::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip false xs ys .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, false::tl).2]/(false::(c,tl).2)
+                  -[(c0, true::tl0).2]/(true::(c0,tl0).2)
+                  -[(c1, false::tl1).2]/(false::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          dcase_full_adder_zip false tl1 zs .
+          move : (IH ys zs false true) => /andP [/eqP Heq0 /eqP Heq1];
+            move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1)
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, true::tl).2]/(true::(c,tl).2)
+                  -[(c0, false::tl0).2]/(false::(c0,tl0).2)
+                  -[(c1, true::tl1).2]/(true::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          dcase_full_adder_zip true tl1 zs .
+          move : (IH ys zs false true) => /andP [/eqP Heq0 /eqP Heq1];
+            move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1)
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, false::tl).2]/(false::(c,tl).2)
+                  -[(c0, true::tl0).2]/(true::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs false true) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, false::tl).2]/(false::(c,tl).2)
+                  -[(c0, false::tl0).2]/(false::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, true::tl).2]/(true::(c,tl).2)
+                  -[(c0, true::tl0).2]/(true::(c0,tl0).2)
+                  -[(c1, false::tl1).2]/(false::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          dcase_full_adder_zip false tl1 zs .
+          move : (IH ys zs true false)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2)
+                  -[(c1, _::tl1).2]/(_::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          dcase_full_adder_zip true tl1 zs .
+          move : (IH ys zs false true)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs false true) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs false true) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs true false) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs true false) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false true) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2)
+                  -[(c1, _::tl1).2]/(_::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          dcase_full_adder_zip false tl1 zs .
+          move : (IH ys zs true false)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip true ys zs .
+          dcase_full_adder_zip true xs ys .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2)
+                  -[(c1, _::tl1).2]/(_::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          dcase_full_adder_zip true tl1 zs .
+          move : (IH ys zs false true)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs true false) => /andP [_ /eqP Heq]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          dcase_full_adder_zip true xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2)
+                  -[(c1, _::tl1).2]/(_::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          dcase_full_adder_zip false tl1 zs .
+          move : (IH ys zs true false)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip true xs ys .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2)
+                  -[(c1, _::tl1).2]/(_::(c1,tl1).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          dcase_full_adder_zip true tl1 zs .
+          move : (IH ys zs true false)
+          => /andP [/eqP Heq0 /eqP Heq1]; move : Heq0 Heq1 .
+          rewrite /full_adder Hadder Hadder0 Hadder1 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+                  -[(c1, tl1).2]/(tl1) 
+             Hadder2 Hadder3 Hadder4 /= => <- <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip true xs tl .
+          dcase_full_adder_zip true tl0 zs .
+          move : (IH ys zs true false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+          
+          dcase_full_adder_zip false ys zs .
+          dcase_full_adder_zip false xs ys .
+          rewrite -[(c, _::tl).2]/(_::(c,tl).2)
+                  -[(c0, _::tl0).2]/(_::(c0,tl0).2) .
+          rewrite !zip_cons (lock zip) /= -(lock zip) .
+          dcase_full_adder_zip false xs tl .
+          dcase_full_adder_zip false tl0 zs .
+          move : (IH ys zs false false) => /andP [/eqP Heq _]; move : Heq .
+          rewrite /full_adder Hadder Hadder0 .
+          rewrite -[(c, tl).2]/(tl) -[(c0,tl0).2]/(tl0)
+             Hadder1 Hadder2 /= => <- .
+          apply /andP; done .
+  Qed .
+          
+  Lemma addBA : associative (@addB).
+  Proof.
+    rewrite /associative /addB /adcB => x y z .
+    move : (@full_adderA x y z false false) => /andP [_ /eqP Heq] .
+    done .
+  Qed .
+  
   Lemma full_adder_zip_0_l : forall p n, (full_adder_zip false (zip (zeros n) p)).2 = unzip2 (zip (zeros n) p).
   Proof.
     intros. generalize dependent p. elim n => [|ns IH] p/=.
@@ -1263,12 +1787,6 @@ Section Lemmas.
       by rewrite /zext /zeros /= .
   Qed .
 
-  Lemma zip_cons A B c0 c1 cs0 cs1 :
-    @zip A B (c0::cs0) (c1::cs1) = (c0, c1)::(zip cs0 cs1) .
-  Proof .
-    by rewrite {1}/zip /= -/zip .
-  Qed .
-
   Lemma adcB_carry_bitr_zext c bs :
     adcB false (zext 1 bs) (zext (size bs) [:: c]) ==
     adcB c (zext 1 bs) (zeros (size bs + 1)) .
@@ -1442,7 +1960,7 @@ Section Lemmas.
         rewrite -[tl2]/((c2, tl2).2) -Hadder2 .
         by rewrite size_full_adder_zip size_zeros !size_zext -Hss
                    minnE subKn leqnn .
-Qed .
+  Qed .
 
   Lemma addB_addB_adcB c bs0 bs1 :
     size bs0 == size bs1 ->
