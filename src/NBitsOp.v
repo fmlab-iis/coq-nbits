@@ -1821,10 +1821,97 @@ Section Lemmas.
     Properties of subtraction
   ---------------------------------------------------------------------------*)
 
-  Lemma subB_equiv_addB_negB (p q : bits) : subB p q = addB p (negB q).
-  Proof.
-  Admitted.
+  Lemma invB_cons p ps :
+    invB (p::ps) == (~~ p)::(invB ps) .
+  Proof .
+    by case p => /= .
+  Qed .
 
+  Lemma succB0 bs : succB (b0 :: bs) == b1 :: bs .
+  Proof .
+    by rewrite /succB .
+  Qed .
+
+  Lemma succB1 bs : succB (b1 :: bs) == b0 :: (succB bs) .
+  Proof .
+    by rewrite /succB .
+  Qed .
+
+  Lemma full_adder_zip_succB bs0 bs1 :
+    size bs0 == size bs1 ->
+    (full_adder_zip false (zip bs0 (succB (~~# bs1)))).2 ==
+    (full_adder_zip  true (zip bs0 (~~# bs1))).2 .
+  Proof .
+    move => /eqP Hszeq .
+    move : bs0 bs1 Hszeq .
+    apply : seq_ind2 .
+    - by rewrite !zip_nil .
+    - move => c0 c1 cs0 cs1 Hsz IH .
+      case c0; case c1; rewrite (eqP (@invB_cons _ _));
+      [ rewrite (eqP (@succB0 _))
+      | rewrite (eqP (@succB1 _))
+      | rewrite (eqP (@succB0 _))
+      | rewrite (eqP (@succB1 _)) ] .
+    - by rewrite !zip_cons (lock zip) /= -(lock zip) .
+    - rewrite !zip_cons (lock zip) /= -(lock zip) .
+      dcase (full_adder_zip false (zip cs0 (succB (~~# cs1))))
+      => [[d0] tl0] => Hadder0 .
+      dcase (full_adder_zip true (zip cs0 (~~# cs1)))
+      => [[d1] tl1] => Hadder1 .
+      by rewrite -[(d0, _::tl0).2]/(_::(d0,tl0).2)
+                 -[(d1, _::tl1).2]/(_::(d1,tl1).2)
+                 -Hadder0 -Hadder1 -(eqP IH) .
+    - by rewrite !zip_cons (lock zip) /= -(lock zip) .
+    - rewrite !zip_cons (lock zip) /= -(lock zip) .
+      dcase (full_adder_zip false (zip cs0 (succB (~~# cs1))))
+      => [[d0] tl0] Hadder0 .
+      dcase (full_adder_zip true (zip cs0 (~~# cs1)))
+      => [[d1] tl1] Hadder1 .
+      by rewrite -[(d0, _::tl0).2]/(_::(d0,tl0).2)
+                 -[(d1, _::tl1).2]/(_::(d1,tl1).2)
+                 -Hadder0 -Hadder1 -(eqP IH) .
+  Qed .      
+      
+  Lemma subB_equiv_addB_negB (p q : bits) :
+    size p == size q -> subB p q == addB p (negB q).
+  Proof.
+    move => /eqP Hszeq .
+    move : p q Hszeq .
+    apply : seq_ind2 .
+    - by rewrite /subB /addB /negB /sbbB /adcB /full_adder !zip_nil_r .
+    - move => p q ps qs Hsz IH .
+      rewrite /subB /sbbB /addB /adcB /negB /full_adder;
+        case p; case q;
+        rewrite !(eqP (@invB_cons _ _));
+        [ rewrite (eqP (@succB0 _))
+        | rewrite (eqP (@succB1 _))
+        | rewrite (eqP (@succB0 _))
+        | rewrite (eqP (@succB1 _)) ];
+        rewrite !zip_cons (lock zip) /= -(lock zip) .
+      + dcase (full_adder_zip true (zip ps (~~# qs)))
+        => [[c0] res0] => Hadder0 .
+        by rewrite -![(_, _::res0).2]/(_::res0) .
+      + dcase (full_adder_zip true (zip ps (~~# qs)))
+        => [[c0] res0] => Hadder0 .
+        dcase (full_adder_zip false (zip ps (succB (~~# qs))))
+        => [[c1] res1] => Hadder1 .
+        rewrite -![(_,_::_).2]/(_::_)
+                -[res0]/((c0, res0).2) -[res1]/((c1, res1).2)
+                -Hadder0 -Hadder1 -(eqP (@full_adder_zip_succB _ _ _));
+          [ done | by rewrite Hsz ] .
+      + dcase (full_adder_zip false (zip ps (~~# qs)))
+        => [[c0] res0] => Hadder0 .
+        by rewrite -![(_, _::res0).2]/(_::res0) .
+      + dcase (full_adder_zip true (zip ps (~~# qs)))
+        => [[c0] res0] => Hadder0 .
+        dcase (full_adder_zip false (zip ps (succB (~~# qs))))
+        => [[c1] res1] => Hadder1 .
+        rewrite -![(_,_::_).2]/(_::_)
+                -[res0]/((c0, res0).2) -[res1]/((c1, res1).2)
+                -Hadder0 -Hadder1 -(eqP (@full_adder_zip_succB _ _ _));
+          [ done | by rewrite Hsz ] .
+  Qed .
+  
   Lemma ltB_borrow_subB bs1 bs2:
     size bs1 = size bs2 ->
     (ltB bs1 bs2 <-> borrow_subB bs1 bs2).
@@ -1858,24 +1945,52 @@ Section Lemmas.
     - apply (ltB_borrow_subB Hs) in Hcarry. by rewrite Hcarry in Hlt.
   Qed.
 
-  Lemma subB_is_dropmsb_adcB_invB (p q: bits) : subB p q = dropmsb (adcB true p (invB q)).2.
-  Proof. 
+  (* to be removed?
+  Lemma subB_is_dropmsb_adcB_invB p q :
+    size p == size q -> 
+    subB p q == dropmsb (adcB true p (invB q)).2 .
+  Proof .
   Admitted.
-
+   *)
+  
   Lemma sub0B : forall m, subB (zeros (size m)) m = negB m.
   Proof.
-    elim => [|mhd mtl IH]/=. done.
-    case mhd. rewrite/subB/sbbB/adcB/full_adder/=.
-    case Hfaddzf : (full_adder_zip false (zip (zeros (size mtl)) (~~# mtl)%bits))=>[c res]/=.
-    have -> : res = (full_adder_zip false (zip (zeros (size mtl)) (~~# mtl)%bits)).2
-      by rewrite Hfaddzf.
-    rewrite full_adder_zip_0_l unzip2_zip ; last by rewrite size_zeros size_invB. 
-  Admitted.
+    move => bs .
+    have : (size (zeros (size bs)) == size bs) .
+    { by rewrite size_zeros . }
+    move => Hszeq .
+    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
+    rewrite add0B unzip2_zip // .
+    by rewrite size_negB size_zeros .
+  Qed .
+
+  Lemma succB_ones_zeros n : succB (ones n) == zeros n .
+  Proof .
+    elim n .
+    - done .
+    - move => m IH .
+      by rewrite -ones_cons -zeros_cons (eqP (@succB1 _)) (eqP IH) .
+  Qed .      
+
+  Lemma negB_zeros n : -# (zeros n) == zeros n .
+  Proof .
+    elim n .
+    - done .
+    - move => m IH .
+      rewrite /negB -zeros_cons (eqP (@invB_cons _ _)) .
+      by rewrite (eqP (@succB1 _)) invB_zeros (eqP (@succB_ones_zeros _)) .
+  Qed .
   
-  Lemma subB0: forall m n, subB m (zeros n) = m.
+  Lemma subB0: forall m, subB m (zeros (size m)) = m .
   Proof.
-  Admitted.
-  
+    move => bs .
+    have : (size bs == size (zeros (size bs))) .
+    { by rewrite size_zeros . }
+    move => Hszeq .
+    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
+    rewrite (eqP (@negB_zeros _)) addB0 unzip1_zip // .
+    by rewrite size_zeros .
+  Qed .
 
   (*---------------------------------------------------------------------------
     Properties of multiplication
