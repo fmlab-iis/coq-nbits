@@ -46,6 +46,10 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma Nat2Z_inj_expn (n m : nat) :
+  Z.of_nat (n ^ m) = Z.pow (Z.of_nat n) (Z.of_nat m).
+Proof. rewrite expn_pow. exact: Nat2Z_inj_pow. Qed.
+
 Lemma ltn_geq_total n m : (n < m) || (m <= n).
 Proof.
   case/orP: (leq_total n m).

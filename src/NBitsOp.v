@@ -207,8 +207,6 @@ Section Ops.
                 else b1::(predB tl)
     end.
 
-  Definition invB (bs : bits) : bits := map (fun b => ~~ b) bs.
-
   Definition andB (bs1 bs2 : bits) : bits := lift0 andb bs1 bs2.
 
   Definition orB (bs1 bs2 : bits) : bits := lift0 orb bs1 bs2.
@@ -509,9 +507,6 @@ Section Lemmas.
 
   Lemma size_shlB n bs : size (shlB n bs) = size bs.
   Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shlB1 IH. Qed.
-
-  Lemma size_invB bs : size (invB bs)%bits = size bs.
-  Proof. elim: bs => [| b bs IH] //=. by rewrite IH. Qed.
   
   Lemma size_negB bs : size (negB bs)%bits = size bs.
   Proof.
@@ -553,24 +548,6 @@ Section Lemmas.
       + rewrite size_sext addnBA; first auto with * .
         rewrite leqNgt Hlt // .
   Qed .
-
-  (* Lemmas about invB *)
-
-  Lemma invB_zeros n : invB (zeros n) = ones n.
-  Proof.
-    elim: n => // n IH. by rewrite -zeros_cons -ones_cons /= IH.
-  Qed.
-
-  Lemma invB_ones n : invB (ones n) = zeros n.
-  Proof.
-    elim: n => // n IH. by rewrite -zeros_cons -ones_cons /= IH.
-  Qed.
-
-  Lemma invB_involutive bs : invB (invB bs) = bs.
-  Proof.
-    elim: bs => [| b bs IH] //=. rewrite IH. rewrite Bool.negb_involutive.
-    reflexivity.
-  Qed.
 
   (******************** Free Region Begin ********************)
 
@@ -2891,5 +2868,324 @@ Section Lemmas.
       rewrite to_nat_mulB to_nat_from_nat.
   Admitted.
       
+
+  (* Lemmas used in coq-cryptoline *)
+
+  Lemma bv2z_shl_unsigned bs n :
+    high n bs == zeros n ->
+    to_Zpos (bs <<# n)%bits = (to_Zpos bs * 2 ^ Z.of_nat n)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_shl_signed bs n :
+    (high (n + 1) bs == zeros n) || (high (n + 1) bs == ones n) ->
+    to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cshl_unsigned bsh bsl n :
+    size bsh = size bsl ->
+    high n (bsh ++ bsl) == zeros n ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
+     to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
+     2 ^ Z.of_nat (size bsl - n))%Z =
+    (to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cshl_signed bsh bsl n :
+    size bsh = size bsl ->
+    (high (n + 1) (bsh ++ bsl) == zeros n) || (high (n + 1) (bsh ++ bsl) == ones n) ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
+     to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
+     2 ^ Z.of_nat (size bsl - n))%Z =
+    (to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_not_unsigned bs :
+    to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_not_signed bs :
+    to_Z (~~# bs)%bits = (- to_Z bs - Z.one)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_add_unsigned bs1 bs2 :
+    size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
+    to_Zpos (bs1 +# bs2)%bits = (to_Zpos bs1 + to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_add_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Saddo bs1 bs2 ->
+    to_Z (bs1 +# bs2)%bits = (to_Z bs1 + to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adds_unsigned bs1 bs2 :
+    size bs1 = size bs2 ->
+    (to_Zpos (bs1 +# bs2)%bits +
+     odd (carry_addB bs1 bs2) * 2 ^ Z.of_nat (size bs1))%Z =
+    (to_Zpos bs1 + to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adds_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Saddo bs1 bs2 ->
+    to_Z (bs1 +# bs2)%bits = (to_Z bs1 + to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adc_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ carry_addB bs1 bs2 && ~~ carry_addB (bs1 +# bs2)%bits bsc ->
+    to_Zpos (adcB (to_bool bsc) bs1 bs2).2 =
+    (to_Zpos bs1 + to_Zpos bs2 + to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adc_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Saddo bs1 bs2 && ~~ Saddo (bs1 +# bs2)%bits bsc ->
+    to_Z (adcB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 + to_Z bs2 + to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adcs_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    (to_Zpos (adcB (to_bool bsc) bs1 bs2).2 +
+     odd (adcB (to_bool bsc) bs1 bs2).1 * 2 ^ Z.of_nat (size bs1))%Z =
+    (to_Zpos bs1 + to_Zpos bs2 + to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_adcs_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Saddo bs1 bs2 && ~~ Saddo (bs1 +# bs2)%bits bsc ->
+    to_Z (adcB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 + to_Z bs2 + to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sub_unsigned bs1 bs2 :
+    size bs1 = size bs2 -> ~~ borrow_subB bs1 bs2 ->
+    to_Zpos (bs1 -# bs2)%bits = (to_Zpos bs1 - to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sub_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Ssubo bs1 bs2 ->
+    to_Z (bs1 -# bs2)%bits = (to_Z bs1 - to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_subc_unsigned bs1 bs2 :
+    size bs1 = size bs2 ->
+    (to_Zpos bs1 - to_Zpos bs2 +
+     (1 - odd (carry_addB bs1 (-# bs2)%bits)) * 2 ^ Z.of_nat (size bs1))%Z =
+    to_Zpos (bs1 +# -# bs2)%bits.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_subc_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Ssubo bs1 bs2 ->
+    to_Z (bs1 +# -# bs2)%bits = (to_Z bs1 - to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_subb_unsigned bs1 bs2 :
+    size bs1 = size bs2 ->
+    (to_Zpos bs1 - to_Zpos bs2 +
+     odd (borrow_subB bs1 bs2) * 2 ^ Z.of_nat (size bs1))%Z =
+    to_Zpos (bs1 -# bs2)%bits.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_subb_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Ssubo bs1 bs2 ->
+    to_Z (bs1 -# bs2)%bits = (to_Z bs1 - to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbc_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ borrow_subB bs1 bs2 && ~~ borrow_subB (bs1 -# bs2)%bits ([:: b1] -# bsc)%bits ->
+    to_Zpos (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2 =
+    (to_Zpos bs1 - to_Zpos bs2 - (1 - to_Zpos bsc))%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbc_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Ssubo bs1 bs2 && ~~ Ssubo (bs1 -# bs2)%bits ([:: b1] -# bsc)%bits ->
+    to_Z (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2 =
+    (to_Z bs1 - to_Z bs2 - (1 - to_Zpos bsc))%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbcs_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    (to_Zpos bs1 - to_Zpos bs2 - (1 - to_Zpos bsc) +
+     (1 - odd (adcB (to_bool bsc) bs1 (~~# bs2)%bits).1) * 2 ^ Z.of_nat (size bs1))%Z =
+    to_Zpos (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbcs_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Ssubo bs1 bs2 && ~~ Ssubo (bs1 -# bs2)%bits ([:: b1] -# bsc)%bits ->
+    to_Z (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2 =
+    (to_Z bs1 - to_Z bs2 - (1 - to_Zpos bsc))%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbb_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ borrow_subB bs1 bs2 && ~~ borrow_subB (bs1 -# bs2)%bits bsc ->
+    to_Zpos (sbbB (to_bool bsc) bs1 bs2).2 =
+    (to_Zpos bs1 - to_Zpos bs2 - (1 - to_Zpos bsc))%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbb_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Ssubo bs1 bs2 && ~~ Ssubo (bs1 -# bs2)%bits bsc ->
+    to_Z (sbbB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 - to_Z bs2 - (1 - to_Zpos bsc))%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbbs_unsigned bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    (to_Zpos (sbbB (to_bool bsc) bs1 bs2).2 +
+     - odd (sbbB (to_bool bsc) bs1 bs2).1 * 2 ^ Z.of_nat (size bs1))%Z =
+    (to_Zpos bs1 - to_Zpos bs2 - to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_sbbs_signed bs1 bs2 bsc :
+    size bs1 = size bs2 -> size bsc = 1 ->
+    ~~ Ssubo bs1 bs2 && ~~ Ssubo (bs1 -# bs2)%bits bsc ->
+    to_Z (sbbB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 - to_Z bs2 - to_Zpos bsc)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mul_unsigned bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Umulo bs1 bs2 ->
+    to_Zpos (bs1 *# bs2)%bits = (to_Zpos bs1 * to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mul_signed bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Smulo bs1 bs2 ->
+    to_Z (bs1 *# bs2)%bits = (to_Z bs1 * to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mull_unsigned bs1 bs2 :
+    size bs1 = size bs2 ->
+    (to_Zpos (low (size bs2) (full_mul bs1 bs2)) +
+     to_Zpos (high (size bs1) (full_mul bs1 bs2)) * 2 ^ Z.of_nat (size bs2))%Z =
+    (to_Zpos bs1 * to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mull_signed bs1 bs2 :
+    size bs1 = size bs2 ->
+    (to_Zpos (low (size bs2) (full_mul bs1 bs2)) +
+     to_Z (high (size bs1) (full_mul bs1 bs2)) * 2 ^ Z.of_nat (size bs2))%Z =
+    (to_Z bs1 * to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mulj_unsigned bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_Zpos (full_mul bs1 bs2) = (to_Zpos bs1 * to_Zpos bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_mulj_signed bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_Z (full_mul bs1 bs2) = (to_Z bs1 * to_Z bs2)%Z.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_split_unsigned bs n :
+    (to_Zpos (bs <<# (size bs - n) >># (size bs - n))%bits +
+     to_Zpos (bs >># n)%bits * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_split_signed bs n :
+    (to_Zpos (bs <<# (size bs - n) >># (size bs - n))%bits +
+     to_Z (sarB n bs) * 2 ^ Z.of_nat n)%Z = to_Z bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_uuu bs n :
+    size bs < n -> to_Zpos (zext (n - size bs) bs) = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_duu bs n q r  :
+    n < size bs -> Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat n) = (q, r) ->
+    (to_Zpos (low n bs) + q * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_usu_eq bs q r :
+    Z.div_eucl (to_Z bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
+    (to_Z bs + - q * 2 ^ Z.of_nat (size bs))%Z = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_usu_gt bs n q r :
+    size bs < n ->
+    Z.div_eucl (to_Z bs) (2 ^ Z.of_nat n) = (q, r) ->
+    (to_Z bs + - q * 2 ^ Z.of_nat n)%Z = to_Zpos (sext (n - size bs) bs).
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_dsu bs n q r :
+    n < size bs ->
+    Z.div_eucl (to_Z bs) (2 ^ Z.of_nat n) = (q, r) ->
+    (to_Zpos (low n bs) + q * 2 ^ Z.of_nat n)%Z = to_Z bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_uus bs n :
+    size bs < n ->  to_Z (zext (n - size bs) bs) = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_dus_eq bs q r q' r' :
+    Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
+    Z.div_eucl r (2 ^ (Z.of_nat (size bs) - 1)) = (q', r') ->
+    (to_Z bs + (q + q') * 2 ^ Z.of_nat (size bs))%Z = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_dus_lt bs n q r q' r' :
+    n < size bs ->
+    Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat n) = (q, r) ->
+    Z.div_eucl r (2 ^ (Z.of_nat n - 1)) = (q', r') ->
+    (to_Z (low n bs) + (q + q') * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_uss bs n :
+    size bs < n ->
+    to_Z (sext (n - size bs) bs) = to_Z bs.
+  Proof.
+  Admitted.
+
+  Lemma bv2z_cast_dss bs n q r q' r' :
+    n < size bs ->
+    Z.div_eucl (to_Z bs) (2 ^ Z.of_nat n) = (q, r) ->
+    Z.div_eucl r (2 ^ (Z.of_nat n - 1)) = (q', r') ->
+    (to_Z (low n bs) + (q + q') * 2 ^ Z.of_nat n)%Z = to_Z bs.
+  Proof.
+  Admitted.
 
 End Lemmas.
