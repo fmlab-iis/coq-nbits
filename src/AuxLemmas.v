@@ -79,6 +79,11 @@ Proof.
     exact: (subKn H).
 Qed.
 
+Lemma subn_addn_leq a b c : a <= b -> b <= c -> c - b + a <= c.
+Proof.
+  move=> H1 H2. rewrite (addnBAC _ H2). move: (subnK H1) => H.
+  rewrite -H. rewrite subnDr. exact: leq_subr.
+Qed.
 
 
 Lemma b2n_cons (b1 : bool) (n1 : nat) (b2 : bool) (n2 : nat) :
@@ -186,3 +191,123 @@ Proof.
     + move/negP/negP: H1 => H1. move/negP/negP: H2. rewrite -leqNgt => H2.
       exact: (b2n_high_geq_nltn2 _ H2 H1).
 Qed.
+
+
+Section SeqLemmas.
+
+  Variable A : Type.
+
+  Lemma drop_take (s : seq A) n m :
+    n <= m -> m < size s -> drop (m - n) (take m s) = take n (drop (m - n) s).
+  Proof.
+    elim: s n m => [| x s IH] n m Hnm Hms //. rewrite /= in Hms.
+    case: m Hnm Hms.
+    - rewrite leqn0 => /eqP ->. rewrite subnn drop0 take0. reflexivity.
+    - move=> m Hnm Hms. rewrite -(addn1 m) -(addn1 (size s)) ltn_add2r in Hms.
+      rewrite leq_eqVlt in Hnm. case/orP: Hnm => Hnm.
+      + rewrite (eqP Hnm) subnn !drop0. reflexivity.
+      + rewrite ltnS in Hnm. rewrite take_cons. rewrite !(subSn Hnm) !drop_cons.
+        exact: (IH _ _ Hnm Hms).
+  Qed.
+
+  Lemma take_take (s : seq A) (n m : nat) : take n (take m s) = take (minn n m) s.
+  Proof.
+    elim: s n m => [| x s IH] n m //.
+    case: m => [| m] //. case: n => [| n] //. rewrite minnSS.
+    rewrite !take_cons. rewrite IH. reflexivity.
+  Qed.
+
+  Lemma nseq_addn (x : A) n m : nseq (n + m) x = nseq n x ++ nseq m x.
+  Proof.
+    elim: n m => [| n IHn] m //=. rewrite IHn. reflexivity.
+  Qed.
+
+  Lemma drop_nseq (x : A) n m : drop n (nseq m x) = nseq (m - n) x.
+  Proof.
+    case Hnm: (m <= n).
+    - rewrite -{1}(subnK Hnm). rewrite -drop_drop.
+      have Hm: m = size (nseq m x) by rewrite size_nseq.
+      rewrite {2}Hm. rewrite drop_size /=. rewrite -subn_eq0 in Hnm.
+      rewrite (eqP Hnm) /=. reflexivity.
+    - move/idP/negP: Hnm. rewrite -ltnNge => Hnm. move: (subnK (ltnW Hnm)) => H.
+      rewrite -{1}H. rewrite addnC nseq_addn.
+      rewrite drop_size_cat; last by rewrite size_nseq. reflexivity.
+  Qed.
+
+  Lemma take_nseq (x : A) n m : take n (nseq m x) = nseq (minn n m) x.
+  Proof.
+    case Hnm: (n <= m).
+    - move/minn_idPl: (Hnm) => ->. move: (subnK Hnm) => <-.
+      rewrite addnC nseq_addn. rewrite take_size_cat; last by rewrite size_nseq.
+      reflexivity.
+    - move/idP/negP: Hnm. rewrite -ltnNge => Hnm.
+      move/minn_idPr: (ltnW Hnm) => ->. rewrite take_oversize; first by reflexivity.
+      rewrite size_nseq. exact: (ltnW Hnm).
+  Qed.
+
+  Lemma drop_nseq_more (s : seq A) (x : A) n m :
+    n <= m -> drop n s = nseq (size s - n) x -> drop m s = nseq (size s - m) x.
+  Proof.
+    move=> Hmn Hdn. move: (subnK Hmn) => H. rewrite -{1}H.
+    rewrite -drop_drop. rewrite Hdn. rewrite drop_nseq. rewrite -subnDA.
+    rewrite addnC H. reflexivity.
+  Qed.
+
+  Lemma take_nseq_less_minn (s : seq A) (x : A) n m :
+    m <= n -> take n s = nseq (minn n (size s)) x ->
+    take m s = nseq (minn m (size s)) x.
+  Proof.
+    move=> Hmn. case Hns: (n <= size s).
+    - move/minn_idPl: (Hns) => ->. move/minn_idPl: (leq_trans Hmn Hns) => ->.
+      elim: s n m Hmn Hns => [| e s IH] n m Hmn Hns.
+      + rewrite leqn0 in Hns. rewrite (eqP Hns) in Hmn.
+        rewrite leqn0 in Hmn. rewrite (eqP Hmn). reflexivity.
+      + case: n Hmn Hns => [| n] Hmn Hns.
+        * rewrite leqn0 in Hmn. rewrite (eqP Hmn). reflexivity.
+        * case: m Hmn => [| m] Hmn.
+          -- reflexivity.
+          -- rewrite /= !ltnS in Hmn Hns. rewrite !take_cons.
+             rewrite -(addn1 n) -(addn1 m). rewrite (addnC n) (addnC m).
+             rewrite !nseq_addn /=. case => -> H.
+             rewrite (IH _ _ Hmn Hns H). reflexivity.
+    - move/idP/negP: Hns. rewrite -ltnNge => Hsn. move/minn_idPr: (ltnW Hsn) => ->.
+      rewrite (take_oversize (ltnW Hsn)). move=> ->. rewrite size_nseq.
+      case Hms: (m <= size s).
+      + rewrite take_nseq. move/minn_idPl: (Hms) => ->. reflexivity.
+      + move/idP/negP: Hms. rewrite -ltnNge => Hsm. move/minn_idPr: (ltnW Hsm) => ->.
+        rewrite take_oversize; first reflexivity.
+        rewrite size_nseq. exact: (ltnW Hsm).
+  Qed.
+
+  Lemma take_nseq_less (s : seq A) (x : A) n m :
+    m <= n -> n <= size s -> take n s = nseq n x -> take m s = nseq m x.
+  Proof.
+    move=> Hmn Hns. move/minn_idPl: (leq_trans Hmn Hns) => {2}<-.
+    move/minn_idPl: (Hns) => {2}<-. exact: (take_nseq_less_minn Hmn).
+  Qed.
+
+End SeqLemmas.
+
+Section EqSeqLemmas.
+
+  Variable A : eqType.
+
+  Lemma cat_nseql (x : A) s1 s2 n :
+    s1 ++ s2 = nseq n x -> s1 = nseq (size s1) x.
+  Proof.
+    move=> H. have: size (s1 ++ s2) = size (nseq n x) by rewrite H.
+    rewrite size_cat size_nseq => Hn. rewrite -Hn in H.
+    rewrite nseq_addn in H. move/eqP: H. rewrite eqseq_cat; last by rewrite size_nseq.
+    move/andP=> [/eqP <- _]. reflexivity.
+  Qed.
+
+  Lemma cat_nseqr (x : A) s1 s2 n :
+    s1 ++ s2 = nseq n x -> s2 = nseq (size s2) x.
+  Proof.
+    move=> H. have: size (s1 ++ s2) = size (nseq n x) by rewrite H.
+    rewrite size_cat size_nseq => Hn. rewrite -Hn in H.
+    rewrite nseq_addn in H. move/eqP: H. rewrite eqseq_cat; last by rewrite size_nseq.
+    move/andP=> [_ /eqP <-]. reflexivity.
+  Qed.
+
+End EqSeqLemmas.

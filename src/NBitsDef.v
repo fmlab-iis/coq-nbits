@@ -7,7 +7,6 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Import Prenex Implicits.
 
-
 Section Split.
 
   Context (A : Type).
@@ -405,7 +404,7 @@ Section Lemmas.
 
   Lemma copy_rcons (b : bool) n : rcons (copy n b) b = copy (n.+1) b.
   Proof.
-    elim: n => [| n IH] //=. rewrite IH. rewrite copy_cons. reflexivity.    
+    elim: n => [| n IH] //=. rewrite IH. rewrite copy_cons. reflexivity.
   Qed.
 
 
@@ -480,6 +479,16 @@ Section Lemmas.
 
   Lemma lsb_ones n : 0 < n -> lsb (ones n) = b1.
   Proof. by case: n. Qed.
+
+  Lemma drop_zeros n m : m <= n -> drop (n - m) (zeros n) = zeros m.
+  Proof.
+    elim: n m => [| n IH] m Hmn.
+    - rewrite sub0n drop0. rewrite leqn0 in Hmn. by rewrite (eqP Hmn).
+    - rewrite leq_eqVlt in Hmn. case/orP: Hmn => Hmn.
+      + rewrite -(eqP Hmn) subnn drop0. reflexivity.
+        rewrite ltnS in Hmn. rewrite (subSn Hmn). rewrite -zeros_cons.
+        rewrite drop_cons. exact: (IH _ Hmn).
+  Qed.
 
 
   (* from_bool *)
@@ -689,6 +698,74 @@ Section Lemmas.
       rewrite high_zeros. reflexivity.
   Qed.
 
+  Lemma high_low bs n m :
+    n <= m -> m <= size bs ->
+    high n (low m bs) = low n (high (size bs - m + n) bs).
+  Proof.
+    move=> Hn Hm. rewrite leq_eqVlt in Hm. case/orP: Hm => Hm.
+    - rewrite (eqP Hm). rewrite low_size subnn add0n.
+      have H: (n = size (high n bs)) by rewrite size_high.
+      rewrite {2}H. rewrite low_size. reflexivity.
+    - rewrite /high /low. rewrite !size_cat size_take size_drop !size_zeros.
+      rewrite Hm. move: (ltnW Hm). rewrite -subn_eq0. move/eqP=> Hms. rewrite Hms /=.
+      rewrite addn0 cats0. rewrite subnDA (subKn (ltnW Hm)).
+      move: (subn_addn_leq Hn (ltnW Hm)) => H. rewrite -subn_eq0 in H.
+      rewrite (eqP H). rewrite zeros0 cats0 addn0 => {H}.
+      have Hmn: m - n <= size bs.
+      { rewrite -(subn0 (size bs)). apply: (leq_sub (ltnW Hm)). done. }
+      rewrite (subnBA _ Hmn). rewrite (subnKC Hn). rewrite Hms cats0.
+      move: (Hn). rewrite -subn_eq0. move/eqP=> Hnm. rewrite Hnm cats0.
+      exact: (drop_take Hn Hm).
+  Qed.
+
+  Lemma high_zeros_le bs n m :
+    m <= n -> high n bs = zeros n -> high m bs = zeros m.
+  Proof.
+    rewrite leq_eqVlt. case/orP=> Hmn.
+    - rewrite (eqP Hmn). by apply.
+    - case Hn: (n <= size bs).
+      + rewrite /high => Hz. have H1: (n = n + (n - size bs)).
+        { rewrite -subn_eq0 in Hn. rewrite (eqP Hn) addn0. reflexivity. }
+        rewrite {3}H1 zeros_addn in Hz => {H1}.
+        move/eqP: Hz. rewrite eqseq_cat;
+                        last by (rewrite size_drop size_zeros; rewrite (subKn Hn)).
+        case/andP=> H1 _.
+        have ->: size bs - m = (n - m) + (size bs - n) by
+            rewrite addnC (addnBA _ (ltnW Hmn)) (subnK Hn).
+        rewrite -drop_drop. rewrite (eqP H1). rewrite (drop_zeros (ltnW Hmn)).
+        rewrite -zeros_addn. move: (ltn_leq_trans Hmn Hn) => Hm.
+        move: (ltnW Hm) => {Hm} Hm. rewrite -subn_eq0 in Hm.
+        rewrite (eqP Hm) addn0. reflexivity.
+      + move/idP/negP: Hn. rewrite -ltnNge => Hs.
+        rewrite (high_oversize (ltnW Hs)) => H.
+        have H1: n = (size bs) + (n - size bs).
+        { rewrite (addnBCA (leqnn (size bs)) (ltnW Hs)) subnn addn0. reflexivity. }
+        rewrite {2}H1 zeros_addn in H => {H1}. move/eqP: H.
+        rewrite eqseq_cat; last by rewrite size_zeros. move/andP=> [/eqP -> _].
+        rewrite high_zeros. reflexivity.
+  Qed.
+
+  Lemma low_zeros_le bs n m :
+    m <= n -> low n bs = zeros n -> low m bs = zeros m.
+  Proof.
+    rewrite leq_eqVlt. case/orP=> Hmn.
+    - rewrite (eqP Hmn). by apply.
+    - case Hn: (n <= size bs).
+      + rewrite /low => Hz. have H1: (n = n + (n - size bs)).
+        { rewrite -subn_eq0 in Hn. rewrite (eqP Hn) addn0. reflexivity. }
+        rewrite {3}H1 zeros_addn in Hz => {H1}. move/eqP: Hz.
+        have H1: seq.size (take n bs) = seq.size (zeros n).
+        { rewrite size_take size_zeros. rewrite leq_eqVlt in Hn. case/orP: Hn => Hn.
+          - rewrite -(eqP Hn) ltnn. reflexivity.
+          - rewrite Hn. reflexivity. }
+        rewrite (eqseq_cat _ _ H1) => {H1}. move/andP => [/eqP H1 _].
+        rewrite (take_nseq_less (ltnW Hmn) Hn H1). rewrite -zeros_addn.
+        move: (ltnW (ltn_leq_trans Hmn Hn)). rewrite -subn_eq0. move/eqP=> ->.
+        rewrite addn0. reflexivity.
+      + move/idP/negP: Hn. rewrite -ltnNge => Hsn. rewrite (low_oversize (ltnW Hsn)).
+        move=> H. rewrite (cat_nseql H). rewrite low_zeros. reflexivity.
+  Qed.
+
 
   (* to_Zpos and to_Zneg is always non-negative *)
 
@@ -814,7 +891,7 @@ Section Lemmas.
     case: n => [| n] //=. move=> _. rewrite zext_Sn. rewrite cats1.
     exact: msb_joinmsb.
   Qed.
-  
+
   Lemma zext_zext n m bs : zext n (zext m bs) = zext (n + m) bs.
   Proof.
     elim: n m bs => [| n IHn] m bs.
@@ -858,7 +935,7 @@ Section Lemmas.
     elim: n => [| n IHn] /=.
     - rewrite sext0. reflexivity.
     - rewrite sext_Sn. rewrite cats1. exact: msb_joinmsb.
-  Qed.  
+  Qed.
 
   Lemma sext_sext n m bs : sext n (sext m bs) = sext (n + m) bs.
   Proof.
@@ -971,19 +1048,19 @@ Section Lemmas.
 
   Lemma to_nat_joinlsb a n : to_nat (joinlsb a n) = (to_nat n).*2 + a.
   Proof. by rewrite addnC. Qed.
-  
+
   Lemma to_nat_droplsb n: to_nat (droplsb n) = (to_nat n)./2.
   Proof. elim n=>[|nhd ntl IH]/=. done.
          rewrite -div.divn2 div.divnDr. case nhd ; (rewrite/= div.divn_small; last done).
-         rewrite add0n; by rewrite -!muln2 div.mulnK. 
+         rewrite add0n; by rewrite -!muln2 div.mulnK.
          rewrite add0n; by rewrite -!muln2 div.mulnK.
          rewrite div.dvdn2 odd_double; done.
-  Qed.       
-  
+  Qed.
+
   Lemma to_nat_joinmsb a n : to_nat (joinmsb n a) = a * 2^(size n) + to_nat n.
   Proof.
-    move : a. elim n=>[|nhd ntl IH]a/=. by rewrite -muln2 mul0n !addn0 expn0 muln1. 
-    rewrite (IH a) -!muln2 mulnDl expnS; ring. 
+    move : a. elim n=>[|nhd ntl IH]a/=. by rewrite -muln2 mul0n !addn0 expn0 muln1.
+    rewrite (IH a) -!muln2 mulnDl expnS; ring.
   Qed.
 
   Lemma to_nat_dropmsb n : to_nat (dropmsb (n)) = div.modn (to_nat n) (2^(size n).-1).
@@ -1131,7 +1208,7 @@ Section Lemmas.
 
   Lemma to_Zneg_nil : to_Zneg [::] = 0%Z.
   Proof. reflexivity. Qed.
-  
+
   Lemma to_Zpos_add_to_Zneg bs :
     (to_Zpos bs + to_Zneg bs)%Z = (Z.pow 2 (Z.of_nat (size bs)) - 1)%Z.
   Proof.
@@ -1162,7 +1239,7 @@ Section Lemmas.
     move: (b2z_cons Hz) => {Hz} [Hz1 Hz2]. rewrite subn1 -pred_Sn.
     rewrite -/(ones (size bs)). rewrite -(to_Zneg0 Hz2). move: Hz1. by case: b.
   Qed.
-  
+
   Lemma to_Zneg_zeros n : to_Zneg (zeros n) = (Z.pow 2 (Z.of_nat n) - 1)%Z.
   Proof.
     move: (to_Zpos_add_to_Zneg (zeros n)). rewrite size_zeros. move=> <-.
@@ -1271,7 +1348,7 @@ Section Lemmas.
     move=> H. move/Z.le_succ_l: H => H.
     move: (Z.le_lt_trans _ _ _ (@to_Zneg_ge0 bs) H). done.
   Qed.
-  
+
   Lemma to_Z1 bs : (to_Z bs = 1)%Z -> bs = b1::(copy (size bs - 1) b0).
   Proof.
     case: (lastP bs) => {bs} //=. move=> bs lb.
@@ -1282,7 +1359,7 @@ Section Lemmas.
     rewrite zeros_rcons. have Hs: (0 < size bs) by case: bs H.
     rewrite subn1. rewrite (ltn_predK Hs). reflexivity.
   Qed.
-  
+
   Lemma to_Z_zeros n : to_Z (zeros n) = 0%Z.
   Proof.
     case: n => [| n] //. rewrite -zeros_rcons. rewrite to_Z_rcons /=.
@@ -1417,7 +1494,28 @@ Section Lemmas.
     high (size bs - n + 1) bs = zeros (size bs - n + 1) ->
     to_Z (low n bs) = to_Zpos bs.
   Proof.
-  Admitted.
+    case Hn: (size bs <= n).
+    - rewrite leq_eqVlt in Hn. case/orP: Hn => Hn.
+      + rewrite -(eqP Hn) subnn add0n. rewrite low_size. exact: high1_0_to_Z.
+      + move=> H. rewrite (low_oversize (ltnW Hn)).
+        rewrite to_Z_cat; last by (rewrite size_zeros subn_gt0; exact: Hn).
+        rewrite to_Z_zeros /= Z.add_0_r. reflexivity.
+    - move/idP/negP: Hn. rewrite -ltnNge => Hn. move=> Hz. case Hn0: (n == 0).
+      + rewrite (eqP Hn0) in Hn Hz *. rewrite low0 /to_Z /=.
+        rewrite subn0 (high_oversize (leq_addr 1 (size bs))) in Hz.
+        rewrite zeros_addn in Hz. move/eqP: Hz.
+        rewrite eqseq_cat; last by rewrite size_zeros. case/andP=> [/eqP -> H2].
+        rewrite to_Zpos_zeros. reflexivity.
+      + move/idP/negP: Hn0. rewrite -lt0n => H0n.
+        have H1: (high 1 (low n bs) = zeros 1).
+        { rewrite (high_low H0n (ltnW Hn)). rewrite Hz low_zeros. reflexivity. }
+        rewrite (high1_0_to_Z H1).
+        move: (subnKC (ltnW Hn)) => {H1} H1. rewrite -{2}(cat_low_high H1) => {H1}.
+        rewrite to_Zpos_cat.
+        have ->: high (size bs - n) bs = zeros (size bs - n).
+        { apply: (high_zeros_le _ Hz). exact: leq_addr. }
+        rewrite to_Zpos_zeros /= Z.add_0_r. reflexivity.
+  Qed.
 
   Lemma sext_low_to_Z_low bs n :
     n < size bs -> sext (size bs - n) (low n bs) = bs ->
@@ -1437,9 +1535,9 @@ Lemma to_nat_take : forall n p, to_nat ((take n) p) = if n < size p then to_nat 
   elim p => [| phd ptl IHm]; done.
   elim p => [| phd ptl IHm]; first done.
   rewrite to_nat_cons/=.
-  case Hlt : (ns.+1 < (size ptl).+1); rewrite ltnS in Hlt. 
+  case Hlt : (ns.+1 < (size ptl).+1); rewrite ltnS in Hlt.
   rewrite odd_add odd_double oddb. rewrite (IH ptl) Hlt.
-  case phd; first by rewrite/=uphalf_double. 
+  case phd; first by rewrite/=uphalf_double.
   by (rewrite/=3!add0n-3!muln2-div.divn2 div.mulnK; last done).
   by rewrite IH Hlt.
 Qed.
@@ -1452,7 +1550,7 @@ Lemma dropmsb_zeros : forall n, dropmsb (zeros n) = zeros n.-1.
 Proof.
   move => n. case n. done.
   move => n0. have->:(zeros n0.+1.-1=zeros n0) by rewrite-addn1-subn1 addnK.
-  by rewrite-zeros_rcons/dropmsb/=belastd_rcons. 
+  by rewrite-zeros_rcons/dropmsb/=belastd_rcons.
 Qed.
 
 
