@@ -1517,12 +1517,6 @@ Section Lemmas.
         rewrite to_Zpos_zeros /= Z.add_0_r. reflexivity.
   Qed.
 
-  Lemma sext_low_to_Z_low bs n :
-    n < size bs -> sext (size bs - n) (low n bs) = bs ->
-    to_Z (low n bs) = to_Z bs.
-  Proof.
-  Admitted.
-
 
 (*---------------------------------------------------------------------------
     Lemmas of take
