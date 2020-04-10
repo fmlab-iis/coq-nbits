@@ -1793,7 +1793,60 @@ Section Lemmas.
                 -Hadder0 -Hadder1 -(eqP (@full_adder_zip_succB _ _ _));
           [ done | by rewrite Hsz ] .
   Qed .
-  
+
+  Lemma full_adder_zip_cat ps0 ps1 b0 b1 c :
+    size ps0 = size ps1 ->
+    full_adder_zip c ((zip ps0 ps1) ++ zip [:: b0] [:: b1]) ==
+    ((bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).1,
+     joinmsb (full_adder_zip c (zip ps0 ps1)).2
+           (bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).2) .
+  Proof .
+    move => Hszeq .
+    move : ps0 ps1 Hszeq c; apply : seq_ind2;
+      first by case; case b0; case b1.
+    move => p0 p1 ps0 ps1 Hszeq .
+    case b0; case b1 => /= IH; case p0; case p1; case => /=;
+      rewrite !(eqP (IH _));
+      try (by dcase_full_adder_zip false ps0 ps1 => /=);
+      try (by dcase_full_adder_zip true ps0 ps1 => /=) .
+  Qed .
+      
+  Lemma sbbB_zext1_catB p1 p2 c :
+    size p1 = size p2 ->
+    (sbbB c (zext 1 p1) (zext 1 p2)).2 ==
+    joinmsb (sbbB c p1 p2).2 (sbbB c p1 p2).1 .
+  Proof .
+    move => Hszeq .
+    rewrite /sbbB .
+    move : p1 p2 Hszeq; apply : seq_ind2;
+      first by case c; rewrite /sbbB !zext_nil /= .
+    move => p0 p1 ps0 ps1 Hszeq .
+    have : (size ps0 = size (~~# ps1)) .
+    { by rewrite size_invB -Hszeq . } 
+    move => Hszinveq .
+    rewrite !zext_cons /sbbB /=; case c; case p0; case p1;
+      rewrite /adcB /full_adder /zext !invB_cat /=
+              !(zip_cat _ _ Hszinveq) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip false ps0 (~~# ps1) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ true Hszinveq)) => /= _ .
+      dcase_full_adder_zip true ps0 (~~# ps1) => /= .
+      by move : Hadder; case c0 => /= .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip false ps0 (~~# ps1) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip false ps0 (~~# ps1) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip true ps0 (~~# ps1) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip true ps0 (~~# ps1) .
+    - rewrite !(eqP (full_adder_zip_cat _ _ false Hszinveq)) => /= _ .
+      dcase_full_adder_zip false ps0 (~~# ps1) => /= .
+      by move : Hadder; case c0 => /= .
+    - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
+      by dcase_full_adder_zip true ps0 (~~# ps1) .
+  Qed .      
+
   Lemma ltB_borrow_subB bs1 bs2:
     size bs1 = size bs2 ->
     (ltB bs1 bs2 <-> borrow_subB bs1 bs2).
