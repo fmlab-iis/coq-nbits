@@ -2291,8 +2291,67 @@ Section Lemmas.
       + by rewrite (eqP H) (size0nil (eqP H)).
     - rewrite mulB0; reflexivity.
   Qed.
-  
 
+  Lemma andB1 n : right_id (ones n) andB.
+  Proof. Admitted.
+
+  Lemma andB0: forall n : nat, right_zero (n) -bits of (0)%bits andB.
+  Proof. Admitted.
+  
+  (*---------------------------------------------------------------------------
+    Properties of bitwise or
+    ---------------------------------------------------------------------------*)
+
+  Lemma or1B: forall (bs : bits), (ones (size bs) ||# bs)%bits = ones (size bs).
+  Proof. Admitted.
+
+  Lemma orB0: forall (n : nat) (bs : bits), (bs||# zeros n)%bits = bs.
+  Proof. Admitted.
+
+  Lemma or0B : forall n bs, orB (zeros n) bs = bs.
+  Proof. Admitted.
+
+
+
+  (*---------------------------------------------------------------------------
+    Properties of bitwise or
+    ---------------------------------------------------------------------------*)
+
+  Lemma xor0B n : left_id (from_nat n 0) xorB.
+  Proof.
+  Admitted.
+
+  Lemma xor1B bs :
+    xorB (ones (size bs)) bs = invB bs.
+  Proof.
+  Admitted.
+  
+  Lemma xorB_copy_case : forall b bs,
+      xorB (copy (size bs) b) bs = if b then (invB bs) else bs.
+  Proof.
+    move => [] bs.
+    - by rewrite xor1B.
+    - by rewrite -/(zeros (size bs)) -from_natn0 xor0B. 
+  Qed.
+
+  Lemma xorBC: commutative (xorB).
+  Proof.
+    intro. rewrite/xorB. 
+    elim x => [|xhd xtl IH] /=; elim => [|yhd ytl IHm] /=.
+    - done.
+    - rewrite /xorB /lift0 lift0n. rewrite liftn0; first done.
+      intro; by rewrite Bool.xorb_false_r.
+      rewrite /left_id. intros; by rewrite Bool.xorb_false_l.
+    - rewrite /xorB /lift0 liftn0. rewrite lift0n; first done.
+      intro; by rewrite Bool.xorb_false_l.
+      rewrite /right_id. intros; by rewrite Bool.xorb_false_r.
+    - by rewrite /lift0 lift_cons liftE -/lift0 (IH ytl) Bool.xorb_comm. 
+  Qed.
+
+  Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = size bs1.
+  Proof.
+  Admitted.
+  
   (*---------------------------------------------------------------------------
     Properties of signed extend 
   ---------------------------------------------------------------------------*)
@@ -2583,6 +2642,17 @@ Section Lemmas.
 
   Lemma uremB_to_nat : forall p q , to_nat (udivB p q).2 = (div.modn (to_nat p) (to_nat q)).
   Proof.  
+  Admitted.
+
+  
+  Lemma udivB_negB_negB bs1 bs2 :
+    udivB (negB bs1) (negB bs2) = ((udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
+  Proof.
+  Admitted.
+
+  Lemma msb_negB bs :
+    msb (negB bs) = ~~ (msb bs).
+  Proof.
   Admitted.
 
 
