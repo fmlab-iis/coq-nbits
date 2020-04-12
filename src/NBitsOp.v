@@ -758,6 +758,19 @@ Section Lemmas.
     rewrite !to_nat_zext. reflexivity.
   Qed.
 
+  Lemma ltB_to_Zpos (bs1 bs2 : bits) : ltB bs1 bs2 <-> (to_Zpos bs1 < to_Zpos bs2)%Z.
+  Proof.
+    rewrite ltB_to_nat !to_Zpos_nat -(Nat2Z.inj_lt). split; by move/ltP.
+  Qed.
+
+  Lemma ltB_to_Zpos_eqn (bs1 bs2 : bits) : 
+    ltB bs1 bs2 = (to_Zpos bs1 <? to_Zpos bs2)%Z.
+  Proof.
+    case HltB : (ltB bs1 bs2); case Hltb : (to_Zpos bs1 <? to_Zpos bs2)%Z; try done.
+    - apply ltB_to_Zpos, Z.ltb_lt in HltB. by rewrite -HltB -Hltb.
+    - apply Z.ltb_lt, ltB_to_Zpos in Hltb. by rewrite -HltB -Hltb.
+  Qed.
+
   (* TODO: Fix it if ltB_msb is needed *)
   (*
   Lemma ltB_msb_to_nat (bs1 bs2 : bits) : ltB_msb bs1 bs2 = (to_nat bs1 < to_nat bs2).
@@ -855,9 +868,168 @@ Section Lemmas.
     by rewrite Bool.negb_involutive.
   Qed.
 
+  Lemma leB_to_nat (bs1 bs2 : bits) :
+    size bs1 = size bs2 -> leB bs1 bs2 = (to_nat bs1 <= to_nat bs2).
+  Proof.
+    rewrite /leB leq_eqVlt ltB_to_nat => Hsz. by rewrite (to_nat_inj_ss Hsz).
+  Qed.
+
+  Lemma leB_to_Zpos (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> leB bs1 bs2 <-> (to_Zpos bs1 <= to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz. rewrite (leB_to_nat Hsz) !to_Zpos_nat -(Nat2Z.inj_le). 
+    split; by move/leP.
+  Qed.
+
+  Lemma leB_to_Zpos_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> leB bs1 bs2 = (to_Zpos bs1 <=? to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz.
+    case HleB : (leB bs1 bs2); case Hleb : (to_Zpos bs1 <=? to_Zpos bs2)%Z; try done.
+    - apply (leB_to_Zpos Hsz), Z.leb_le in HleB. by rewrite -HleB -Hleb.
+    - apply Z.leb_le, (leB_to_Zpos Hsz) in Hleb. by rewrite -HleB -Hleb.
+  Qed.
+
+  Lemma gtB_to_nat_ss (bs1 bs2 : bits) :
+    size bs1 = size bs2 -> gtB bs1 bs2 = (to_nat bs1 > to_nat bs2).
+  Proof.
+    move=> Hsz; apply Logic.eq_sym in Hsz. by rewrite /gtB ltB_to_nat_ss. 
+  Qed.
+
+  Lemma gtB_to_nat (bs1 bs2 : bits) : gtB bs1 bs2 = (to_nat bs1 > to_nat bs2).
+  Proof. by rewrite /gtB ltB_to_nat. Qed.
+
+  Lemma gtB_to_Zpos (bs1 bs2 : bits) : gtB bs1 bs2 <-> (to_Zpos bs1 > to_Zpos bs2)%Z.
+  Proof.
+    rewrite /gtB ltB_to_Zpos. split; [exact: Z.lt_gt | exact: Z.gt_lt].
+  Qed.
+
+  Lemma gtB_to_Zpos_eqn (bs1 bs2 : bits) : 
+    gtB bs1 bs2 = (to_Zpos bs1 >? to_Zpos bs2)%Z.
+  Proof. 
+    by rewrite /gtB ltB_to_Zpos_eqn Z.gtb_ltb. 
+  Qed.
+
+  Lemma geB_to_nat (bs1 bs2 : bits) :
+    size bs1 = size bs2 -> geB bs1 bs2 = (to_nat bs1 >= to_nat bs2).
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. rewrite /geB. exact: leB_to_nat. 
+  Qed.
+
+  Lemma geB_to_Zpos (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> geB bs1 bs2 <-> (to_Zpos bs1 >= to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. rewrite /geB (leB_to_Zpos Hsz).
+    split; [exact: Z.le_ge | exact: Z.ge_le].   
+  Qed.
+
+  Lemma geB_to_Zpos_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> geB bs1 bs2 = (to_Zpos bs1 >=? to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. 
+    by rewrite /geB (leB_to_Zpos_eqn Hsz) Z.geb_leb.
+  Qed.
+
   Corollary sbbB_ltB_leB (bs1 bs2: bits):
     if (sbbB false bs1 bs2).1 then ltB bs1 bs2 else leB bs2 bs1.
   Admitted.
+
+
+  (*---------------------------------------------------------------------------
+    Properties of signed comparison
+    ---------------------------------------------------------------------------*)
+
+  (* the size-not-eq case is incorrect, try
+     Eval cbv in sltB (false :: false :: true :: true :: nil) 
+                      (false :: true :: nil)
+                 ==
+                 (to_Z (false :: false :: true :: true :: nil) 
+                  <? to_Z (false :: true :: nil))%Z.
+   *)
+  Lemma sltB_to_Z (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sltB bs1 bs2 <-> (to_Z bs1 < to_Z bs2)%Z.
+  Proof.
+    case (lastP bs1); case (lastP bs2) => {bs1 bs2}.
+    - rewrite /sltB /to_Z //=.
+    - move=> bs2 b2. rewrite /= size_rcons; discriminate.
+    - move=> bs1 b1. rewrite /= size_rcons; discriminate.
+    - move=> bs2 b2 bs1 b1. 
+      rewrite !size_rcons /sltB /to_Z !splitmsb_rcons /= => /eqP. 
+      rewrite eqSS => /eqP Hsz. case b1; case b2 => /=.
+      + rewrite orbF ltB_to_Zpos.
+        have -> : to_Zpos bs1 = (Z.pow 2 (Z.of_nat (size bs1)) - 1 - to_Zneg bs1)%Z
+          by rewrite -Z.add_move_r; exact: (to_Zpos_add_to_Zneg bs1).
+        have -> : to_Zpos bs2 = (Z.pow 2 (Z.of_nat (size bs2)) - 1 - to_Zneg bs2)%Z
+          by rewrite -Z.add_move_r; exact: (to_Zpos_add_to_Zneg bs2).
+        rewrite Hsz -Z.sub_lt_mono_l -Z.opp_lt_mono -Z.succ_lt_mono. done.
+      + split; last done; move=> _.
+        move: (@to_Zpos_ge0 bs2). apply Z.lt_le_trans.
+        rewrite -Z.opp_0 -Z.opp_lt_mono. apply Zle_lt_succ. exact: to_Zneg_ge0.
+      + split; first done.
+        move=> Hlt; apply Z.lt_asymm in Hlt. case Hlt.
+        move: (@to_Zpos_ge0 bs1). apply Z.lt_le_trans.
+        rewrite -Z.opp_0 -Z.opp_lt_mono. apply Zle_lt_succ. exact: to_Zneg_ge0.
+      + by rewrite orbF ltB_to_Zpos.
+  Qed.
+
+  Lemma sltB_to_Z_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sltB bs1 bs2 = (to_Z bs1 <? to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. 
+    case HsltB : (sltB bs1 bs2); case Hltb : (to_Z bs1 <? to_Z bs2)%Z; try done.
+    - apply (sltB_to_Z Hsz), Z.ltb_lt in HsltB. by rewrite -HsltB -Hltb.
+    - apply Z.ltb_lt, (sltB_to_Z Hsz) in Hltb. by rewrite -HsltB -Hltb.
+  Qed.
+
+  Lemma sleB_to_Z (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sleB bs1 bs2 <-> (to_Z bs1 <= to_Z bs2)%Z.
+  Proof.
+    move=> Hsz; rewrite /sleB; split.
+    - case Hlt : (sltB bs1 bs2).
+      + move=> _. apply (sltB_to_Z Hsz) in Hlt. exact: Z.lt_le_incl.
+      + case Heq : (bs1 == bs2) => //= _.
+        move/eqP: Heq => <-; exact: Z.le_refl.
+    - move=> Hle. apply Z.le_lteq in Hle. case: Hle => [Hlt | Heq].
+      + apply (sltB_to_Z Hsz) in Hlt. by rewrite Hlt orbT.
+      + by rewrite (to_Z_inj_ss Hsz Heq) eqxx.
+  Qed.
+
+  Lemma sleB_to_Z_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sleB bs1 bs2 = (to_Z bs1 <=? to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. 
+    case HsleB : (sleB bs1 bs2); case Hleb : (to_Z bs1 <=? to_Z bs2)%Z; try done.
+    - apply (sleB_to_Z Hsz), Z.leb_le in HsleB. by rewrite -HsleB -Hleb.
+    - apply Z.leb_le, (sleB_to_Z Hsz) in Hleb. by rewrite -HsleB -Hleb.
+  Qed.
+
+  Lemma sgtB_to_Z (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sgtB bs1 bs2 <-> (to_Z bs1 > to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. rewrite /sgtB (sltB_to_Z Hsz).
+    split; [exact: Z.lt_gt | exact: Z.gt_lt].
+  Qed.
+
+  Lemma sgtB_to_Z_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sgtB bs1 bs2 = (to_Z bs1 >? to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. 
+    by rewrite /sgtB (sltB_to_Z_eqn Hsz) Z.gtb_ltb. 
+  Qed.    
+
+  Lemma sgeB_to_Z (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sgeB bs1 bs2 <-> (to_Z bs1 >= to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. rewrite /sgeB (sleB_to_Z Hsz).
+    split; [exact: Z.le_ge | exact: Z.ge_le].
+  Qed.
+
+  Lemma sgeB_to_Z_eqn (bs1 bs2 : bits) : 
+    size bs1 = size bs2 -> sgeB bs1 bs2 = (to_Z bs1 >=? to_Z bs2)%Z.
+  Proof.
+    move=> Hsz. apply Logic.eq_sym in Hsz. 
+    by rewrite /sgeB (sleB_to_Z_eqn Hsz) Z.geb_leb. 
+  Qed.
 
 
   (*---------------------------------------------------------------------------
