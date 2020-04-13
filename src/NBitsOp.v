@@ -2027,20 +2027,125 @@ Section Lemmas.
     by apply : sbbB_zext1_catB .
   Qed .
 
+  
+  Lemma sub0B : forall m, subB (zeros (size m)) m = negB m.
+  Proof.
+    move => bs .
+    have : (size (zeros (size bs)) == size bs) .
+    { by rewrite size_zeros . }
+    move => Hszeq .
+    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
+    rewrite add0B unzip2_zip // .
+    by rewrite size_negB size_zeros .
+  Qed .
+
+  Lemma succB_ones_zeros n : succB (ones n) == zeros n .
+  Proof .
+    elim n .
+    - done .
+    - move => m IH .
+      by rewrite -ones_cons -zeros_cons (eqP (@succB1 _)) (eqP IH) .
+  Qed .      
+
+  Lemma negB_zeros n : -# (zeros n) == zeros n .
+  Proof .
+    elim n .
+    - done .
+    - move => m IH .
+      rewrite /negB -zeros_cons (eqP (@invB_cons _ _)) .
+      by rewrite (eqP (@succB1 _)) invB_zeros (eqP (@succB_ones_zeros _)) .
+  Qed .
+  
+  Lemma negB1_ones n :
+    -# (n) -bits of (1) == ones n .
+  Proof .
+    case : n; first done .
+    move => n; by rewrite /negB /= -zeros_from_nat invB_zeros .
+  Qed .
+
+  Lemma subB0: forall m, subB m (zeros (size m)) = m .
+  Proof.
+    move => bs .
+    have : (size bs == size (zeros (size bs))) .
+    { by rewrite size_zeros . }
+    move => Hszeq .
+    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
+    rewrite (eqP (@negB_zeros _)) addB0 unzip1_zip // .
+    by rewrite size_zeros .
+  Qed .
+
+  Lemma subB1 bs:
+    bs -# (from_nat (size bs) 1) == predB bs .
+  Proof .
+    elim : bs; first by rewrite /subB /sbbB /predB .
+    move => b bs .
+    case b .
+    - rewrite {1 2}/subB {2}/predB /sbbB /adcB /full_adder /= => _ .
+      dcase_full_adder_zip true bs (~~# (size bs) -bits of (0)) .
+      rewrite -zeros_from_nat in Hadder .
+      move : (subB0 bs) => /= .
+      by rewrite /subB /sbbB /adcB /full_adder /= Hadder => <- .
+    - rewrite {2}/subB /sbbB /adcB /full_adder /= => /eqP <- .
+      dcase_full_adder_zip false bs (~~# (size bs) -bits of (0)) => /= .
+      rewrite -zeros_from_nat invB_zeros in Hadder .
+      rewrite eqseq_cons /= .
+      rewrite (eqP (@subB_equiv_addB_negB _ _ _));
+        last by rewrite size_from_nat .
+      by rewrite (eqP (negB1_ones _)) /addB /adcB /full_adder Hadder .
+  Qed .      
+
+  Lemma sbbB_carry_predB bs0 bs1 :
+    size bs0 = size bs1 ->
+    (sbbB true bs0 bs1).2 == predB (bs0 -# bs1) .
+  Proof .
+    move : bs0 bs1; apply : seq_ind2;
+      first by rewrite /sbbB /predB .
+    move => c0 c1 cs0 cs1 Hszeq .
+    rewrite /predB /subB /sbbB /adcB /full_adder;
+      case c0; case c1 => /=;
+      dcase_full_adder_zip false cs0 (~~# cs1);
+      dcase_full_adder_zip true cs0 (~~# cs1);
+      done .
+  Qed .
+  
   Lemma subB_subB_zext_sbbB c bs0 bs1 : 
    size bs0 = size bs1 ->
    zext 1 bs0 -# zext 1 bs1 -# zext (size bs0) [:: c] ==
    (sbbB c (zext 1 bs0) (zext 1 bs1)).2 .
   Proof .
-  Admitted .
+    move => Hszeq .
+    have : (size (zext 1 bs0) = size (zext 1 bs1)) .
+    { by rewrite !size_zext -Hszeq . }
+    move => Hszexteq .
+    case c .
+    - rewrite (eqP (sbbB_carry_predB Hszexteq)) .
+      have : (zext (size bs0) [:: true] ==
+             (size (zext 1 bs0 -# zext 1 bs1)) -bits of (1)) .
+      { rewrite size_subB !size_zext -Hszeq minnE subKn;
+          last by apply leqnn .
+        by rewrite addn1 /from_nat /= -/from_nat
+                   zext_cons /joinlsb from_natn0 zext_nil . }
+      case => /eqP -> .
+      by rewrite subB1 .
+    - have : (zext (size bs0) [:: false] ==
+             (size (zext 1 bs0 -# zext 1 bs1)) -bits of (0)) .
+      { rewrite size_subB !size_zext -Hszeq minnE subKn;
+          last by apply leqnn .
+        by rewrite addn1 /from_nat /= -/from_nat
+                   zext_cons /joinlsb from_natn0 zext_nil . }
+      case => /eqP -> .
+      by rewrite -zeros_from_nat (subB0 (zext 1 bs0 -# zext 1 bs1)) .
+  Qed .
     
   Lemma subB_subB_sbbB c bs0 bs1 :
    size bs0 = size bs1 ->
    zext 1 bs0 -# zext 1 bs1 -# zext (size bs0) [:: c] ==
    joinmsb (sbbB c bs0 bs1).2 (sbbB c bs0 bs1).1 .
   Proof .
-  Admitted .
-  
+    move => Hszeq; rewrite (eqP (subB_subB_zext_sbbB _ Hszeq)) .
+    by rewrite (sbbB_zext1_catB _ Hszeq) .
+  Qed .
+    
   Lemma ltB_borrow_subB bs1 bs2:
     size bs1 = size bs2 ->
     (ltB bs1 bs2 <-> borrow_subB bs1 bs2).
@@ -2081,46 +2186,6 @@ Section Lemmas.
   Proof .
   Admitted.
    *)
-  
-  Lemma sub0B : forall m, subB (zeros (size m)) m = negB m.
-  Proof.
-    move => bs .
-    have : (size (zeros (size bs)) == size bs) .
-    { by rewrite size_zeros . }
-    move => Hszeq .
-    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
-    rewrite add0B unzip2_zip // .
-    by rewrite size_negB size_zeros .
-  Qed .
-
-  Lemma succB_ones_zeros n : succB (ones n) == zeros n .
-  Proof .
-    elim n .
-    - done .
-    - move => m IH .
-      by rewrite -ones_cons -zeros_cons (eqP (@succB1 _)) (eqP IH) .
-  Qed .      
-
-  Lemma negB_zeros n : -# (zeros n) == zeros n .
-  Proof .
-    elim n .
-    - done .
-    - move => m IH .
-      rewrite /negB -zeros_cons (eqP (@invB_cons _ _)) .
-      by rewrite (eqP (@succB1 _)) invB_zeros (eqP (@succB_ones_zeros _)) .
-  Qed .
-  
-  Lemma subB0: forall m, subB m (zeros (size m)) = m .
-  Proof.
-    move => bs .
-    have : (size bs == size (zeros (size bs))) .
-    { by rewrite size_zeros . }
-    move => Hszeq .
-    rewrite (eqP (@subB_equiv_addB_negB _ _ Hszeq)) {Hszeq} /= .
-    rewrite (eqP (@negB_zeros _)) addB0 unzip1_zip // .
-    by rewrite size_zeros .
-  Qed .
-
   (*---------------------------------------------------------------------------
     Properties of multiplication
   ---------------------------------------------------------------------------*)
