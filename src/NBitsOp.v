@@ -2477,6 +2477,7 @@ Section Lemmas.
     joinmsb (adcB c p1 p2).2 (adcB c p1 p2).1 .
    *)
 
+  (*
   Lemma adc_sext_add_high b bs0 bs1 :
     size bs0 = size bs1 ->
     from_bool 1 (adcB (to_bool b) bs0 bs1).1 ==
@@ -2557,7 +2558,8 @@ Section Lemmas.
     rewrite Hbool => {Hbool} Heq .
     rewrite (eqP Heq) .
   Admitted .
-
+   *)
+  
   Lemma mul_sext bs0 bs1 :
     full_mul bs0 bs1 ==
     ((sext (size bs0) bs0) *# (sext (size bs0) bs1))%bits .
