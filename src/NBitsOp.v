@@ -2017,8 +2017,30 @@ Section Lemmas.
       by move : Hadder; case c0 => /= .
     - rewrite !(eqP (full_adder_zip_cat _ _ _ Hszinveq)) => /= /eqP -> .
       by dcase_full_adder_zip true ps0 (~~# ps1) .
-  Qed .      
+  Qed .
 
+  Lemma subB_zext1_catB p1 p2 :
+    size p1 = size p2 ->
+    (zext 1 p1) -# (zext 1 p2) ==
+    joinmsb (sbbB false p1 p2).2 (sbbB false p1 p2).1 .
+  Proof .
+    by apply : sbbB_zext1_catB .
+  Qed .
+
+  Lemma subB_subB_zext_sbbB c bs0 bs1 : 
+   size bs0 = size bs1 ->
+   zext 1 bs0 -# zext 1 bs1 -# zext (size bs0) [:: c] ==
+   (sbbB c (zext 1 bs0) (zext 1 bs1)).2 .
+  Proof .
+  Admitted .
+    
+  Lemma subB_subB_sbbB c bs0 bs1 :
+   size bs0 = size bs1 ->
+   zext 1 bs0 -# zext 1 bs1 -# zext (size bs0) [:: c] ==
+   joinmsb (sbbB c bs0 bs1).2 (sbbB c bs0 bs1).1 .
+  Proof .
+  Admitted .
+  
   Lemma ltB_borrow_subB bs1 bs2:
     size bs1 = size bs2 ->
     (ltB bs1 bs2 <-> borrow_subB bs1 bs2).
