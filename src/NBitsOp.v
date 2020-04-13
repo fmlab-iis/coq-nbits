@@ -2265,11 +2265,11 @@ Section Lemmas.
     Properties of bitwise and
     ---------------------------------------------------------------------------*)
 
-  Lemma and1B n : left_id (ones n) andB.
+  Lemma and1B bs : andB (ones (size bs)) bs = bs.
   Proof.
   Admitted.
 
-  Lemma and0B n : left_zero (from_nat n 0) andB.
+  Lemma and0B bs : andB (zeros (size bs)) bs = zeros (size bs).
   Proof.
   Admitted.
 
@@ -2279,7 +2279,7 @@ Section Lemmas.
   Proof.
     move=> [] bs.
     - exact: and1B.
-    - rewrite -/(zeros (size bs)) -from_natn0. exact: and0B.
+    - rewrite -/(zeros (size bs)) from_natn0. exact: and0B.
   Qed.
 
   Lemma andB_copy_mul :
@@ -2292,32 +2292,31 @@ Section Lemmas.
     - rewrite mulB0; reflexivity.
   Qed.
 
-  Lemma andB1 n : right_id (ones n) andB.
+  Lemma andB1 bs : andB bs (ones (size bs)) = bs.
   Proof. Admitted.
 
-  Lemma andB0: forall n : nat, right_zero (n) -bits of (0)%bits andB.
+  Lemma andB0 bs : andB bs (zeros (size bs)) = zeros (size bs).
   Proof. Admitted.
   
   (*---------------------------------------------------------------------------
     Properties of bitwise or
     ---------------------------------------------------------------------------*)
 
-  Lemma or1B: forall (bs : bits), (ones (size bs) ||# bs)%bits = ones (size bs).
+  Lemma or1B: forall (bs : bits), orB (ones (size bs)) bs = ones (size bs).
   Proof. Admitted.
 
-  Lemma orB0: forall (n : nat) (bs : bits), (bs||# zeros n)%bits = bs.
+  Lemma orB0: forall (bs : bits), orB bs (zeros (size bs)) = bs.
   Proof. Admitted.
 
-  Lemma or0B : forall n bs, orB (zeros n) bs = bs.
+  Lemma or0B : forall bs, orB (zeros (size bs)) bs = bs.
   Proof. Admitted.
-
 
 
   (*---------------------------------------------------------------------------
     Properties of bitwise or
     ---------------------------------------------------------------------------*)
 
-  Lemma xor0B n : left_id (from_nat n 0) xorB.
+  Lemma xor0B bs : xorB (zeros (size bs)) bs = bs.
   Proof.
   Admitted.
 
@@ -2331,7 +2330,7 @@ Section Lemmas.
   Proof.
     move => [] bs.
     - by rewrite xor1B.
-    - by rewrite -/(zeros (size bs)) -from_natn0 xor0B. 
+    - by rewrite xor0B. 
   Qed.
 
   Lemma xorBC: commutative (xorB).
