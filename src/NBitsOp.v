@@ -2354,11 +2354,19 @@ Section Lemmas.
 
   Lemma and1B bs : andB (ones (size bs)) bs = bs.
   Proof.
-  Admitted.
-
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -ones_cons .
+    by rewrite /andB /andb /lift0 /lift; case b => /= -> .
+  Qed .
+  
   Lemma and0B bs : andB (zeros (size bs)) bs = zeros (size bs).
   Proof.
-  Admitted.
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -zeros_cons .
+    by rewrite /andB /andb /lift0 /lift; case b => /= -> .
+  Qed .
 
   Lemma andB_copy_case :
     forall b (bs : bits),
@@ -2380,24 +2388,48 @@ Section Lemmas.
   Qed.
 
   Lemma andB1 bs : andB bs (ones (size bs)) = bs.
-  Proof. Admitted.
-
+  Proof.
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -ones_cons .
+    by rewrite /andB /andb /lift0 /lift; case b => /= -> .
+  Qed .
+    
   Lemma andB0 bs : andB bs (zeros (size bs)) = zeros (size bs).
-  Proof. Admitted.
+  Proof.
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -zeros_cons .
+    by rewrite /andB /andb /lift0 /lift; case b => /= -> .
+  Qed .
   
   (*---------------------------------------------------------------------------
     Properties of bitwise or
     ---------------------------------------------------------------------------*)
 
   Lemma or1B: forall (bs : bits), orB (ones (size bs)) bs = ones (size bs).
-  Proof. Admitted.
+  Proof. 
+    elim; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -ones_cons .
+    by rewrite /orB /orb /lift0 /lift; case b => /= -> .
+  Qed .
 
   Lemma orB0: forall (bs : bits), orB bs (zeros (size bs)) = bs.
-  Proof. Admitted.
+  Proof. 
+    elim; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -zeros_cons .
+    by rewrite /orB /orb /lift0 /lift; case b => /= -> .
+  Qed .
 
   Lemma or0B : forall bs, orB (zeros (size bs)) bs = bs.
-  Proof. Admitted.
-
+  Proof.
+    elim; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -zeros_cons .
+    by rewrite /orB /orb /lift0 /lift; case b => /= -> .
+  Qed .
 
   (*---------------------------------------------------------------------------
     Properties of bitwise or
@@ -2405,12 +2437,20 @@ Section Lemmas.
 
   Lemma xor0B bs : xorB (zeros (size bs)) bs = bs.
   Proof.
-  Admitted.
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -zeros_cons .
+    by rewrite /xorB /xorb /lift0 /lift; case b => /= -> .
+  Qed .
 
   Lemma xor1B bs :
     xorB (ones (size bs)) bs = invB bs.
   Proof.
-  Admitted.
+    elim : bs; first done .
+    move => b bs .
+    rewrite size_joinlsb addn1 -ones_cons .
+    by rewrite /xorB /xorb /lift0 /lift; case b => /= -> .
+  Qed .
   
   Lemma xorB_copy_case : forall b bs,
       xorB (copy (size bs) b) bs = if b then (invB bs) else bs.
