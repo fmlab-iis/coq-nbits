@@ -250,6 +250,25 @@ Section Lemmas.
 
   (* Lemmas about size *)
 
+  Lemma size0 (bs : bitseq) :
+    size bs = 0 -> bs == [::] .
+  Proof .
+    case : bs; done .
+  Qed .
+
+  Lemma size1 (bs : bitseq) :
+    size bs = 1 -> ((bs == [:: false]) + (bs == [:: true])) .
+  Proof .
+    case : bs .
+    - done .
+    - move => b bs /eqP Heq /= .
+      move : Heq .
+      rewrite eqSS => Hs0 .
+      move : (size0 (eqP Hs0)) => Hbs .
+      rewrite (eqP Hbs) .
+      case : b; [right | left]; done .
+  Qed .
+    
   Lemma size_cat lo hi : size (cat lo hi) = size lo + size hi.
   Proof. rewrite size_cat. reflexivity. Qed.
 
