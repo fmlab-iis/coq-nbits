@@ -2703,11 +2703,36 @@ Section Lemmas.
   Proof. intros. induction n; try done.
   Qed.
 
+  Lemma from_natSn1 n :
+    from_nat n.+1 1 == zext n [::true] .
+  Proof .
+    case : n; first done .
+    move => n .
+    by rewrite /from_nat /= -/from_nat from_natn0
+               joinlsb_false_zeros zext_zeros_bit .
+  Qed .
 
+  Lemma dropmsb_cons n b bs :
+    size bs = n.+1 ->
+    dropmsb (b::bs) == b::(dropmsb bs) .
+  Proof .
+    case bs; first done .
+    move => c cs Hsz .
+    by rewrite {1}/dropmsb /splitmsb /split_last /= .
+  Qed .
+    
   Lemma subB_joinmsb_dropmsb: forall b q n, size q = n.+1 -> (dropmsb (joinlsb b q) -# joinlsb b (zeros n))%bits = dropmsb (joinlsb false q).
   Proof.
-  Admitted.
-
+    move => b q n Hsz .
+    have : (size (dropmsb q) = n) .
+    { by rewrite size_dropmsb Hsz subn1 . } 
+    rewrite /joinlsb !(eqP (@dropmsb_cons _ _ _ Hsz)) .
+    rewrite /subB /sbbB /adcB /full_adder; case b => /= Hszdrop;
+      dcase (full_adder_zip true (zip (dropmsb q) (~~# zeros n)))
+      => [[c] tl] Hadder /=;
+      move : (subB0 (dropmsb q));
+      by rewrite Hszdrop /subB /sbbB /adcB /full_adder /= Hadder /= => -> .
+  Qed .
   
   Lemma udivB1: forall p, udivB p (from_nat (size p) 1) = (p, from_nat (size p) 0).
   Proof.
