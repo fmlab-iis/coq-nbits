@@ -2474,9 +2474,10 @@ Section Lemmas.
     - by rewrite /lift0 lift_cons liftE -/lift0 (IH ytl) Bool.xorb_comm. 
   Qed.
 
-  Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = size bs1.
+  Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = maxn (size bs1) (size bs2).
   Proof.
-  Admitted.
+    by rewrite /xorB /lift0 size_lift .
+  Qed .
   
   (*---------------------------------------------------------------------------
     Properties of signed extend 
@@ -2803,11 +2804,12 @@ Section Lemmas.
   Proof.
   Admitted.
 
+  (*
   Lemma msb_negB bs :
     msb (negB bs) = ~~ (msb bs).
   Proof.
   Admitted.
-
+   *)
 
   (*---------------------------------------------------------------------------
     Others
@@ -2921,11 +2923,12 @@ Section Lemmas.
     intros. rewrite/=andbT orbF. case (andb_orb_all_zip bsptl); try done.
   Qed.
 
+  (*
   Lemma rev_behead : forall bs, zext (size bs - (size bs - 1)) (rev (behead bs)) = rev bs.
   Proof.
     elim =>[|bshd bstl IH]. by rewrite/=sub0n zext0.
     rewrite/=. Abort.
-
+   *)
   
   Lemma sig_bits_zeros n : sig_bits (zeros n) = 0.
   Proof.
@@ -3091,12 +3094,53 @@ Section Lemmas.
   Lemma orb_all_0 n : orb_all (zeros n) = false.
   Proof.
     elim n => [|ns IH]; first done. by rewrite/=orbF IH. Qed.
-    
+
+  Lemma rev_zip_zeros T (bs : seq T) :
+    rev (zip (zeros (size bs)) bs) = zip (zeros (size bs)) (rev bs) .
+  Proof .
+    elim : bs => [|b bs IH]; first done .
+    rewrite size_joinlsb addn1 -zeros_cons zip_cons rev_cons IH .
+    rewrite -zip_rcons /=;
+      last by rewrite size_zeros size_rev .
+    by rewrite zeros_rcons -rev_cons zeros_cons .
+  Qed .
+
+  Lemma unzip1_zip_zeros T (bs : seq T) :
+    unzip1 (zip (zeros (size bs)) bs) == zeros (size bs) .
+  Proof .
+    elim : bs => [|b bs IH]; first done .
+    by rewrite size_joinlsb addn1 -zeros_cons zip_cons /= (eqP IH) .
+  Qed .
+
+  Lemma andb_orb_all_0l_rec b bs :
+    andb_orb_all_zip (zip (zeros (size bs).+1) (b::bs)) ==
+    andb_orb_all_zip (zip (zeros (size bs)) bs) .
+  Proof .
+    rewrite {1}/andb_orb_all_zip /= .
+    rewrite (eqP (@unzip1_zip_zeros _ bs)) (orb_all_0) /= .
+    rewrite -/andb_orb_all_zip .
+    by case (andb_orb_all_zip (zip (zeros (size bs)) bs)) .
+  Qed .
+
+  Lemma andb_orb_all_zip_0l_ss : forall bs,
+      andb_orb_all_zip (zip (zeros (size bs)) bs) = false.
+  Proof .
+    elim => [|rb rbs]; first done .
+    rewrite size_joinlsb addn1 .
+    by rewrite (eqP (@andb_orb_all_0l_rec _ _)) .
+  Qed .
+
   Lemma andb_orb_all_0l : forall bs n, andb_orb_all (zeros n) bs = false.
   Proof.
-    intros. rewrite/andb_orb_all /extzip0 extzip_zip size_rev size_zeros zeros_cats. 
-  Admitted.
-
+    move => bs n .
+    rewrite /andb_orb_all /extzip0 extzip_zip .
+    rewrite size_rev size_zeros .
+    rewrite zeros_cats .
+    have : (n + (size bs - n) = size (rev bs ++ copy (n - size bs) b0)) .
+    { by rewrite size_cat size_copy size_rev -!maxnE maxnC . } 
+    case => -> .
+    by rewrite andb_orb_all_zip_0l_ss .
+  Qed .
 
   Lemma size_unzip (bsp: seq (bool*bool)) : size (unzip1 bsp) = size (unzip2 bsp).
   Proof.
