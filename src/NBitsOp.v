@@ -3172,10 +3172,206 @@ Section Lemmas.
     rewrite nth_rev/=; last done. by rewrite subn1/=-last_nth.
   Qed.
 
+  Lemma sig_bits_lsb1 bs : 0 < sig_bits (b1::bs) .
+  Proof .
+    case : bs => [|b bs]; first done .
+    dcase (sig_bits (b::bs)); case => [Hsigbits | m Hsigbits] .
+    - by rewrite -(sig_bits_consb _ Hsigbits) addn1 ltn0Sn . 
+    - rewrite -(sig_bits_cons1); first by apply ltn0Sn .
+      by rewrite Hsigbits ltn0Sn .
+  Qed .
+
+  Lemma head0_rev_sig_bits bs :
+    head false (rev bs) -> 0 < sig_bits bs .
+  Proof .
+    elim : bs => [|b bs IH]; first done .
+    case b => H .
+    - apply : sig_bits_lsb1 .
+    - rewrite head_rev in H .
+      by rewrite -(sig_bits_cons1 _ (IH H)) ltn0Sn .
+  Qed .
+
+  Lemma orb_all_sig_bits bs :
+    orb_all bs -> 0 < sig_bits bs .
+  Proof .
+    elim : bs => [|b bs IH]; first done .
+    case b .
+    - move => _; apply sig_bits_lsb1 .
+    - rewrite /orb_all Bool.orb_false_r -/orb_all => H .
+      by rewrite -(sig_bits_cons1 _ (IH H)) ltn0Sn .
+  Qed .      
+
+  Lemma behead_rev (b : bool) bs :
+    behead (rev (b::bs)) = rev (belast b bs) .
+  Proof .
+    elim : bs b => [|c cs IH]; first done .
+    move => b; rewrite !rev_cons /= -/belast .
+    rewrite -(IH c) /= -rev_cons /= .
+    dcase (rev (c::cs)); case; last done .
+    move => Hnil .
+    move : (rev_nil c cs) .
+    by rewrite -Hnil eq_refl /= .
+  Qed .
+
+  Lemma orb_all_false_zeros bs :
+    orb_all bs = false -> bs == zeros (size bs) .
+  Proof .
+    elim : bs => [|b bs IH]; first done .
+    case b => /= .
+    - by rewrite Bool.orb_true_r .
+    - rewrite Bool.orb_false_r => Horb .
+      by rewrite (eqP (IH Horb)) size_zeros .
+  Qed .
+
+  (*
+  Lemma andb_orb_all_zip_
+  Hhd : head false (rev cs1) = false
+  ============================
+  andb_orb_all_zip (extzip0 cs0 (behead (rev (false :: cs1)))) ->
+   *)
+
+  Lemma rev_zeros n :
+    rev (zeros n) == zeros n .
+  Proof .
+    elim : n => [|n /eqP IH]; first done .
+    by rewrite -zeros_cons rev_cons IH zeros_rcons .
+  Qed .
+
+  Lemma behead_zeros n :
+    behead (zeros n) == zeros n.-1 .
+  Proof .
+    elim : n => [|n /eqP IH]; first done .
+    by rewrite -zeros_cons /= .
+  Qed .
+
+  Lemma andb_orb_all_true_ss : forall bs1 bs2, size bs1 = size bs2 -> andb_orb_all bs1 bs2 -> (0 < sig_bits bs1) /\ (0 < sig_bits bs2).
+  Proof .
+    apply : seq_ind2; first done .
+    move => c0 c1 cs0 cs1 Hszeq IH .
+    case c0; case c1; rewrite /andb_orb_all /= rev_cons headI /=;
+      try (rewrite Bool.orb_true_r || rewrite Bool.orb_false_r);
+      try (rewrite Bool.andb_true_l);
+      move => H; split; try apply sig_bits_lsb1 .
+    - (* case 1 *)
+      move : H; dcase (head false (rev cs1)); case => Hhd;
+        [ rewrite Bool.orb_true_r => _;
+          by rewrite -(sig_bits_cons1 _ (head0_rev_sig_bits Hhd)) ltn0Sn
+        | rewrite Bool.orb_false_r => Htl ] .
+      rewrite -sig_bits_cons1; first by rewrite ltn0Sn .
+      dcase (0 < sig_bits cs1); case; first done .
+      move => Hn0 .
+      have : (sig_bits cs1 == 0) .
+      { move : Hn0; by case (sig_bits cs1) . }
+      move => /eqP Hszcs1 {Hn0} .
+      move : Htl .
+      have : (cs1 = zeros (size cs1)) .
+      { apply sig_bits_is0; trivial . }
+      case => -> .
+      rewrite (eqP (@rev_zeros _)) zeros_rcons
+              (eqP (@behead_zeros _)) -Hszeq /= .
+      by rewrite -(andb_orb_all_0r cs0 (size cs0)) 
+                 /andb_orb_all (eqP (@rev_zeros _)) .
+    - (* case 2 *)
+      move : H; dcase (orb_all (unzip1 (extzip0 cs0 (behead (rcons (rev cs1) true)))));
+        case => Horb;
+        [ rewrite Bool.andb_true_l => _;
+          move : Horb;
+          rewrite unzip1_extzip_ss;
+          [ move => Horb;
+            move : (orb_all_sig_bits Horb) => Hsigbits;
+            by rewrite -(sig_bits_cons1 _ Hsigbits) ltn0Sn
+          | by rewrite size_behead size_rcons size_rev -Hszeq ]
+        | rewrite Bool.andb_false_l Bool.orb_false_r
+                  -rev_cons behead_rev ] .
+      move : Horb .
+      rewrite /extzip0 extzip_zip_ss;
+        last by rewrite size_behead size_rcons size_rev .
+      rewrite unzip1_zip; 
+        last by rewrite size_behead size_rcons size_rev -Hszeq .
+      move => Hcs0; move : (orb_all_false_zeros Hcs0) => /eqP -> .
+      have : (size cs0 = size (rev (belast true cs1))) .
+      { by rewrite size_rev size_belast -Hszeq . }
+      case => -> .
+      rewrite extzip_zip_ss;
+        last by rewrite !size_rev !size_belast size_zeros .
+      by rewrite andb_orb_all_zip_0l_ss .
+    - (* case 3 *)
+      move : H; dcase (orb_all (unzip1 (extzip0 cs0 (behead (rcons (rev cs1) false)))));
+        case => Horb;
+        [ rewrite Bool.andb_true_l => _;
+          move : Horb;
+          rewrite unzip1_extzip_ss;
+          [ move => Horb;
+            move : (orb_all_sig_bits Horb) => Hsigbits;
+            by rewrite -(sig_bits_cons1 _ Hsigbits) ltn0Sn
+          | by rewrite size_behead size_rcons size_rev -Hszeq ]
+        | rewrite Bool.andb_false_l Bool.orb_false_r
+                  -rev_cons behead_rev ] .
+      move : Horb .
+      rewrite /extzip0 extzip_zip_ss;
+        last by rewrite size_behead size_rcons size_rev .
+      rewrite unzip1_zip; 
+        last by rewrite size_behead size_rcons size_rev -Hszeq .
+      move => Hcs0; move : (orb_all_false_zeros Hcs0) => /eqP -> .
+      have : (size cs0 = size (rev (belast false cs1))) .
+      { by rewrite size_rev size_belast -Hszeq . }
+      case => -> .
+      rewrite extzip_zip_ss;
+        last by rewrite !size_rev !size_belast size_zeros .
+      by rewrite andb_orb_all_zip_0l_ss .
+    - (* case 4 *)
+      move : H; dcase (head false (rev cs1)); case => Hhd;
+        [ rewrite Bool.andb_true_r => _;
+          by rewrite -(sig_bits_cons1 _ (head0_rev_sig_bits Hhd)) ltn0Sn
+        | rewrite Bool.andb_false_r Bool.orb_false_r => Htl ] .
+      rewrite -sig_bits_cons1; first by rewrite ltn0Sn .
+      dcase (0 < sig_bits cs1); case; first done .
+      move => Hn0 .
+      have : (sig_bits cs1 == 0) .
+      { move : Hn0; by case (sig_bits cs1) . }
+      move => /eqP Hszcs1 {Hn0} .
+      move : Htl .
+      have : (cs1 = zeros (size cs1)) .
+      { apply sig_bits_is0; trivial . }
+      case => -> .
+      rewrite (eqP (@rev_zeros _)) zeros_rcons
+              (eqP (@behead_zeros _)) -Hszeq /= .
+      by rewrite -(andb_orb_all_0r cs0 (size cs0)) 
+                 /andb_orb_all (eqP (@rev_zeros _)) .
+  Qed .
+
+  Lemma sig_bits_zeros_cat m n bs :
+    0 < sig_bits ((zeros m) ++ bs ++ (zeros n)) -> 0 < sig_bits bs .
+  Proof .
+    dcase (sig_bits bs); case; 
+      last by (intros; rewrite ltn0Sn) .
+    rewrite sig_bits_is0 => -> .
+    by rewrite -!zeros_addn sig_bits_zeros .
+  Qed .
+
   Lemma andb_orb_all_true : forall bs1 bs2, andb_orb_all bs1 bs2 -> (0 < sig_bits bs1) /\ (0 < sig_bits bs2).
   Proof.
-  Admitted.
-
+    move => bs1 bs2 .
+    rewrite /andb_orb_all /extzip0 extzip_zip .
+    rewrite -(rev_copy (size bs1 - size (rev bs2))) -rev_cat .
+    have : (size (bs1 ++ copy (size (rev bs2) - size bs1) b0)
+            = size (copy (size bs1 - size (rev bs2)) b0 ++ bs2)) .
+    { by rewrite !size_rev !size_cat !size_copy
+                 (addnC (size bs1 - size bs2) (size bs2))
+                 -!maxnE maxnC . }
+    move => Hszeq .
+    move : (andb_orb_all_true_ss Hszeq) .
+    rewrite {1}/andb_orb_all /extzip0 extzip_zip_ss /=;
+      last by rewrite Hszeq rev_cat !size_cat !size_rev (addnC) .
+    move => Hss H .
+    move : (Hss H) .
+    elim; split .
+    - apply : (@sig_bits_zeros_cat 0 (size (rev bs2) - size bs1) bs1) .
+      by rewrite zeros0 cat0s .
+    - apply : (@sig_bits_zeros_cat (size bs1 - size (rev bs2)) 0 bs2) .
+      by rewrite zeros0 cats0 .
+  Qed .
+  
   Lemma andb_orb_all_sig_bits : forall bs1 bs2,
       size bs1 = size bs2 -> andb_orb_all bs1 bs2 -> size bs1 < (sig_bits bs1) + (sig_bits bs2).
   Proof.
