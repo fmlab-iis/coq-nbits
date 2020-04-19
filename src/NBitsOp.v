@@ -3024,21 +3024,53 @@ Section Lemmas.
     move =>  bsrhd bsrtl IH.
     rewrite /splitmsb/=rev_cons lastd_rcons.
     case bsrhd; last done. by rewrite sig_bits_rcons1 size_rcons.
-  Qed.    
+  Qed.
+
+  Lemma sig_bits_gt0_size bs :
+    0 < sig_bits bs -> 0 < size bs .
+  Proof .
+    elim : bs => [ | b bs IH _ ]; first done .
+    by rewrite size_joinlsb addn1 ltn0Sn .
+  Qed .
+
+  Lemma size_gt0_case bs :
+    0 < size bs ->
+    exists cs, (bs == cs ++ [::true]) || (bs == cs ++ [::false]) .
+  Proof .
+    case : bs => [ | b bs Hsz ]; first done .
+    exists (belast b bs) .
+    rewrite lastI -!cats1 .
+    case (last b bs);
+      [ by apply /orP; left |
+        by apply /orP; right ].
+  Qed .
+
+  Lemma sig_bits_cons1_rec: forall n (bs : seq bool) b, size bs = n -> 0 < sig_bits bs -> (sig_bits bs).+1 = (sig_bits (b :: bs)).
+  Proof .
+    elim => [ bs b | n IH bs b ] .
+    - move => Hsz; by rewrite (size0nil Hsz) .
+    - move => Hsz Hsigbits .
+      move : (size_gt0_case (sig_bits_gt0_size Hsigbits));
+        case => cs; case /orP => /eqP Hcs; rewrite !Hcs .
+      + by rewrite /sig_bits -!cat_cons !rev_cat /= .
+      + rewrite /sig_bits -!cat_cons !rev_cat !size_cat
+                /= !addn1 !subn1 /= .
+        have : (0 < sig_bits cs) .
+        { move : Hsigbits; rewrite Hcs /sig_bits /= .
+          by rewrite rev_cat /= size_cat /= addn1 subn1 . }
+        move => Hsigbitscs .
+        have : (size cs = n) .
+        { move : Hsz; rewrite Hcs size_cat addn1 /=; apply eq_add_S . }
+        move => Hszcs .
+        move : (IH cs b Hszcs Hsigbitscs) .
+        by rewrite /sig_bits size_joinlsb addn1 .
+  Qed .
   
   Lemma sig_bits_cons1: forall (bs : seq bool) b, 0 < sig_bits bs -> (sig_bits bs).+1 = (sig_bits (b :: bs)).
   Proof.
-    move => bs b Hgt0. move : (ltn_leq_trans Hgt0 (sig_bits_le bs)) => Hgt0s.
-    rewrite /sig_bits.
-    have ->: rev(b::bs) = joinlsb (splitlsb (rev(b::bs))).1 (splitlsb (rev(b::bs))).2 by
-    (rewrite joinlsb_splitlsb; last by rewrite size_rev).
-    have ->: rev bs = joinlsb (splitlsb (rev bs)).1 (splitlsb (rev bs)).2 by (rewrite joinlsb_splitlsb; last by rewrite size_rev ).
-    rewrite/=-!nth0. rewrite !nth_rev; try done. Local Opaque take. rewrite subn1 nth_last.
-    symmetry. rewrite subn1 nth_last last_cons. 
-    case Hlast : (last b bs); case Hlast0: (last b0 bs); first done; rewrite -drop1.
-    rewrite drop_rev. 
-    have ->:  (size bs).-1 = size (rev (take (size bs - 1) bs)) by rewrite size_rev size_take -subn_gt0 (subKn Hgt0s) subn1/=. 
-  Admitted.
+    move => bs b Hsigbits .
+    apply : (@sig_bits_cons1_rec (size bs)); done .
+  Qed .
     
   Lemma get_sig_bit bs: 0 < sig_bits bs-> nth b1 bs (sig_bits bs - 1).
   Proof.
