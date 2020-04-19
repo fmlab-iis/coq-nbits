@@ -3461,7 +3461,7 @@ Section Lemmas.
   Lemma modn_neq : forall m d, d > 0 -> d <= m-> ~~ (m %% d == m).
   Proof.
     intros.
-    SearchAbout (modn). rewrite -(ltn_mod m) in H.
+    rewrite -(ltn_mod m) in H.
     move : (ltn_leq_trans H H0) => Hgt.
     rewrite ltn_neqAle in Hgt. move/andP : Hgt => [Hne Hle]. exact.
   Qed.
