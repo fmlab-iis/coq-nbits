@@ -3426,6 +3426,14 @@ Section Lemmas.
       exact : (ltn_trans Hgt01 Hszj).
   Qed.
 
+  Lemma modn_neq : forall m d, d > 0 -> d <= m-> ~~ (m %% d == m).
+  Proof.
+    intros.
+    SearchAbout (modn). rewrite -(ltn_mod m) in H.
+    move : (ltn_leq_trans H H0) => Hgt.
+    rewrite ltn_neqAle in Hgt. move/andP : Hgt => [Hne Hle]. exact.
+  Qed.
+    
   Lemma umulo_to_nat : forall bs1 bs2, size bs1 = size bs2 -> Umulo bs1 bs2 -> to_nat bs1 * (to_nat bs2) != to_nat (mulB bs1 bs2).
   Proof.
     move => bs1 bs2 Hsz. rewrite/Umulo neq_ltn. 
@@ -3456,44 +3464,62 @@ Section Lemmas.
       move => Hlbd2 Hlbd1. move : (ltn_mul Hlbd1 Hlbd2)=> Hmullbd. rewrite -expnD in Hmullbd.
       move : (leq_mod (to_nat bs1 * to_nat bs2) (2 ^ size bs1 )) =>Hleqmod.
       rewrite /ucastB to_nat_mulB to_nat_from_nat. apply /orP; right.
+      move : (exp2n_gt0 (size bs1)) => Hszexpgt01.
+      have Haux : (size bs1  <=((sig_bits bs1).-1 + (sig_bits bs2).-1))
+        by rewrite addnC -subn1 (addnBAC _ Hgtc2) -subn1 (addnBA _ Hgtc1) 2!subn1 -subn2 addnC Hsub2.
+      move : (leq_pexp2l (ltn0Sn 1) Haux) => Hexp2n.
+      move : (leq_ltn_trans Hexp2n Hmullbd) => Hlt.
       case Heq1 : (sig_bits bs1 == size bs1); case Heq2 : (sig_bits bs2 == size bs2).
-      + rewrite (eqP Heq1) (eqP Heq2) Hsz -ltnS in Hsub2. rewrite (eqP Heq1) (eqP Heq2) Hsz in Hmulbd.
-        have Hm : (size bs2 + size bs2 - 2).+1 = (size bs2 + size bs2 - 2)+1 by rewrite addn1.
-        rewrite Hm (addnBAC _ Hadd) in Hsub2.
-        have Haux : (2 ^ size bs1  <= 2 ^ ((sig_bits bs1).-1 + (sig_bits bs2).-1) ).
-        rewrite (eqP Heq1) (eqP Heq2) Hsz. 
-        rewrite (leq_exp2l _ _ (ltnSn 1)) -ltnS -subn_gt0 -subn1 (addnBA _ Hszgt02) addnC subn1/= (addnBA _ Hszgt02) subn1.
-        have ->:(size bs2 + size bs2).-2.+1 = (size bs2 + size bs2)-2+1 by rewrite addn1 subn2.
-        rewrite -(subnBA _ Hszgt02).
-        rewrite -(muln1 2) addnn mulnC muln2 -doubleB subn_gt0 -muln2.
-        generalize Hgtsz2. rewrite -subn_gt0 => Hsub12.
-        by rewrite (ltn_Pmulr (ltnSn 1) Hsub12).
-        move : (leq_ltn_trans Haux Hmullbd) => Hexp.
-        rewrite ltn_neqAle in Hexp. move/andP : Hexp => [Hnt Hleexp].
+      + rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod].
+        move : (modn_neq Hszexpgt01 (ltnW Hlt)) => Hneq. by rewrite Heqmod in Hneq.
+        exact.
+      + move :(sig_bits_le bs2) => Hsigle2. 
+        move : (ltn_neqAle (sig_bits bs2) (size bs2)). rewrite Heq2 Hsigle2/=. move => Hcond2.
+        rewrite Hcond2.
+        rewrite /low to_nat_cat to_nat_zeros mul0n to_nat_take Hcond2 addn0 (to_nat_from_nat_bounded Hbd2).
         rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod].
-        admit. done.
-      + case Hsglt : (sig_bits bs2 < size bs2).
-        rewrite /low to_nat_cat to_nat_zeros mul0n to_nat_take Hsglt addn0 (to_nat_from_nat_bounded Hbd2).
-        rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
-        rewrite to_nat_zext.
-        rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
+        move : (modn_neq Hszexpgt01 (ltnW Hlt)) => Hneq. by rewrite Heqmod in Hneq.
+        exact.
       + move :(sig_bits_le bs1) => Hsigle1. 
         move : (ltn_neqAle (sig_bits bs1) (size bs1)). rewrite Heq1 Hsigle1/=. move => Hcond1.
-        rewrite Hcond1 /low to_nat_cat to_nat_zeros mul0n to_nat_take Hcond1 addn0 (to_nat_from_nat_bounded Hbd1).
-        rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
-      + case Hsglt1: (sig_bits bs1 < size bs1); case Hsglt2 : (sig_bits bs2 < size bs2). 
-        * rewrite /low 2!to_nat_cat 2!to_nat_zeros 2!mul0n 2!addn0 2!to_nat_take Hsglt1 Hsglt2 (to_nat_from_nat_bounded Hbd1) (to_nat_from_nat_bounded Hbd2).
-          rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
-        * rewrite /low 2!to_nat_cat 2!to_nat_zeros 2!mul0n 2!addn0 to_nat_take Hsglt1 (to_nat_from_nat_bounded Hbd1) .
-          rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
-        * rewrite /low 2!to_nat_cat 2!to_nat_zeros 2!mul0n 2!addn0 to_nat_take Hsglt2 (to_nat_from_nat_bounded Hbd2) .
-          rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
-        * rewrite 2!to_nat_zext.
-          rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod]. admit. done.
+        rewrite Hcond1.
+        rewrite /low to_nat_cat to_nat_zeros mul0n to_nat_take Hcond1 addn0 (to_nat_from_nat_bounded Hbd1).
+        rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod].
+        move : (modn_neq Hszexpgt01 (ltnW Hlt)) => Hneq. by rewrite Heqmod in Hneq.
+        exact.
+      + move :(sig_bits_le bs1) => Hsigle1. 
+        move : (ltn_neqAle (sig_bits bs1) (size bs1)). rewrite Heq1 Hsigle1/=. move => Hcond1.
+        rewrite Hcond1.
+        move :(sig_bits_le bs2) => Hsigle2. 
+        move : (ltn_neqAle (sig_bits bs2) (size bs2)). rewrite Heq2 Hsigle2/=. move => Hcond2.
+        rewrite Hcond2.
+        rewrite 2!/low 2!to_nat_cat 2!to_nat_zeros 2!mul0n 2!to_nat_take Hcond1 Hcond2 (to_nat_from_nat_bounded Hbd1) (to_nat_from_nat_bounded Hbd2) 2!addn0.
+        rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod].
+        move : (modn_neq Hszexpgt01 (ltnW Hlt)) => Hneq. by rewrite Heqmod in Hneq.
+        exact.
     - move : (msb_sig_bits Hmsb). rewrite size_mulB size_zext. move => Hsigmul.
       apply /orP; right.
-      rewrite to_nat_mulB to_nat_from_nat.
-  Admitted.
+      rewrite to_nat_mulB to_nat_from_nat. 
+      have Hsbgt0 : 0 < (sig_bits (zext 1 bs1 *# zext 1 bs2)) by rewrite Hsigmul addn1 ltn0Sn.
+      move : (lower_bound Hsbgt0). rewrite ltB_to_nat.
+      rewrite to_nat_joinmsb size_zeros Hsigmul to_nat_zeros to_nat_zext addn0 -subn1 addnK mul1n.
+      rewrite to_nat_take size_full_mul !size_zext . 
+      have : (0 < (size bs2) +1) by rewrite addn1 ltn0Sn. rewrite -(ltn_add2l (size bs1 +1)) addn0. move => Hcond.
+      rewrite Hcond to_nat_full_mul !to_nat_zext size_full_mul !size_zext. 
+      rewrite to_nat_from_nat to_nat_from_nat_bounded. move => Hexp2n.
+      move : (leq_mod (to_nat bs1 * to_nat bs2) (2 ^ (size bs1 +1))) =>Hleqmod1.
+      move : (ltn_leq_trans Hexp2n Hleqmod1) => Hlt.
+      move : (modn_neq (exp2n_gt0 (size bs1)) (ltnW Hlt)) => Hneq.
+      move : (leq_mod (to_nat bs1 * to_nat bs2) (2 ^ (size bs1))) =>Hleqmod.
+      rewrite leq_eqVlt in Hleqmod. move/orP : Hleqmod => [Heqmod|Hltmod].
+      rewrite Heqmod in Hneq. done.
+      exact.
+      move : (leq_add (sig_bits_le bs1) (sig_bits_le bs2)).
+      rewrite -ltnS. move/ltnW => Hadd2. rewrite -ltnS in Hadd2.
+      rewrite -(ltn_exp2l _ _ (ltnSn 1)) in Hadd2.
+      rewrite 2!addn1 addnS addSn.
+      exact : (ltn_trans Hmulbd Hadd2).
+  Qed.
       
 
   (* Lemmas used in coq-cryptoline *)
