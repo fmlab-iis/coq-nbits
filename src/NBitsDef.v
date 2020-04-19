@@ -1206,6 +1206,77 @@ Section Lemmas.
       rewrite Z.add_0_r. reflexivity.
   Qed.
 
+  Lemma high_zeros_to_Zpos_low_eq bs n :
+    high (size bs - n) bs = zeros (size bs - n) ->
+    to_Zpos (low n bs) = to_Zpos bs.
+  Proof.
+    case/orP: (AuxLemmas.ltn_geq_total n (size bs)) => Hs.
+    - move: (@cat_low_high bs n (size bs - n)). rewrite (subnKC (ltnW Hs)) => H.
+      move: (H (Logic.eq_refl (size bs))) => {H} H. rewrite -{5}H.
+      move=> ->.  rewrite to_Zpos_cat to_Zpos_zeros Z.mul_0_l Z.add_0_r.
+      reflexivity.
+    - move=> _. rewrite (low_oversize Hs). rewrite to_Zpos_cat.
+      rewrite to_Zpos_zeros Z.mul_0_l Z.add_0_r. reflexivity.
+  Qed.
+
+  Lemma to_Zpos_bounded bs : (to_Zpos bs < 2 ^ Z.of_nat (size bs))%Z.
+  Proof.
+    rewrite to_Zpos_nat. 
+    have->: 2%Z = Z.of_nat 2 by trivial.
+    rewrite -Nat2Z_inj_expn -(Nat2Z.inj_lt). apply/ltP; exact: to_nat_bounded. 
+  Qed.
+
+  Lemma high_zeros_to_Zpos_bounded bs n :
+    high n bs = zeros n -> (to_Zpos bs < 2 ^ Z.of_nat (size bs - n))%Z.
+  Proof.
+    case Hsz : (size bs <= n).
+    - rewrite (high_oversize Hsz) => Hzeros.
+      apply (f_equal (high (size bs))) in Hzeros; move: Hzeros.
+      rewrite high_size_cat; last by trivial.
+      rewrite high_zeros => ->. rewrite to_Zpos_zeros.
+      apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+    - move=> Hhighn.
+      rewrite -(@high_zeros_to_Zpos_low_eq bs (size bs - n)).
+      + move: (to_Zpos_bounded (low (size bs - n) bs)). by rewrite size_low.
+      + rewrite subKn; first done. apply ltnW. 
+        rewrite leqNgt in Hsz. apply negbT in Hsz. by rewrite negbK in Hsz.
+  Qed.
+
+  Lemma high_zeros_to_Zpos_mul_pow2_bounded bs n :
+    high n bs = zeros n -> (to_Zpos bs * 2 ^ Z.of_nat n < 2 ^ Z.of_nat (size bs))%Z.
+  Proof.
+    case Hsz : (size bs <= n).
+    - rewrite (high_oversize Hsz) => Hzeros.
+      apply (f_equal (high (size bs))) in Hzeros; move: Hzeros.
+      rewrite high_size_cat; last by trivial.
+      rewrite high_zeros => ->. rewrite to_Zpos_zeros.
+      apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+    - move=> Hhighn.
+      move: (high_zeros_to_Zpos_bounded Hhighn) => Hbs.
+      rewrite leqNgt in Hsz. apply negbT in Hsz. 
+      rewrite negbK in Hsz. apply ltnW in Hsz.
+      have->: size bs = size bs - n + n by rewrite subnK.
+      rewrite Nat2Z.inj_add. rewrite Z.pow_add_r; try exact: Nat2Z.is_nonneg.
+      apply Zmult_lt_compat_r; last done.
+      apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+  Qed.
+
+  Lemma to_Zpos_dropmsb bs : 
+    to_Zpos (dropmsb bs) = ((to_Zpos bs) mod (2 ^ (Z.of_nat (size bs) - 1)))%Z.
+  Proof.
+    case (lastP bs) => {bs} [| bs b] //=.
+    rewrite /dropmsb splitmsb_rcons /= to_Zpos_rcons size_rcons.
+    rewrite Nat2Z.inj_succ -Z.add_1_r Z.add_simpl_r Z.mod_add.
+    - rewrite Z.mod_small; first reflexivity. 
+      split; [exact: to_Zpos_ge0 | exact: to_Zpos_bounded].
+    - apply Z.pow_nonzero; [ done | exact: Nat2Z.is_nonneg ].
+  Qed.
+
+  Lemma to_Zpos_joinlsb b bs : to_Zpos (joinlsb b bs) = ((to_Zpos bs) * 2 + b)%Z.
+  Proof.
+    case: bs => [| x bs] /=; [rewrite Z.add_0_r | rewrite Z.add_comm]; done.
+  Qed.
+
 
   (* Lemmas about to_Zneg *)
 
@@ -1477,19 +1548,6 @@ Section Lemmas.
       rewrite -Z.add_succ_l Z.opp_add_distr. apply/Z.add_cancel_r.
       move/Z.add_move_r: (to_Zpos_add_to_Zneg bs1). move=> ->. ring.
     - exact: to_Zpos_cat.
-  Qed.
-
-  Lemma high_zeros_to_Zpos_low_eq bs n :
-    high (size bs - n) bs = zeros (size bs - n) ->
-    to_Zpos (low n bs) = to_Zpos bs.
-  Proof.
-    case/orP: (AuxLemmas.ltn_geq_total n (size bs)) => Hs.
-    - move: (@cat_low_high bs n (size bs - n)). rewrite (subnKC (ltnW Hs)) => H.
-      move: (H (Logic.eq_refl (size bs))) => {H} H. rewrite -{5}H.
-      move=> ->.  rewrite to_Zpos_cat to_Zpos_zeros Z.mul_0_l Z.add_0_r.
-      reflexivity.
-    - move=> _. rewrite (low_oversize Hs). rewrite to_Zpos_cat.
-      rewrite to_Zpos_zeros Z.mul_0_l Z.add_0_r. reflexivity.
   Qed.
 
   Lemma high_zeros_to_Z_low bs n :

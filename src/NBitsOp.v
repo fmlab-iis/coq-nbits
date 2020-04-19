@@ -3556,11 +3556,31 @@ Section Lemmas.
 
   (* Lemmas used in coq-cryptoline *)
 
+  Lemma to_Zpos_shlB1 bs :
+    to_Zpos (shlB1 bs) = ((to_Zpos bs * 2) mod (2 ^ Z.of_nat (size bs)))%Z.
+  Proof.
+    rewrite /shlB1 to_Zpos_dropmsb to_Zpos_joinlsb size_joinlsb. 
+    by rewrite Nat2Z.inj_add /= Z.add_simpl_r Z.add_0_r. 
+  Qed.
+
   Lemma bv2z_shl_unsigned bs n :
     high n bs == zeros n ->
     to_Zpos (bs <<# n)%bits = (to_Zpos bs * 2 ^ Z.of_nat n)%Z.
   Proof.
-  Admitted.
+    elim: n => [| n IHn].
+    - by rewrite /= Z.mul_1_r. 
+    - move/eqP=> HhighSn. 
+      have Hhighn : high n bs == zeros n by rewrite (high_zeros_le _ HhighSn).
+      rewrite /=. 
+      have ->: Z.pow_pos 2 (Pos.of_succ_nat n) = (2 ^ Z.of_nat n.+1)%Z by trivial.
+      rewrite to_Zpos_shlB1 (IHn Hhighn) size_shlB -Z.mul_assoc. 
+      have ->: (2 ^ Z.of_nat n * 2)%Z = (2 * 2 ^ Z.of_nat n)%Z by rewrite Z.mul_comm.
+      rewrite -Z.pow_succ_r; last exact: Nat2Z.is_nonneg.
+      rewrite -Nat2Z.inj_succ Z.mod_small; first reflexivity.
+      split.
+      + apply Z.mul_nonneg_nonneg; [ exact: to_Zpos_ge0 | by apply Z.pow_nonneg ].
+      + by apply high_zeros_to_Zpos_mul_pow2_bounded.
+  Qed.
 
   Lemma bv2z_shl_signed bs n :
     (high (n + 1) bs == zeros n) || (high (n + 1) bs == ones n) ->
