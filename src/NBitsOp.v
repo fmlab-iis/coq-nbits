@@ -2190,7 +2190,6 @@ Section Lemmas.
     Properties of multiplication
   ---------------------------------------------------------------------------*)
 
-
   Lemma joinlsb_false_zeros : forall n, joinlsb false (zeros n) = zeros n.+1.
   Proof. elim; done. Qed.
 
@@ -2810,6 +2809,62 @@ Section Lemmas.
   Proof.
   Admitted.
    *)
+
+
+  (*---------------------------------------------------------------------------
+    Properties of signed division     
+  ---------------------------------------------------------------------------*)
+  Definition absB bs :=
+    if msb bs then negB bs else bs.
+
+  Definition Nat_dvdn n m := Nat.modulo n m == 0. 
+
+  Lemma modn_mod : forall n m , 0 < m -> div.modn n m = Nat.modulo n m.
+  Proof.
+  Admitted.
+
+      
+  Lemma divn_div : forall n m,  0 < m -> div.divn n m = Nat.div n m.
+  Proof.
+  Admitted.
+
+  
+  Definition sdivB bs1' bs2' : bits * bits :=
+    let bs1 := absB bs1' in
+    let bs2 := absB bs2' in
+    if (msb bs1' == msb bs2') && negb (msb bs1') then udivB bs1 bs2
+    else if (msb bs1' == msb bs2') && (msb bs1') then ((udivB bs1 bs2).1, negB (udivB bs1 bs2).2)
+         else if (msb bs1' != msb bs2') && negb (msb bs1') then (negB (udivB bs1 bs2).1, (udivB bs1 bs2).2)
+              else (negB (udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
+
+  Lemma toZ_udiv ub1 ub2 : to_nat ub2 <> 0 -> size ub1 = size ub2 -> to_Zpos (udivB ub1 ub2).1 = Z.div (to_Zpos ub1) (to_Zpos ub2).
+  Proof.
+    move => Hnot0 Hsz12 .
+    rewrite !to_Zpos_nat -(div_Zdiv _ _ Hnot0) udivB_to_nat Hsz12 (to_nat_from_nat_bounded (to_nat_bounded ub2)).
+    rewrite ->Nat2Z.inj_iff. rewrite divn_div. done.
+    rewrite lt0n. by move/eqP : Hnot0.
+  Qed.
+  
+  Lemma toZ_sdivB sb1 sb2: to_Z (sdivB sb1 sb2).1 = Z.div (to_Z sb1) (to_Z sb2).
+  Proof.
+    rewrite {2 3}/to_Z /sdivB /absB.
+    case Hspmsb1 : (splitmsb sb1) => [tl1 msb1].
+    case Hspmsb2 : (splitmsb sb2) => [tl2 msb2]. rewrite /msb Hspmsb1 Hspmsb2/=.
+    case Hmsb1 : (msb1); case Hmsb2 : (msb2).
+    - rewrite udivB_negB_negB /= Zdiv_opp_opp.
+Admitted.
+  
+  (*---------------------------------------------------------------------------
+    Properties of signed modulo     
+  ---------------------------------------------------------------------------*)
+  
+  Definition smodB bs1 bs2 : bits :=
+  let (q_sdiv, r_sdiv) := eta_expand (sdivB bs1 bs2) in 
+  if (msb bs1 == msb bs2) || (r_sdiv == (zeros (size r_sdiv))) then
+    r_sdiv
+  else addB r_sdiv bs2.
+
+
 
   (*---------------------------------------------------------------------------
     Others
