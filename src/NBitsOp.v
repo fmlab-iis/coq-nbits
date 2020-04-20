@@ -3638,7 +3638,7 @@ Admitted.
   Qed.
 
   Lemma bv2z_shl_signed bs n :
-    (high (n + 1) bs == zeros n) || (high (n + 1) bs == ones n) ->
+    (high (n + 1) bs == zeros (n + 1)) || (high (n + 1) bs == ones (n + 1)) ->
     to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
   Proof.
   Admitted.
@@ -3655,7 +3655,8 @@ Admitted.
 
   Lemma bv2z_cshl_signed bsh bsl n :
     size bsh = size bsl ->
-    (high (n + 1) (bsh ++ bsl) == zeros n) || (high (n + 1) (bsh ++ bsl) == ones n) ->
+    (high (n + 1) (bsh ++ bsl) == zeros (n + 1))
+    || (high (n + 1) (bsh ++ bsl) == ones (n + 1)) ->
     (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
      to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
      2 ^ Z.of_nat (size bsl - n))%Z =
