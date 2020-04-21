@@ -268,7 +268,7 @@ Section Lemmas.
       rewrite (eqP Hbs) .
       case : b; [right | left]; done .
   Qed .
-    
+
   Lemma size_cat lo hi : size (cat lo hi) = size lo + size hi.
   Proof. rewrite size_cat. reflexivity. Qed.
 
@@ -514,7 +514,7 @@ Section Lemmas.
   Proof. rewrite /ones. rewrite take_nseq. reflexivity. Qed.
 
 
-  (* from_bool *)
+  (* from_bool and to_bool *)
 
   Lemma from_bool_cat n b : from_bool n b = drop (n - 1) (copy n b) ++ zeros (n - 1).
   Proof.
@@ -524,6 +524,12 @@ Section Lemmas.
     rewrite zeros_cons -zeros_rcons -cats1 catA -IH. rewrite -zeros_from_nat /joinlsb.
     rewrite zeros_cons -zeros_rcons -cats1 cat_cons. reflexivity.
   Qed.
+
+  Lemma from_bool_bit b : from_bool 1 b = [:: b].
+  Proof. by case: b. Qed.
+
+  Lemma to_bool_bit b : to_bool [:: b] = b.
+  Proof. by case: b. Qed.
 
 
   (* Lemmas about invB *)
@@ -609,6 +615,14 @@ Section Lemmas.
   Lemma low1_cons b bs : low 1 (b::bs) = [::b].
   Proof.
     rewrite /low /=. rewrite take0 /=. reflexivity.
+  Qed.
+
+  Lemma high1_joinmsb b bs : high 1 (joinmsb bs b) = [:: b].
+  Proof. exact: high1_rcons. Qed.
+
+  Lemma low_joinmsb b bs : low (size bs) (joinmsb bs b) = bs.
+  Proof.
+    elim: bs => [| c cs IH] //=. rewrite low_cons. rewrite IH. reflexivity.
   Qed.
 
   Lemma high_size bs : high (size bs) bs = bs.
