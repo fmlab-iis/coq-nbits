@@ -3724,7 +3724,7 @@ Admitted.
 
   Lemma bv2z_cshl_unsigned bsh bsl n :
     size bsh = size bsl ->
-    high n (bsh ++ bsl) == zeros n ->
+    high n (bsl ++ bsh) == zeros n ->
     (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits * 2 ^ Z.of_nat n +
      to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
     ((to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
@@ -3733,8 +3733,8 @@ Admitted.
 
   Lemma bv2z_cshl_signed bsh bsl n :
     size bsh = size bsl ->
-    (high (n + 1) (bsh ++ bsl) == zeros (n + 1))
-    || (high (n + 1) (bsh ++ bsl) == ones (n + 1)) ->
+    (high (n + 1) (bsl ++ bsh) == zeros (n + 1))
+    || (high (n + 1) (bsl ++ bsh) == ones (n + 1)) ->
     (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits * 2 ^ Z.of_nat n +
      to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
     ((to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
