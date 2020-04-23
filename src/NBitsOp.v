@@ -451,6 +451,15 @@ Section Lemmas.
     move: (IH _ _ H3 c0). rewrite Hfull /=. by move=> ->.
   Qed.
 
+  Lemma size_andB bs1 bs2 : size (andB bs1 bs2) = maxn (size bs1) (size bs2).
+  Proof. rewrite /andB. rewrite size_lift. reflexivity. Qed.
+
+  Lemma size_orB bs1 bs2 : size (orB bs1 bs2) = maxn (size bs1) (size bs2).
+  Proof. rewrite /orB. rewrite size_lift. reflexivity. Qed.
+
+  Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = maxn (size bs1) (size bs2).
+  Proof. rewrite /xorB. rewrite size_lift. reflexivity. Qed.
+
   Lemma size_addB bs0 bs1 : size (addB bs0 bs1) = minn (size bs0) (size bs1).
   Proof. exact: size_full_adder_zip. Qed.
 
@@ -507,7 +516,7 @@ Section Lemmas.
 
   Lemma size_shlB n bs : size (shlB n bs) = size bs.
   Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shlB1 IH. Qed.
-  
+
   Lemma size_negB bs : size (negB bs)%bits = size bs.
   Proof.
     elim: bs => [| b bs IH] //=. rewrite /negB /=. case b; rewrite /=.
@@ -2552,11 +2561,6 @@ Section Lemmas.
     - by rewrite /lift0 lift_cons liftE -/lift0 (IH ytl) Bool.xorb_comm. 
   Qed.
 
-  Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = maxn (size bs1) (size bs2).
-  Proof.
-    by rewrite /xorB /lift0 size_lift .
-  Qed .
-  
   (*---------------------------------------------------------------------------
     Properties of signed extend 
   ---------------------------------------------------------------------------*)
