@@ -2810,9 +2810,13 @@ Section Lemmas.
   Admitted.
    *)
 
+  (*---------------------------------------------------------------------------
+    Properties of unsigned modulo
+  ---------------------------------------------------------------------------*)
+  Definition uremB bs1 bs2 := (udivB bs1 bs2).2.
 
   (*---------------------------------------------------------------------------
-    Properties of signed division     
+    Properties of signed division    
   ---------------------------------------------------------------------------*)
   Definition absB bs :=
     if msb bs then negB bs else bs.
@@ -2836,7 +2840,7 @@ Section Lemmas.
     else if (msb bs1' == msb bs2') && (msb bs1') then ((udivB bs1 bs2).1, negB (udivB bs1 bs2).2)
          else if (msb bs1' != msb bs2') && negb (msb bs1') then (negB (udivB bs1 bs2).1, (udivB bs1 bs2).2)
               else (negB (udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
-
+  
   Lemma toZ_udiv ub1 ub2 : to_nat ub2 <> 0 -> size ub1 = size ub2 -> to_Zpos (udivB ub1 ub2).1 = Z.div (to_Zpos ub1) (to_Zpos ub2).
   Proof.
     move => Hnot0 Hsz12 .
@@ -2852,8 +2856,16 @@ Section Lemmas.
     case Hspmsb2 : (splitmsb sb2) => [tl2 msb2]. rewrite /msb Hspmsb1 Hspmsb2/=.
     case Hmsb1 : (msb1); case Hmsb2 : (msb2).
     - rewrite udivB_negB_negB /= Zdiv_opp_opp.
-Admitted.
+  Admitted.
+
+
+  (*---------------------------------------------------------------------------
+    Properties of signed remainder    
+  ---------------------------------------------------------------------------*)
   
+  Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
+
+    
   (*---------------------------------------------------------------------------
     Properties of signed modulo     
   ---------------------------------------------------------------------------*)
