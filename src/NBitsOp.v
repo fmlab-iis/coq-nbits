@@ -2900,6 +2900,14 @@ Section Lemmas.
   Definition absB bs :=
     if msb bs then negB bs else bs.
 
+  Lemma size_absB bs : size (absB bs) = size bs.
+  Proof.
+    rewrite /absB. case: (msb bs).
+    - rewrite size_negB; reflexivity.
+    - reflexivity.
+  Qed.
+
+
   Definition Nat_dvdn n m := Nat.modulo n m == 0. 
 
   Lemma modn_mod : forall n m , 0 < m -> div.modn n m = Nat.modulo n m.
@@ -2939,22 +2947,41 @@ Section Lemmas.
 
 
   (*---------------------------------------------------------------------------
-    Properties of signed remainder    
+    Properties of signed remainder
   ---------------------------------------------------------------------------*)
-  
+
   Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
 
-    
+  Lemma size_sremB bs1 bs2 : size (sremB bs1 bs2) = size bs1.
+  Proof.
+    rewrite /sremB. rewrite /sdivB. case: ((msb bs1 == msb bs2) && ~~ msb bs1) => /=.
+    - rewrite size_uremB size_absB. reflexivity.
+    - case: ((msb bs1 == msb bs2) && msb bs1) => /=.
+      + rewrite size_negB size_uremB size_absB. reflexivity.
+      + case: (~~ (msb bs1 == msb bs2) && ~~ msb bs1) => /=.
+        * rewrite size_uremB size_absB. reflexivity.
+        * rewrite size_negB size_uremB size_absB. reflexivity.
+  Qed.
+
   (*---------------------------------------------------------------------------
-    Properties of signed modulo     
+    Properties of signed modulo
   ---------------------------------------------------------------------------*)
-  
+
   Definition smodB bs1 bs2 : bits :=
-  let (q_sdiv, r_sdiv) := eta_expand (sdivB bs1 bs2) in 
+  let (q_sdiv, r_sdiv) := eta_expand (sdivB bs1 bs2) in
   if (msb bs1 == msb bs2) || (r_sdiv == (zeros (size r_sdiv))) then
     r_sdiv
   else addB r_sdiv bs2.
 
+  Lemma size_smodB bs1 bs2 :
+    size bs1 = size bs2 -> size (smodB bs1 bs2) = size bs1.
+  Proof.
+    move=> Hs. rewrite /smodB.
+    case: ((msb bs1 == msb bs2)
+           || ((sdivB bs1 bs2).2 == zeros (size (sdivB bs1 bs2).2))).
+    - rewrite size_sremB. reflexivity.
+    - rewrite size_addB size_sremB. rewrite Hs minnn. reflexivity.
+  Qed.
 
 
   (*---------------------------------------------------------------------------
