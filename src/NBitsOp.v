@@ -2978,13 +2978,32 @@ Section Lemmas.
   else addB r_sdiv bs2.
 
   Lemma size_smodB bs1 bs2 :
+    size (smodB bs1 bs2) =
+    if (msb bs1 == msb bs2) || is_zero (eta_expand (sdivB bs1 bs2)).2
+    then size bs1
+    else minn (size (eta_expand (sdivB bs1 bs2)).2) (size bs2).
+  Proof.
+    rewrite /smodB.
+    case H: ((msb bs1 == msb bs2) ||
+             ((sdivB bs1 bs2).2 == zeros (size (sdivB bs1 bs2).2))).
+    - case/orP: H => H.
+      + rewrite H /=. rewrite size_sremB. reflexivity.
+      + rewrite (eqP H) /=. rewrite zeros_is_zero orbT /=.
+        rewrite size_zeros size_sremB. reflexivity.
+    - move/Bool.orb_false_iff: H => [H1 H2]. rewrite H1 /=.
+      have ->: is_zero (sdivB bs1 bs2).2 = false.
+      { apply/negP=> H3. move/negP: H2. apply. rewrite {1}(is_zero_zeros H3).
+        exact: eqxx. }
+      rewrite size_addB. reflexivity.
+  Qed.
+
+  Lemma size_smodB_ss bs1 bs2 :
     size bs1 = size bs2 -> size (smodB bs1 bs2) = size bs1.
   Proof.
-    move=> Hs. rewrite /smodB.
-    case: ((msb bs1 == msb bs2)
-           || ((sdivB bs1 bs2).2 == zeros (size (sdivB bs1 bs2).2))).
-    - rewrite size_sremB. reflexivity.
-    - rewrite size_addB size_sremB. rewrite Hs minnn. reflexivity.
+    move=> Hs. rewrite size_smodB.
+    case: ((msb bs1 == msb bs2) || is_zero (eta_expand (sdivB bs1 bs2)).2).
+    - reflexivity.
+    - rewrite size_sremB Hs minnn. reflexivity.
   Qed.
 
 

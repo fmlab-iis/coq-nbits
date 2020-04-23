@@ -873,6 +873,15 @@ Section Lemmas.
   Lemma not_is_zero_singleton b : ~~ is_zero [::b] = b.
   Proof. by case: b. Qed.
 
+  Lemma zeros_is_zero n : is_zero (zeros n).
+  Proof. by elim: n. Qed.
+
+  Lemma is_zero_zeros bs : is_zero bs -> bs = zeros (size bs).
+  Proof.
+    elim: bs => [| b bs IH] //=. move/andP=> [H1 H2]. rewrite (eqP H1).
+    rewrite (IH H2). rewrite size_zeros. reflexivity.
+  Qed.
+
 
   (* Lemmas about zext *)
 
