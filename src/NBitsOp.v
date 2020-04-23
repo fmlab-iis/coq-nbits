@@ -1871,6 +1871,47 @@ Section Lemmas.
     apply : adcB_zext1_catB (eqP Hss) .
   Qed .
 
+  Lemma addB_zext1_high1 bs1 bs2 :
+    size bs1 = size bs2 ->
+    high 1 (zext 1 bs1 +# zext 1 bs2)%bits =
+    (1) -bits of bool (carry_addB bs1 bs2)%bits.
+  Proof.
+    move=> Hs. move: (addB_zext1_catB Hs) => Hext. rewrite (eqP Hext).
+    rewrite (high1_joinmsb (adcB false bs1 bs2).1 (adcB false bs1 bs2).2).
+    rewrite /carry_addB. by case: ((adcB false bs1 bs2).1).
+  Qed.
+
+  Lemma addB_zext1_lown bs1 bs2 :
+    size bs1 = size bs2 ->
+    low (size bs1) (zext 1 bs1 +# zext 1 bs2)%bits = (bs1 +# bs2)%bits.
+  Proof.
+    move=> Hs. move: (addB_zext1_catB Hs) => Hext. rewrite (eqP Hext).
+    move: (low_joinmsb (adcB false bs1 bs2).1 (adcB false bs1 bs2).2).
+    rewrite size_adcB -Hs minnE subKn; last apply leqnn. by apply.
+  Qed.
+
+  Lemma adcB_zext1_high1 bs1 bs2 b :
+    size bs1 = size bs2 ->
+    high 1 (zext 1 bs1 +# zext 1 bs2 +# zext (size bs1) [:: b])%bits =
+    (1) -bits of bool ((adcB (to_bool [:: b]) bs1 bs2).1)%bits.
+  Proof.
+    move/eqP=> Hs. rewrite (eqP (addB_addB_adcB b Hs)).
+    rewrite high1_joinmsb. rewrite to_bool_bit.
+      by case: ((adcB b bs1 bs2).1).
+  Qed.
+
+  Lemma adcB_zext1_lown bs1 bs2 b :
+    size bs1 = size bs2 ->
+    low (size bs1) (zext 1 bs1 +# zext 1 bs2 +# zext (size bs1) [:: b])%bits =
+    (adcB (to_bool [:: b]) bs1 bs2).2.
+  Proof.
+    move/eqP=> Hs. rewrite (eqP (addB_addB_adcB b Hs)).
+    have : (size bs1 = size (adcB b bs1 bs2).2).
+    { by rewrite size_adcB -(eqP Hs) minnE subKn. }
+    move=> ->. rewrite low_joinmsb. rewrite to_bool_bit. reflexivity.
+  Qed.
+
+
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
@@ -2177,6 +2218,44 @@ Section Lemmas.
     move=> Hs. case Hlt: (ltB bs1 bs2); case Hcarry: (borrow_subB bs1 bs2); try done.
     - apply (ltB_borrow_subB Hs) in Hlt. by rewrite Hlt in Hcarry.
     - apply (ltB_borrow_subB Hs) in Hcarry. by rewrite Hcarry in Hlt.
+  Qed.
+
+  Lemma subB_zext1_high1 bs1 bs2 :
+    size bs1 = size bs2 ->
+    high 1 (zext 1 bs1 -# zext 1 bs2)%bits =
+    (1) -bits of bool (borrow_subB bs1 bs2)%bits.
+  Proof.
+    move=> Hs. rewrite /borrow_subB. rewrite (eqP (subB_zext1_catB Hs)).
+    rewrite high1_joinmsb. by case: ((sbbB false bs1 bs2).1).
+  Qed.
+
+  Lemma subB_zext1_lown bs1 bs2 :
+    size bs1 = size bs2 ->
+    low (size bs1) (zext 1 bs1 -# zext 1 bs2)%bits = (bs1 -# bs2)%bits.
+  Proof.
+    move=> Hs. rewrite (eqP (subB_zext1_catB Hs)).
+    move: (low_joinmsb (sbbB false bs1 bs2).1 (sbbB false bs1 bs2).2).
+    rewrite size_sbbB -Hs minnE subKn; last apply leqnn. by apply.
+  Qed.
+
+  Lemma sbbB_zext1_high1 bs1 bs2 b :
+    size bs1 = size bs2 ->
+    high 1 (zext 1 bs1 -# zext 1 bs2 -# zext (size bs1) [:: b])%bits =
+    (1) -bits of bool ((sbbB (to_bool [:: b]) bs1 bs2).1)%bits.
+  Proof.
+    move=> Hs. rewrite (eqP (subB_subB_sbbB b Hs)).
+    rewrite high1_joinmsb. rewrite to_bool_bit. by case: ((sbbB b bs1 bs2).1).
+  Qed.
+
+  Lemma sbbB_zext1_lown bs1 bs2 b :
+    size bs1 = size bs2 ->
+    low (size bs1) (zext 1 bs1 -# zext 1 bs2 -# zext (size bs1) [:: b])%bits =
+    (sbbB (to_bool [:: b]) bs1 bs2).2.
+  Proof.
+    move=> Hs. rewrite (eqP (subB_subB_sbbB b Hs)).
+    have ->: size bs1 = size (sbbB b bs1 bs2).2.
+    { by rewrite size_sbbB -Hs minnE subKn. }
+    rewrite low_joinmsb. rewrite to_bool_bit. reflexivity.
   Qed.
 
   (* to be removed?
@@ -3650,28 +3729,27 @@ Section Lemmas.
   Qed.
 
   Lemma bv2z_shl_signed bs n :
-    (high (n + 1) bs == zeros n) || (high (n + 1) bs == ones n) ->
+    (high (n + 1) bs == zeros (n + 1)) || (high (n + 1) bs == ones (n + 1)) ->
     to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
   Proof.
   Admitted.
 
   Lemma bv2z_cshl_unsigned bsh bsl n :
     size bsh = size bsl ->
-    high n (bsh ++ bsl) == zeros n ->
-    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
-     to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
-     2 ^ Z.of_nat (size bsl - n))%Z =
-    (to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+    high n (bsl ++ bsh) == zeros n ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits * 2 ^ Z.of_nat n +
+     to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
+    ((to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
   Admitted.
 
   Lemma bv2z_cshl_signed bsh bsl n :
     size bsh = size bsl ->
-    (high (n + 1) (bsh ++ bsl) == zeros n) || (high (n + 1) (bsh ++ bsl) == ones n) ->
-    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
-     to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
-     2 ^ Z.of_nat (size bsl - n))%Z =
-    (to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+    (high (n + 1) (bsl ++ bsh) == zeros (n + 1))
+    || (high (n + 1) (bsl ++ bsh) == ones (n + 1)) ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits * 2 ^ Z.of_nat n +
+     to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
+    ((to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
   Admitted.
 
