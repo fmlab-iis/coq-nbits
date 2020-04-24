@@ -1210,6 +1210,8 @@ Section Lemmas.
       by rewrite /shrB iter_add .
   Qed .
   
+  (* duplicated with size_shrB1 and size_shrB *)
+  (*
   Lemma shrB1_size bs :
     size (shrB1 bs) = size bs .
   Proof .
@@ -1226,6 +1228,7 @@ Section Lemmas.
     move => n IH .
       by rewrite shrB1_size .
   Qed .
+   *)
 
   Lemma to_nat_shrB1 : forall bs, to_nat (shrB1 bs) = div.divn (to_nat bs) 2.
   Proof.
@@ -1239,6 +1242,67 @@ Section Lemmas.
     elim n => [|ns IH]/=. by rewrite div.divn1.
       by rewrite to_nat_shrB1 IH-div.divnMA expnS mulnC. 
   Qed.
+
+  Lemma msb_shrB1 bs : msb (shrB1 bs) = b0.
+  Proof.
+    case (lastP bs) => {bs} [| bs b] //=.
+    rewrite /shrB1 droplsb_joinmsb.
+    - by rewrite /msb splitmsb_joinmsb.
+    - by rewrite size_rcons.
+  Qed.
+
+  Lemma shrB_nil n : [::] >># n = [::].
+  Proof.
+    elim: n => [| n IHn] //=. by rewrite IHn.
+  Qed.
+
+  Lemma shrB1_zeros n : shrB1 (zeros n) = zeros n.
+  Proof.
+    case: n => [| n] //=. by rewrite /shrB1 /= /droplsb /= /joinmsb zeros_rcons. 
+  Qed.
+
+  Lemma shrB_zeros n m : (zeros n) >># m = zeros n.
+  Proof.
+    elim: m => [| m IHm] //=. by rewrite IHm shrB1_zeros.
+  Qed.
+
+  Lemma shrB_cat bs n : 
+    n <= size bs -> bs >># n = high (size bs - n) bs ++ zeros n.
+  Proof.    
+    elim: n => [| n IHn] Hsz /=.
+    - by rewrite cats0 subn0 high_size. 
+    - rewrite IHn; last by apply ltnW. 
+      rewrite /shrB1 /joinmsb rcons_cat zeros_rcons.
+      rewrite droplsb_cat; last by rewrite size_high subn_gt0.
+      rewrite -(subnSK Hsz) droplsb_high. reflexivity.
+  Qed.
+
+  Lemma shrB_size bs : bs >># (size bs) = zeros (size bs).
+  Proof. 
+    rewrite shrB_cat; last trivial. by rewrite subnn high0. 
+  Qed.
+
+  Lemma shrB_oversize bs n : size bs <= n -> bs >># n = zeros (size bs).
+  Proof.
+    move=> Hsz. rewrite -(subnK Hsz) -shrB_add shrB_size shrB_zeros. reflexivity.
+  Qed.
+
+  Lemma high_shrB_ss bs n : high n (bs >># n) = zeros n.
+  Proof.
+    case/orP: (ltn_geq_total n (size bs)).
+    - elim: n => [| n IHn] Hn.
+      + by rewrite high0.
+      + apply (ltn_trans (ltnSn n)) in Hn.
+        rewrite /= /shrB1 high_droplsb; last by rewrite size_rcons size_shrB. 
+        rewrite /joinmsb high_rcons (IHn Hn) zeros_rcons. reflexivity.
+    - move=> Hsz. rewrite (shrB_oversize Hsz) high_zeros. reflexivity.
+  Qed.
+
+  Lemma high_shrB bs n m : n <= m -> high n (bs >># m) = zeros n.
+  Proof.
+    move=> Hsz. by rewrite -(high_high _ Hsz) high_shrB_ss high_zeros.
+  Qed.
+
 
   (*---------------------------------------------------------------------------
     Properties of shift left
@@ -1256,6 +1320,8 @@ Section Lemmas.
       by rewrite /= addn1 .
   Qed .
 
+  (* duplicated with size_shlB1 and size_shlB *)
+  (*
   Lemma shlB1_size bs :
     size (shlB1 bs) = size bs .
   Proof .
@@ -1272,6 +1338,7 @@ Section Lemmas.
     move => n IH .
       by rewrite shlB1_size .
   Qed .
+ *)
 
   Lemma to_nat_shlB1 : forall (p: bits), to_nat (shlB1 p) = div.modn ((to_nat p).*2) (2^size p).
   Proof. move => p. by rewrite /shlB1 to_nat_dropmsb to_nat_joinlsb size_joinlsb-subn1 addnK addn0-muln2.
@@ -1285,7 +1352,7 @@ Section Lemmas.
       by rewrite -{1}(expn0 2) ltn_exp2l. 
     - move=> Hlt. rewrite to_nat_shlB1.
       have Hkn : k < n by apply (ltn_trans (ltnSn k)).
-      rewrite (IH Hkn) shlB_size size_from_nat -muln2 -expnSr modn_small //=.
+      rewrite (IH Hkn) size_shlB size_from_nat -muln2 -expnSr modn_small //=.
       rewrite ltn_exp2l; done.
   Qed.
 
@@ -1293,6 +1360,65 @@ Section Lemmas.
   Proof.
     elim: n p => [| n IHn] p /=; first done.
     rewrite /shlB1 (IHn p). case (p <<# n); by rewrite /dropmsb.
+  Qed.
+
+  Lemma lsb_shlB1 bs : lsb (shlB1 bs) = b0.
+  Proof. by case: bs. Qed.
+
+
+  Lemma shlB_nil n : [::] <<# n = [::].
+  Proof.
+    elim: n => [| n IHn] //=. by rewrite IHn.
+  Qed.
+
+  Lemma shlB1_zeros n : shlB1 (zeros n) = zeros n.
+  Proof.
+    case: n => [| n]; first done. 
+    rewrite /shlB1 /joinlsb.
+    have->: false :: zeros n.+1 = zeros n.+2 by trivial.
+    rewrite dropmsb_zeros. reflexivity.
+  Qed.
+
+  Lemma shlB_zeros n m : (zeros n) <<# m = zeros n.
+  Proof.
+    elim: m => [| m IHm] //=. by rewrite IHm shlB1_zeros.
+  Qed.
+
+  Lemma shlB_cat bs n : 
+    n <= size bs -> bs <<# n = zeros n ++ low (size bs - n) bs.
+  Proof.    
+    elim: n => [| n IHn] Hsz /=.
+    - by rewrite subn0 low_size. 
+    - rewrite IHn; last by apply ltnW. 
+      rewrite /shlB1 /joinlsb -cat_cons.
+      rewrite dropmsb_cat; last by rewrite size_low subn_gt0.
+      rewrite -(subnSK Hsz) dropmsb_low. reflexivity.
+  Qed.
+
+  Lemma shlB_size bs : bs <<# (size bs) = zeros (size bs).
+  Proof. 
+    rewrite shlB_cat; last trivial. by rewrite subnn low0 cats0. 
+  Qed.
+
+  Lemma shlB_oversize bs n : size bs <= n -> bs <<# n = zeros (size bs).
+  Proof.
+    move=> Hsz. rewrite -(subnK Hsz) -shlB_add shlB_size shlB_zeros. reflexivity.
+  Qed.
+
+  Lemma low_shlB_ss bs n : low n (bs <<# n) = zeros n.
+  Proof.
+    case/orP: (ltn_geq_total n (size bs)).
+    - elim: n => [| n IHn] Hn.
+      + by rewrite low0.
+      + apply (ltn_trans (ltnSn n)) in Hn.
+        rewrite /= /shlB1 low_dropmsb; last by rewrite size_joinlsb size_shlB addn1. 
+        rewrite /joinlsb low_cons (IHn Hn). reflexivity.    
+    - move=> Hsz. rewrite (shlB_oversize Hsz) low_zeros. reflexivity.
+  Qed.
+
+  Lemma low_shlB bs n m : n <= m -> low n (bs <<# m) = zeros n.
+  Proof.
+    move=> Hsz. by rewrite -(low_low _ Hsz) low_shlB_ss low_zeros.
   Qed.
 
 
@@ -3405,15 +3531,6 @@ Section Lemmas.
     by rewrite /from_nat /= -/from_nat from_natn0
                joinlsb_false_zeros zext_zeros_bit .
   Qed .
-
-  Lemma dropmsb_cons n b bs :
-    size bs = n.+1 ->
-    dropmsb (b::bs) == b::(dropmsb bs) .
-  Proof .
-    case bs; first done .
-    move => c cs Hsz .
-    by rewrite {1}/dropmsb /splitmsb /split_last /= .
-  Qed .
     
   Lemma subB_joinmsb_dropmsb: forall b q n, size q = n.+1 -> (dropmsb (joinlsb b q) -# joinlsb b (zeros n))%bits = dropmsb (joinlsb false q).
   Proof.
@@ -4356,6 +4473,39 @@ Section Lemmas.
   Proof.
   Admitted.
 
+  Lemma to_Zpos_low_high bs n m :
+    n + m = size bs -> 
+    to_Zpos bs = (to_Zpos (low n bs) + to_Zpos (high m bs) * 2 ^ Z.of_nat n)%Z.
+  Proof.
+    move=> Hsz. by rewrite -{1}(cat_low_high Hsz) to_Zpos_cat size_low.
+  Qed.
+
+  Lemma shlB_shrB_cancel bs n : high n bs == zeros n -> bs <<# n >># n = bs.
+  Proof.
+    move=> Hzeros. case/orP: (leq_total n (size bs)) => Hsz.
+    - rewrite (shlB_cat Hsz) shrB_cat; 
+        last by rewrite size_cat size_zeros size_low leq_addr.
+      rewrite size_cat size_zeros size_low -(addnBAC _ (leqnn n)) subnn add0n.
+      rewrite high_size_cat; last by rewrite size_low.
+      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnK]. 
+    - rewrite (shlB_oversize Hsz) shrB_zeros.
+      move/eqP in Hzeros. apply (f_equal (high (size bs))) in Hzeros.
+      rewrite (high_high _ Hsz) high_size high_zeros in Hzeros. done.
+  Qed.
+
+  Lemma shrB_shlB_cancel bs n : low n bs == zeros n -> bs >># n <<# n = bs.
+  Proof.
+    move=> Hzeros. case/orP: (leq_total n (size bs)) => Hsz.
+    - rewrite (shrB_cat Hsz) shlB_cat;
+        last by rewrite size_cat size_zeros size_high leq_addl.
+      rewrite size_cat size_zeros size_high addnK.
+      rewrite low_size_cat; last by rewrite size_high.
+      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnKC]. 
+    - rewrite (shrB_oversize Hsz) shlB_zeros.
+      move/eqP in Hzeros. apply (f_equal (low (size bs))) in Hzeros.
+      rewrite (low_low _ Hsz) low_size low_zeros in Hzeros. done.
+  Qed.
+
   Lemma bv2z_cshl_unsigned bsh bsl n :
     size bsh = size bsl ->
     high n (bsl ++ bsh) == zeros n ->
@@ -4363,7 +4513,16 @@ Section Lemmas.
      to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
     ((to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
-  Admitted.
+    move=> Hsz Hzeros.
+    rewrite [in RHS]Z.add_comm -to_Zpos_cat -(bv2z_shl_unsigned Hzeros). 
+    rewrite -bv2z_shl_unsigned; last by rewrite high_shrB.
+    rewrite shrB_shlB_cancel. 
+    - rewrite -to_Zpos_low_high; [reflexivity | by rewrite size_shlB size_cat].
+    - case Hn : (n <= size bsl).
+      + by rewrite (low_low _ Hn) low_shlB_ss.
+      + apply negbT in Hn; rewrite leqNgt negbK in Hn; apply ltnW in Hn. 
+        by rewrite (low_shlB _ Hn) low_zeros.
+  Qed.
 
   Lemma bv2z_cshl_signed bsh bsl n :
     size bsh = size bsl ->
