@@ -939,9 +939,87 @@ Section Lemmas.
     by rewrite /geB (leB_to_Zpos_eqn Hsz) Z.geb_leb.
   Qed.
 
+  Lemma full_adder_zip_carry_propagate bs0 bs1 :
+    size bs0 = size bs1 ->
+    ~~(~~(full_adder_zip true (zip bs0 bs1)).1 &&
+         (full_adder_zip false (zip bs0 bs1)).1) .
+  Proof .
+    move : bs0 bs1; apply : seq_ind2; first done .
+    move => c0 c1 cs0 cs1 Hsz .
+    case c0; case c1 => /=;
+      dcase (full_adder_zip true (zip cs0 cs1))
+      => [[d0] tl0];
+      dcase (full_adder_zip false (zip cs0 cs1))
+      => [[d1] tl1];
+         case d0; case d1; done .
+  Qed .
+
+  Lemma full_adder_zip_carry_inv bs :
+    (full_adder_zip true (zip bs (~~# bs))).1 && 
+    ~~ (full_adder_zip false (zip bs (~~# bs))).1 .
+  Proof .
+    elim : bs; first done .
+    move => b bs .
+    case b => /=;
+      dcase (full_adder_zip true (zip bs (~~# bs)))
+      => [[h0] tl0];
+      dcase (full_adder_zip false (zip bs (~~# bs)))
+      => [[h1] tl1] /=; done .
+  Qed .      
+
   Corollary sbbB_ltB_leB (bs1 bs2: bits):
+    size bs1 = size bs2 ->
     if (sbbB false bs1 bs2).1 then ltB bs1 bs2 else leB bs2 bs1.
-  Admitted.
+  Proof .
+    move : bs1 bs2; apply : seq_ind2; first done .
+    move => c0 c1 cs0 cs1 Hsz .
+    rewrite /leB !ltB_cons -!Hsz !subnn !zext0 .
+    have : (size cs0 = size (~~# cs1)) .
+    { by rewrite size_invB -Hsz . }
+    move => Hszinv;
+      move : (full_adder_zip_carry_propagate Hszinv) => {Hszinv} .
+    rewrite /sbbB /adcB /full_adder;
+      dcase (full_adder_zip true (zip cs0 (~~# cs1)))
+      => [[d0] tl0];
+      dcase (full_adder_zip false (zip cs0 (~~# cs1)))
+      => [[d1] tl1];
+      case d0; case d1; try done;
+      case c0; case c1 => /=; move => Hadder0 Hadder1 _;
+      try (rewrite Hadder0 Hadder1 /= || rewrite Hadder1 /=) .
+    - rewrite !Bool.andb_true_r !Bool.andb_false_r !Bool.orb_false_l .
+      case /orP .
+      + case => /eqP ->; apply /orP; by left .
+      + case => ->; by rewrite Bool.orb_true_r .
+    - by rewrite !Bool.andb_true_r .
+    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
+      case /orP .
+      * move => /eqP Heq; move : Hadder0 Hadder1 .
+        rewrite Heq => Hadder0 Hadder1 .
+        move : (full_adder_zip_carry_inv cs0) .
+        by rewrite Hadder0 Hadder1 .
+      * done .
+    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
+      case /orP .
+      + case => /eqP ->; apply /orP; by left .
+      + case => ->; by rewrite Bool.orb_true_r .
+    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
+      case /orP .
+      + case => /eqP ->; apply /orP; by left .
+      + case => ->; by rewrite Bool.orb_true_r .
+    - by rewrite !Bool.andb_true_r .
+    - rewrite !Bool.andb_true_r .
+      case /orP .
+      * case => /eqP ->; apply /orP; by left .
+      * admit .
+    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
+      case /orP .
+      + case => /eqP ->; apply /orP; by left .
+      + case => ->; by rewrite Bool.orb_true_r .
+    - by rewrite !Bool.andb_false_r !Bool.orb_false_l .
+    - by rewrite !Bool.andb_false_r !Bool.orb_false_l .
+    - case => ->; apply /orP; by right .
+    - case => ->; apply /orP; by right .
+  Admitted .
 
 
   (*---------------------------------------------------------------------------
@@ -2206,7 +2284,7 @@ Section Lemmas.
       + move => Hinv_carry.
         move /negP /eqP /eqP: Hinv_carry.
         rewrite Bool.negb_true_iff => H.
-        move: (sbbB_ltB_leB bs1 bs2).
+        move: (sbbB_ltB_leB Hs).
         rewrite /borrow_subB in H.
         rewrite H /=.
         move=> HleB HltB.
@@ -2215,7 +2293,7 @@ Section Lemmas.
         rewrite HltB in HleB.
         done.
     - move=> Hcarry.
-      move: (sbbB_ltB_leB bs1 bs2).
+      move: (sbbB_ltB_leB Hs).
       rewrite /borrow_subB in Hcarry.
       by rewrite Hcarry.
   Qed.
@@ -2339,29 +2417,468 @@ Section Lemmas.
        by rewrite full_mulB2 low_zext.
   Qed.
 
+  Lemma joinlsb_addB ps qs :
+  joinlsb false (ps +# qs) = (joinlsb false ps) +# (joinlsb false qs) .
+  Proof .
+    rewrite /addB /adcB /full_adder /= .
+    by dcase (full_adder_zip false (zip ps qs))
+    => [[c0] tl0] Hadder0 .
+  Qed .
+
+  Lemma zext_joinlsb0 n qs :
+    zext n (joinlsb false qs) = joinlsb false (zext n qs) .
+  Proof .
+    elim : n => [ | n IH ] .
+    - by rewrite !zext0 .
+    - by rewrite /joinlsb !zext_cons /addB /adcB /full_adder /= .
+  Qed .
+    
+  Lemma zext_joinlsb1 n qs :
+    zext n (joinlsb true qs) =
+    (zext n (joinlsb false qs)) +# (zext ((size qs) + n) [::true]) .
+  Proof .
+    elim : n => [ | n IH ] .
+    - rewrite !zext0 addn0 .
+      rewrite /addB /adcB /full_adder /= .
+      dcase (full_adder_zip false (zip qs (zeros (size qs))))
+      => [[c0] tl0] Hadder0 /= .
+      rewrite -[tl0]/((c0, tl0).2) -Hadder0 .
+      rewrite full_adder_zip_B0 unzip1_zip; first by trivial .
+      by rewrite size_zeros leqnn .
+    - rewrite /joinlsb !zext_cons /addB /adcB /full_adder /= .
+      dcase (full_adder_zip false
+              (zip (zext n.+1 qs) (zext (size qs + n.+1) [::])))
+      => [[c0] tl0] Hadder0 /= .
+      rewrite -[tl0]/((c0, tl0).2) -Hadder0 .
+      rewrite zext_nil full_adder_zip_B0 unzip1_zip; first by trivial .
+      by rewrite size_zext size_zeros .
+  Qed .
+    
+  Lemma full_mul_joinlsbC ps qs :
+    full_mul ps (joinlsb false qs) = joinlsb false (full_mul ps qs) /\
+    full_mul ps (joinlsb true qs) =
+    joinlsb false (full_mul ps qs) +# zext (size qs).+1 ps .
+  Proof .
+    elim : ps => [ | p ps [IH0 IH1] ] .
+    - rewrite /= add0n; split; first trivial .
+      rewrite zext_nil addB0 unzip1_zip; first trivial .
+      by rewrite size_joinlsb size_from_nat size_zeros addn1 leqnn .
+    - case : p => /= .
+      + rewrite IH0 IH1 .
+        rewrite /joinlsb; split.
+        * rewrite zext_cons .
+          by rewrite -joinlsb_addB /joinlsb .
+        * rewrite -/joinlsb !joinlsb_addB .
+          rewrite (zext_joinlsb1 (size ps).+1)
+                  (zext_joinlsb1 (size qs).+1) .
+          rewrite !addBA 
+                  -{2}(addn1 (size ps)) -{3}(addn1 (size qs))
+                  !addnA (addnC (size qs) (size ps)) .
+          rewrite -(addBA _ _ (zext (size ps).+1 (joinlsb false qs))) .
+          rewrite (addBC _ (zext (size ps).+1 (joinlsb false qs))) .
+          by rewrite (addBA _ (zext (size ps).+1 (joinlsb false qs)) _ ) .
+      + rewrite IH0 IH1 .
+        split; first by trivial .
+        by rewrite joinlsb_addB -zext_joinlsb0 .
+  Qed .
+
+  Lemma full_mul_joinlsb ps qs :
+    full_mul ps (joinlsb false qs) = full_mul (joinlsb false ps) qs /\
+   (full_mul ps (joinlsb true qs) = full_mul (joinlsb false ps) qs +#
+                                    zext (size qs).+1 ps) .
+  Proof .
+    elim : qs => /= [|q qs] .
+    - rewrite -zeros0 /joinlsb zeros_cons !full_mulB0 addn0 addn1
+                      zeros_cons .
+      split; first done .
+      rewrite -[true::zeros 0]/(from_nat 1 1) .
+      rewrite (full_mulB1 _ 1) add0B unzip2_zip; first done .
+      by rewrite size_zeros size_zext addn1 ltnSn .
+    - move => [IH0 IH1] .
+      case : q => /= .
+      + rewrite !IH1 .
+        move : (full_mul_joinlsbC ps (true::qs)) => [Heq0 Heq1] .
+        rewrite Heq0 Heq1 => {Heq0 Heq1} .
+        rewrite -!IH1; split; first by trivial .
+        by rewrite size_joinlsb addn1 .
+      + rewrite !IH0 .
+        move : (full_mul_joinlsbC ps (false::qs)) => [Heq0 Heq1] .
+        rewrite Heq0 Heq1 => {Heq0 Heq1} .
+        rewrite -!IH0; split; first by trivial .
+        by rewrite size_joinlsb addn1 .
+  Qed .
+
   Lemma full_mulBC : forall p q, full_mul p q = full_mul q p.
   Proof.
-  Admitted.
+    elim => [|p ps IHp] .
+    - move => q; by rewrite /= -zeros0 full_mulB0 zeros_from_nat addnC .
+    - elim => [| q qs] .
+      + by rewrite -!zeros0 full_mulB0 addn0 /= -zeros_from_nat .
+      + case p; case q => /= <- /= .
+        * move : (full_mul_joinlsb ps qs) => [Heq0 Heq1] .
+          rewrite Heq1 !joinlsb_addB /= .
+          rewrite (zext_joinlsb1 (size ps).+1)
+                  (zext_joinlsb1 (size qs).+1) .
+          rewrite -{2}(addn1 (size ps)) -{3}(addn1 (size qs)) .
+          by rewrite !addnA (addnC (size qs) (size ps)) !addBA 
+                     -(addBA _ _ (zext (size ps).+1 (joinlsb false qs)))
+                     (addBC _ (zext (size ps).+1 (joinlsb false qs)))
+                     (addBA _ (zext (size ps).+1 (joinlsb false qs)) _) .
+        * move : (full_mul_joinlsb ps qs) => [Heq0 Heq1] .
+          by rewrite Heq0 !joinlsb_addB /= zext_joinlsb0 .
+        * move : (full_mul_joinlsb ps qs) => [Heq0 Heq1] .
+          by rewrite Heq1 !joinlsb_addB /= zext_joinlsb0 .
+        * move : (full_mul_joinlsb ps qs) => [Heq0 Heq1] .
+          by rewrite Heq0 .
+  Qed .
       
   Lemma mulBC : forall (p q: bits), size p = size q -> mulB p q = mulB q p.
   Proof.
-
-  Admitted.
+    move => p q Hsz .
+    by rewrite /mulB full_mulBC Hsz .
+  Qed .
   
-  Lemma shlB_mul2exp i (p: bits) : iter i shlB1 p = mulB p (from_nat (size p) (2^i)).
-  Proof.
-    elim i. rewrite expn0. case H : ((size p) == 0). rewrite (eqP H)/=.
-    elim p => [|phd ptl IH]/=; first done. case phd. rewrite/mulB/=zext_nil addB0 unzip1_zip. 
-  Admitted.
+  Lemma low_joinlsb n b bs :
+    low n.+1 (joinlsb b bs) =
+    joinlsb b (low n bs) .
+  Proof .    
+    elim : bs => [ | c cs IH ]; first done .
+    by rewrite low_cons .
+  Qed .    
+
+  Lemma joinlsb0_addB bs :
+    joinlsb false (bs) = (zext 1 bs) +# (zext 1 bs) .
+  Proof .
+    elim : bs => [ | b bs ]; first by rewrite /addB .
+    rewrite !zext_cons /addB /adcB /full_adder; case b => /= .
+    - dcase (full_adder_zip true (zip (zext 1 bs) (zext 1 bs)))
+      => [[c0] tl0] Hadder0 /= .
+      rewrite -[tl0]/((c0, tl0).2) -Hadder0 .
+      move : (@addB_addB_zext_adcB true bs bs (eq_refl (size bs))) .
+      case => /eqP <- .
+      move : (@addB_addB_zext_adcB false bs bs (eq_refl (size bs))) .
+      case => /eqP <- .
+      rewrite zext_cons zext_nil zeros_cons addB0 .
+      rewrite unzip1_zip;
+        last by rewrite size_addB size_zeros !size_zext
+                addn1 minnE subKn ltnSn .
+      case => <- .
+      rewrite -[joinlsb false (true::bs)]/(false::(joinlsb true bs)) .
+      move : (addB0 bs (size bs)) .
+      rewrite /joinlsb /addB zext_cons /adcB /full_adder zext_nil /= .
+      dcase (full_adder_zip false (zip bs (zeros (size bs))))
+      => [[c1] tl1] Hadder1 /= -> .
+      by rewrite unzip1_zip;
+        last by rewrite size_zeros leqnn .
+    - dcase (full_adder_zip false (zip (zext 1 bs) (zext 1 bs)))
+      => [[c0] tl0] Hadder0 /= .
+      by rewrite -[false::bs]/(joinlsb false bs) => -> .
+  Qed .      
+      
+  Lemma mulB_cons ps m :
+    (false :: ps) *# ((size ps).+1) -bits of m =
+    zext 1 (ps *# ((size ps).+1) -bits of m) +#
+    zext 1 (ps *# ((size ps).+1) -bits of m) .
+  Proof .
+    rewrite {1}/mulB /= !from_nat_dhalf -/mulB .
+    rewrite low_joinlsb .
+    rewrite -[low (size ps) (full_mul ps ((size ps).+1 -bits of (m)))]/
+            (mulB ps (from_nat (size ps).+1 m)) .
+    by rewrite joinlsb0_addB .
+  Qed .
+
+  Lemma low_adcB n ps qs :
+    n <= size ps -> n <= size qs ->
+    forall b,
+      low n (adcB b ps qs).2 = (adcB b (low n ps) (low n qs)).2  .
+  Proof .
+    elim : n ps qs => [ ps qs _ _ b | n IH ps qs ]; first by rewrite !low0 /addB .
+    case : ps => [ | p ps ]; first by trivial .
+    rewrite size_joinlsb addn1 ltnS => Hnps .
+    case : qs => [ | q qs ]; first by trivial .
+    rewrite size_joinlsb addn1 ltnS => Hnqs .
+    rewrite !low_cons .
+    move : (IH _ _ Hnps Hnqs) => {IH} IH b .
+    move : IH; case b; case p; case q;
+      rewrite /addB /adcB /full_adder /= => IH;
+      move : (IH true) (IH false);
+      dcase (full_adder_zip true (zip ps qs))
+      => [[c0] tl0] Hadder0;
+      dcase (full_adder_zip true (zip (low n ps) (low n qs)))
+      => [[c1] tl1] Hadder1;
+      dcase (full_adder_zip false (zip ps qs))
+      => [[c2] tl2] Hadder2;
+      dcase (full_adder_zip false (zip (low n ps) (low n qs)))
+      => [[c3] tl3] Hadder3 /=;
+      rewrite low_cons;
+      try (by move => -> _ || by move => _ ->) .
+  Qed .
+      
+  Lemma low_addB n ps qs :
+    n <= size ps -> n <= size qs ->
+    low n (ps +# qs) = (low n ps) +# (low n qs) .
+  Proof .
+    move => Hnps Hnqs .
+    rewrite /addB .
+    by rewrite (low_adcB Hnps Hnqs) .
+  Qed .
+
+  Lemma low_zext_low n m bs :
+    n <= size bs ->
+    low n (zext m bs) == low n bs .
+  Proof .
+    elim : n bs => [ bs | n IH bs ] /=; first by rewrite !low0 .
+    case : bs => [ | b bs Hle ] ; first done .
+    rewrite zext_cons !low_cons .
+    have : (n <= size bs) .
+    { move : Hle; by rewrite size_joinlsb addn1 . }
+    by move => Hnlebs; move : (IH _ Hnlebs) => /eqP -> .
+  Qed .
+
+  Lemma low_from_nat i j n :
+    low i (i + j) -bits of n = i -bits of n .
+  Proof .
+    elim : i j n => [ j n | i IH j n ];
+      first by rewrite add0n low0 /= .
+    by rewrite /= low_cons /joinlsb (IH j (n./2)) .
+  Qed .    
+
+  Lemma mulB_from_natSn n m ps :
+    ps *# ((size ps) + n) -bits of m =
+    ps *# (size ps) -bits of m .
+  Proof .
+    elim : ps n => [ n | p ps IH n ];
+      first by rewrite /mulB !low0 .
+    rewrite !size_joinlsb /mulB .
+    case : p;
+      rewrite (lock from_nat) /= -(lock from_nat) .
+    - rewrite !low_addB;
+        [ idtac
+        | rewrite size_joinlsb size_full_mul size_from_nat
+                  -addnA !addn1; by apply ltn_addl
+        | rewrite size_zext size_from_nat addn1;
+            by apply ltn_addl
+        | rewrite size_joinlsb size_full_mul size_from_nat
+                  -addnA !addn1;
+          apply ltn_addl; apply ltn_trans with ((size ps).+1 + n);
+          [ apply ltn_addr; by apply ltnSn
+          | by apply ltnSn ]
+        | rewrite size_zext size_from_nat;
+            by apply ltn_addl
+        ] .
+      rewrite low_cons low_cons .
+      rewrite -[low (size ps) (full_mul ps (size ps + 1 + n) -bits of m)]/(ps *# (size ps + 1 + n) -bits of m) .
+      rewrite -[low (size ps) (full_mul ps (size ps + 1) -bits of m)]/(ps *# (size ps + 1) -bits of m) .
+      rewrite (IH 1) .
+      rewrite -{1}(addnA _ 1 n) (IH (1 + n)) .
+      have : ((size ps).+1 <= size ((size ps + 1 + n) -bits of m)) .
+      { by rewrite size_from_nat addn1 ltn_addr . }
+      move => Hle;
+        rewrite (eqP (low_zext_low (size ps).+1 Hle)) => {Hle} .
+      have : ((size ps).+1 <= size ((size ps + 1) -bits of m)) .
+      { by rewrite size_from_nat addn1 . }
+      move => Hle;
+        rewrite (eqP (low_zext_low (size ps).+1 Hle)) => {Hle} .
+      rewrite addn1 low_from_nat .
+      move : (low_from_nat (size ps).+1 0 m) .
+      by rewrite addn0 => -> .
+    - rewrite !low_cons .
+      rewrite -[low (size ps) (full_mul ps (size ps + 1 + n) -bits of (m))]/(ps *# (size ps + 1 + n) -bits of m) .
+      rewrite -[low (size ps) (full_mul ps (size ps + 1) -bits of (m))]/(ps *# (size ps + 1) -bits of m) .
+      move : (IH (1 + n)) .
+      rewrite addnA => -> .
+      by rewrite (IH 1) .
+  Qed .
+
+  Lemma addB_carry_bitr c bs :
+    addB bs (zext (size bs - 1) [:: c]) ==
+    (adcB c bs (zeros (size bs))).2 .
+  Proof .
+    dcase (0 < size bs); case => Hbs .
+    - rewrite /addB .
+      rewrite (eqP (@adcB_carry_bitr _ _ _)); done .
+    - have : (size bs == 0) .
+      { by rewrite eqn0Ngt Hbs . }
+      move => {Hbs} /eqP Hbs .
+      rewrite (eqP (size0 Hbs)) .
+      by rewrite -[0-1]/0 zext0 /addB /= .
+  Qed .
+
+  Lemma from_natn1 n :
+    0 < n -> from_nat n 1 == zext (n.-1) [::true] .
+  Proof .
+    move => Hn .
+    rewrite -{1}(prednK Hn) /= .
+    by rewrite zext_cons zext_nil from_natn0 .
+  Qed .    
+    
+  Lemma from_natSn_from_nat n m :
+    from_nat n m.+1 = from_nat n m +# from_nat n 1 .
+  Proof .
+    elim : n m => [ m | n IH m ]; first by rewrite /addB .
+    rewrite /= uphalf_half addnC .
+    dcase (odd m); case => Hodd /= .
+    - rewrite addn1 (IH m./2) .
+      rewrite {2}/addB /adcB /full_adder /= .
+      move : (addB_carry_bitr true (from_nat n m./2)) .
+      rewrite /adcB /full_adder .
+      rewrite size_from_nat from_natn0 subn1 .
+      dcase (full_adder_zip true (zip ((n) -bits of (m./2)) (zeros n)))
+      => [[c0] tl0] Hadder0 /= .
+      case => /eqP <- .
+      dcase (0 < n); case => Hngt0 .
+      + by rewrite (eqP (@from_natn1 _ _)) .
+      + move : (eqn0Ngt n); rewrite Hngt0 /= /eqP => {Hngt0} /eqP -> .
+        by rewrite /addB .
+    - rewrite addn0 .
+      rewrite /addB /adcB /full_adder /= .
+      move : (addB0 (from_nat n m./2) n) .
+      rewrite /addB /adcB /full_adder from_natn0 .
+      dcase (full_adder_zip false (zip (from_nat n m./2) (zeros n)))
+      => [[c0] tl0] Hadder0 /= -> .
+      rewrite unzip1_zip; first by trivial .
+      by rewrite size_zeros size_from_nat .
+  Qed .
+
+  Lemma mulB_addSn p m : mulB p (from_nat (size p) m.+1) = addB (mulB p (from_nat (size p) m)) p .
+  Proof .
+    elim : p => [ | p ps IH ]; first done .
+    rewrite size_joinlsb addn1 .
+    have : ((size ps).+1 = size (from_nat ((size ps).+1) (m.+1))) .
+    { by rewrite size_from_nat . }
+    move => Hszm1 .
+    have : ((size ps).+1 = size (from_nat ((size ps).+1) (m))) .
+    { by rewrite size_from_nat . }
+    move => Hszm .
+    case : p; rewrite (lock from_nat) /mulB /= -(lock from_nat);
+      [ rewrite !low_addB;
+        [ idtac
+        | rewrite size_joinlsb size_full_mul size_from_nat -addnA addn1;
+            by apply ltn_addl
+        | rewrite size_zext size_from_nat; by apply ltn_addl
+        | rewrite size_joinlsb size_full_mul size_from_nat -addnA addn1;
+            by apply ltn_addl
+        | rewrite size_zext size_from_nat;
+            by apply ltn_addl
+        ];
+        rewrite {3}Hszm1 {8}Hszm !low_zext
+      | idtac ];
+      rewrite !low_cons;
+      rewrite -[low (size ps) (full_mul ps ((size ps).+1 -bits of (m.+1)))]/(ps *# (size ps).+1 -bits of (m.+1));
+      rewrite -[low (size ps) (full_mul ps ((size ps).+1 -bits of (m)))]/(ps *# (size ps).+1 -bits of m);
+      move : (mulB_from_natSn 1 m.+1 ps);
+      rewrite addn1 => ->;
+      move : (mulB_from_natSn 1 m ps);
+      rewrite addn1 => ->;
+      rewrite IH .
+    - rewrite from_natSn_from_nat .
+      have : (true :: ps = (false :: ps) +# (from_nat (size ps).+1 1)) .
+      { rewrite (eqP (@from_natn1 _ _)) /=; last by apply ltn0Sn .
+        rewrite zext_cons /addB /adcB /full_adder /= zext_nil .
+        move : (addB0 ps (size ps)) .
+        rewrite /addB /adcB /full_adder .
+        dcase (full_adder_zip false (zip ps (zeros (size ps))))
+        => [[c0] tl0] Hadder0 /= -> .
+        rewrite unzip1_zip; first by trivial .
+        by rewrite size_zeros leqnn .
+      }
+      move => -> .
+      rewrite !addBA -(addBA _ _ (false::ps)) (addBC _ (false::ps)) addBA .
+      have : (false :: ps *# (from_nat (size ps) m) +# ps =
+              (false :: (ps *# (from_nat (size ps) m))) +# (false :: ps)) .
+      { rewrite /addB /adcB /full_adder /= .
+        by dcase (full_adder_zip false
+                                 (zip (ps *# (from_nat (size ps) m)) ps))
+        => [[c0] tl0] Hadder0 /= . }
+      by move => -> .
+    - have : (false :: ps *# (from_nat (size ps) m) +# ps =
+             (false :: (ps *# (from_nat (size ps) m))) +# (false :: ps)) .
+      { rewrite /addB /adcB /full_adder /= .
+        by dcase (full_adder_zip false
+                                 (zip (ps *# (from_nat (size ps) m)) ps))
+        => [[c0] tl0] Hadder0 /= . }
+      by move => -> .
+  Qed .
 
   Lemma mulB_addn p m1 m2: mulB p (from_nat (size p) (m1 + m2)) = addB (mulB p (from_nat (size p) m1)) (mulB p (from_nat (size p) m2)). 
   Proof.
-  Admitted.
+    elim : m1 => [ | n IH ] .
+    - rewrite mulB0 -zeros_from_nat add0B unzip2_zip;
+        last by rewrite size_mulB size_zeros leqnn .
+      by rewrite add0n .
+    - rewrite addSn .
+      rewrite !mulB_addSn IH .
+        by rewrite -!addBA (addBC p (p *# (size p) -bits of (m2))) .
+  Qed .
 
   Lemma mulB_muln p m1 m2 : mulB p (from_nat (size p) (m1*m2)) = mulB (mulB p (from_nat (size p) m1)) (from_nat (size p) m2).
   Proof.
-  Admitted.
+    have : (size p = size (p *# (from_nat (size p) m1))) .
+    { by rewrite size_mulB . }
+    move => Hsz .
+    elim : m2 => [ | m2 ];
+      first by rewrite muln0 {3}Hsz !mulB0 size_mulB .
+    rewrite mulnS .
+    rewrite !mulB_addn => -> .
+    by rewrite {5}Hsz mulB_addSn addBC -Hsz .
+  Qed .
 
+  Lemma succB_shlB1 ps :
+    succB (shlB1 ps) = dropmsb (true::ps) .
+  Proof .
+    elim : ps => [ | p ps IH ] /=; first done .
+    by rewrite /dropmsb /= .
+  Qed .
+    
+  Lemma mulB2 ps :
+    ps *# (from_nat (size ps) 2) = shlB1 ps .
+  Proof .
+    elim : ps => [ | p ps IH ] .
+    - by rewrite /mulB low0 /shlB1 /dropmsb /joinlsb .
+    - rewrite size_joinlsb .
+      case : p; rewrite addn1 /mulB /= .
+      + rewrite zext_cons low_addB;
+          [ idtac
+          | rewrite size_joinlsb size_full_mul size_joinlsb size_from_nat
+                    (addn1 (size ps));
+            apply ltn_addr; apply ltn_addl; apply ltnSn
+          | rewrite size_joinlsb size_zext size_from_nat;
+            apply ltn_addr; apply ltn_addl; apply ltnSn ] .
+        rewrite !low_cons .
+        rewrite -[joinlsb false (from_nat (size ps) 1)]/(from_nat (size ps).+1 2) .
+        rewrite -[low (size ps) (full_mul ps (from_nat (size ps).+1 2))]/(ps *# (from_nat (size ps).+1 2)) -{1}addn1 .
+        rewrite mulB_from_natSn IH .
+        rewrite -{1}(size_from_nat (size ps) 1) .
+        rewrite (eqP (@low_zext_low _ _ _ _)); last by apply leqnn .
+        rewrite low_size -joinlsb_addB .
+        rewrite -(size_shlB1 ps) addB1 .
+        rewrite {2}/shlB1 .
+        by rewrite succB_shlB1 .
+      + rewrite low_cons .
+        rewrite -[joinlsb false (from_nat (size ps) 1)]/(from_nat (size ps).+1 2) .
+        rewrite -[low (size ps) (full_mul ps (from_nat (size ps).+1 2))]/(ps *# (from_nat (size ps).+1 2)) -addn1 .
+        by rewrite mulB_from_natSn IH .
+  Qed .
+
+  Lemma size_iter_shlB1 i ps :
+    size (iter i shlB1 ps) = size ps .
+  Proof .
+    elim : i => [ | i IH ]; first done .
+    by rewrite /= size_shlB1 IH .
+  Qed .
+
+  Lemma shlB_mul2exp i (p: bits) : iter i shlB1 p = mulB p (from_nat (size p) (2^i)).
+  Proof.
+    elim : i => [ | i IH ] .
+    - rewrite /iter expn0 /= .
+      move : (mulB1 p (size p)) .
+      case : p => /=; first by trivial .
+      by move => p ps -> .
+    - rewrite expnSr .
+      rewrite mulB_muln /= -IH .
+      rewrite -(size_iter_shlB1 i p) .
+      by rewrite mulB2 .
+  Qed .
 
   Lemma full_mul0B : forall m n, full_mul (zeros m) n = zeros (m + (size n)).
   Proof.
@@ -2415,6 +2932,16 @@ Section Lemmas.
     move/negP/negP: Hlt. rewrite-eqn0Ngt. move/eqP => Hlt. by rewrite Hlt addn0.
   Qed.
 
+  (*
+    Next lemma is incorrect, try :
+
+    Eval cbv in
+        let m := [:: true] in
+        let n := [:: false; true] in
+        (mulB m n == (zeros (size m)),
+         (m == zeros (size m)) || (n == zeros (size n))) .
+   *)
+  (*
   Lemma mulnB_eq0: forall m n : bits, (mulB m n == (zeros (size m))) = (m == zeros (size m)) || (n == zeros (size n)).
   Proof.
     intros.
@@ -2427,7 +2954,8 @@ Section Lemmas.
         rewrite /mulB/=. case Hmhd: mhd. intros.
         move : (IH n). rewrite/mulB/low size_addB size_joinlsb size_zext!size_full_mul addnAC addn1 subnDA subnn sub0n cats0. intros. rewrite addnC minnn subnDA subnAC subnn sub0n cats0. rewrite (take_nth false). 
   Admitted.
-
+   *)
+  
   Lemma mulB0' : forall m n, mulB m (zeros n) = zeros (size m).
   Proof.
     intros. rewrite/mulB full_mulB0/low -zeros_cats take_cat size_zeros/=.
@@ -2680,6 +3208,14 @@ Section Lemmas.
     rewrite Hbool => {Hbool} Heq .
     rewrite (eqP Heq) .
   Admitted .
+   *)
+
+  (* the next lemma is incorrect, try:
+
+    Eval cbv in
+        let bs0 := [::true; false] in
+        let bs1 := [::false; true] in
+        (full_mul bs0 bs1, sext (size bs0) bs0 *# sext (size bs0) bs1) .
    *)
   
   Lemma mul_sext bs0 bs1 :
