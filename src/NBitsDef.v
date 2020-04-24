@@ -417,6 +417,38 @@ Section Lemmas.
   Lemma size1_msb bs : size bs = 1 -> bs = [:: msb bs].
   Proof. by case: bs => [| b [| b' bs]]. Qed.
 
+  Lemma droplsb_joinmsb bs b : 
+    0 < size bs -> droplsb (joinmsb bs b) = joinmsb (droplsb bs) b.
+  Proof. case: bs => [| a bs] //=. Qed.
+
+  Lemma droplsb_dropmsb bs : droplsb (dropmsb bs) = dropmsb (droplsb bs).
+  Proof.
+    case: bs => [| b bs] //=. case: (lastP bs) => {bs} [| bs b'] //=.
+    by rewrite {2}/droplsb /= -{1}rcons_cons /dropmsb !splitmsb_rcons /droplsb. 
+  Qed.
+
+  Lemma dropmsb_cons n b bs :
+    size bs = n.+1 ->
+    dropmsb (b::bs) == b::(dropmsb bs) .
+  Proof .
+    case bs; first done .
+    move => c cs Hsz .
+    by rewrite {1}/dropmsb /splitmsb /split_last /= .
+  Qed .
+
+  Lemma droplsb_cat bs1 bs2 : 
+    0 < size bs1 -> droplsb (bs1 ++ bs2) = droplsb bs1 ++ bs2.
+  Proof. by case: bs1. Qed.
+
+  Lemma dropmsb_cat bs1 bs2 : 
+    0 < size bs2 -> dropmsb (bs1 ++ bs2) = bs1 ++ dropmsb bs2.
+  Proof. 
+    elim: bs1 => [| b bs1 IH] //=. move=> Hsz. 
+    have H : size (bs1 ++ bs2) = (size (bs1 ++ bs2)).-1.+1.
+    { apply S_pred_pos. apply/ltP. rewrite size_cat. by apply ltn_addl. }
+    by rewrite (eqP (dropmsb_cons _ H)) (IH Hsz).
+  Qed.
+
 
   (* Lemmas about copy *)
 
@@ -782,6 +814,58 @@ Section Lemmas.
   Proof.
     move=> Hnm Hn. have: (low m (low n bs) = low m (zeros n)) by rewrite Hn.
     rewrite (low_low _ Hnm) low_zeros. by apply.
+  Qed.
+
+  Lemma high_cons bs b n : n <= size bs -> high n (b :: bs) = high n bs.
+  Proof.
+    move=> Hn. rewrite /high. 
+    have Hn' : (n <= size (b :: bs)) by rewrite /=; apply (leq_trans Hn).
+    rewrite (eqP Hn) (eqP Hn') zeros0 /=.
+    by rewrite -addn1 -(addnBAC _ Hn) addn1.
+  Qed.
+
+  Lemma low_rcons bs b n : n <= size bs -> low n (rcons bs b) = low n bs.
+  Proof.
+    move=> Hn. rewrite /low.
+    have Hn' : (n <= size (rcons bs b)) by rewrite size_rcons; apply (leq_trans Hn).
+    rewrite (eqP Hn) (eqP Hn') zeros0 !cats0 -cats1 (takel_cat _ Hn). reflexivity.
+  Qed.
+
+  Lemma high_droplsb bs n : n < size bs -> high n (droplsb bs) = high n bs.
+  Proof.
+    case: bs => [| b bs] //=.
+    move=> Hn. by rewrite /droplsb /= high_cons.
+  Qed.
+
+  Lemma low_dropmsb bs n : n < size bs -> low n (dropmsb bs) = low n bs.
+  Proof.
+    case: (lastP bs) => {bs} [| bs b] //=.
+    rewrite size_rcons => Hn. by rewrite /dropmsb splitmsb_rcons low_rcons. 
+  Qed.
+
+  Lemma droplsb_high bs n : droplsb (high n.+1 bs) = high n bs.
+  Proof.
+    rewrite /high. case Hn : (n.+1 - size bs) => [| m].
+    - rewrite zeros0 /= /droplsb /splitlsb /split_head /=.
+      rewrite !drop_behead. move/eqP in Hn; rewrite subn_eq0 in Hn.
+      move: (ltnW Hn); rewrite -subn_eq0 => /eqP -> /=.
+      rewrite -(@subnSK n _ Hn). reflexivity.
+    - rewrite droplsb_cat; last trivial. rewrite -Hn.
+      have Hsz : 0 < n.+1 - size bs by rewrite Hn.
+      rewrite subn_gt0 /leq subSS in Hsz. 
+      rewrite subnS (eqP Hsz) (subSn Hsz) /droplsb /=. reflexivity.
+  Qed.
+
+  Lemma dropmsb_low bs n : dropmsb (low n.+1 bs) = low n bs.
+  Proof.
+    rewrite /low. case/orP: (leq_gtn_total n.+1 (size bs)) => Hn.
+    - rewrite -subn_eq0 in Hn. rewrite (eqP Hn) zeros0 cats0.
+      move: (ltnW Hn); rewrite -subn_eq0 => /eqP -> /=. rewrite cats0.
+      rewrite (take_nth b0 Hn) /dropmsb splitmsb_rcons /=. reflexivity.
+    - rewrite dropmsb_cat; last by rewrite size_zeros subn_gt0.
+      rewrite subSn; last done. rewrite -zeros_rcons /dropmsb splitmsb_rcons /=.
+      rewrite take_oversize; last exact: ltnW. 
+      rewrite take_oversize; done.
   Qed.
 
 
