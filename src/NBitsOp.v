@@ -954,18 +954,72 @@ Section Lemmas.
          case d0; case d1; done .
   Qed .
 
-  Lemma full_adder_zip_carry_inv bs :
-    (full_adder_zip true (zip bs (~~# bs))).1 && 
-    ~~ (full_adder_zip false (zip bs (~~# bs))).1 .
+  Lemma zip_cons A B c0 c1 cs0 cs1 :
+    @zip A B (c0::cs0) (c1::cs1) = (c0, c1)::(zip cs0 cs1) .
   Proof .
-    elim : bs; first done .
-    move => b bs .
-    case b => /=;
-      dcase (full_adder_zip true (zip bs (~~# bs)))
-      => [[h0] tl0];
-      dcase (full_adder_zip false (zip bs (~~# bs)))
-      => [[h1] tl1] /=; done .
-  Qed .      
+    by rewrite {1}/zip /= -/zip .
+  Qed .
+
+  Lemma full_adder_zip_inv_carry bs0 bs1 :
+    size bs0 = size bs1 ->
+    (bs0 == bs1 <->
+     (full_adder_zip true (zip bs0 (~~# bs1))).1 = true /\
+     (full_adder_zip false (zip bs0 (~~# bs1))).1 = false) .
+  Proof .
+    move : bs0 bs1; apply : seq_ind2; first done .
+    move => c0 c1 cs0 cs1 Hsz IH .
+    case c0; case c1; rewrite eqseq_cons /=; split; try done;
+      dcase (full_adder_zip false (zip cs0 (~~# cs1)))
+      => [[d0] tl0] Hadder0;
+      dcase (full_adder_zip true (zip cs0 (~~# cs1)))
+      => [[d1] tl1] Hadder1 /= .
+    - move : IH; case => IH _ Heq .
+      move : (IH Heq) .
+      by rewrite Hadder0 Hadder1 .
+    - move : IH; case => _ IH .
+      move : IH .
+      by rewrite Hadder0 Hadder1 .
+    - by rewrite Hadder1 /=; case => -> .
+    - by rewrite Hadder0 /=; case => -> .
+    - move : IH; case => IH _ Heq .
+      move : (IH Heq) .
+      by rewrite Hadder0 Hadder1 .
+    - move : IH; case => _ IH .
+      move : IH .      
+      by rewrite Hadder0 Hadder1 .
+  Qed .
+  
+  Lemma leB_joinlsb b bs0 bs1 :
+    bs0 <=# bs1 -> (b::bs0) <=# (b::bs1) .
+  Proof .
+    case b; rewrite /leB; case /orP .
+    - move => /eqP <-; apply /orP; by left .
+    - rewrite /ltB /= => ->; by rewrite !Bool.orb_true_r .
+    - move => /eqP <-; apply /orP; by left .
+    - rewrite /ltB /= => ->; by rewrite !Bool.orb_true_r .
+  Qed .
+      
+  Lemma leB_joinlsb1 b bs0 bs1 :
+    bs0 <=# bs1 -> (b::bs0) <=# (true::bs1) .
+  Proof .
+    case b; rewrite /leB; case /orP .
+    - move => /eqP <-; apply /orP; by left .
+    - rewrite /ltB /= => ->; by rewrite !Bool.orb_true_r .
+    - move => /eqP <-; apply /orP; right .
+      rewrite /ltB /= .
+      rewrite !Bool.andb_true_r .
+      rewrite unzip1_extzip_ss; last by reflexivity .
+      rewrite unzip2_extzip_ss; last by reflexivity .
+      apply /orP; by left .
+    - rewrite /ltB /= => ->; by rewrite !Bool.orb_true_r .
+  Qed .
+
+  Lemma ltB_joinlsb b c bs0 bs1 :
+    bs0 <# bs1 -> (b::bs0) <# (c::bs1) .
+  Proof .
+    case b; case c; rewrite /ltB /=; move => ->;
+      by apply Bool.orb_true_r .
+  Qed .
 
   Corollary sbbB_ltB_leB (bs1 bs2: bits):
     size bs1 = size bs2 ->
@@ -973,7 +1027,7 @@ Section Lemmas.
   Proof .
     move : bs1 bs2; apply : seq_ind2; first done .
     move => c0 c1 cs0 cs1 Hsz .
-    rewrite /leB !ltB_cons -!Hsz !subnn !zext0 .
+    rewrite !ltB_cons -!Hsz !subnn !zext0 .
     have : (size cs0 = size (~~# cs1)) .
     { by rewrite size_invB -Hsz . }
     move => Hszinv;
@@ -985,42 +1039,30 @@ Section Lemmas.
       => [[d1] tl1];
       case d0; case d1; try done;
       case c0; case c1 => /=; move => Hadder0 Hadder1 _;
-      try (rewrite Hadder0 Hadder1 /= || rewrite Hadder1 /=) .
-    - rewrite !Bool.andb_true_r !Bool.andb_false_r !Bool.orb_false_l .
-      case /orP .
-      + case => /eqP ->; apply /orP; by left .
-      + case => ->; by rewrite Bool.orb_true_r .
-    - by rewrite !Bool.andb_true_r .
-    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
-      case /orP .
-      * move => /eqP Heq; move : Hadder0 Hadder1 .
-        rewrite Heq => Hadder0 Hadder1 .
-        move : (full_adder_zip_carry_inv cs0) .
-        by rewrite Hadder0 Hadder1 .
-      * done .
-    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
-      case /orP .
-      + case => /eqP ->; apply /orP; by left .
-      + case => ->; by rewrite Bool.orb_true_r .
-    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
-      case /orP .
-      + case => /eqP ->; apply /orP; by left .
-      + case => ->; by rewrite Bool.orb_true_r .
-    - by rewrite !Bool.andb_true_r .
-    - rewrite !Bool.andb_true_r .
-      case /orP .
-      * case => /eqP ->; apply /orP; by left .
-      * admit .
-    - rewrite !Bool.andb_false_r !Bool.orb_false_l .
-      case /orP .
-      + case => /eqP ->; apply /orP; by left .
-      + case => ->; by rewrite Bool.orb_true_r .
-    - by rewrite !Bool.andb_false_r !Bool.orb_false_l .
-    - by rewrite !Bool.andb_false_r !Bool.orb_false_l .
-    - case => ->; apply /orP; by right .
-    - case => ->; apply /orP; by right .
-  Admitted .
-
+      try (rewrite Hadder0 Hadder1 /=
+        || rewrite Hadder1 Hadder0 /=
+        || rewrite Hadder0 /= || rewrite Hadder1 /=);
+      try (apply leB_joinlsb || apply leB_joinlsb1);
+      try (move => ->; apply Bool.orb_true_r) .
+    - rewrite /leB; case /orP .
+      + move => /eqP Heq .
+        move : (full_adder_zip_inv_carry Hsz); case => Hif _ .
+        move : Hadder0 Hadder1 Hif; rewrite Heq => -> -> /= .
+        move => Hif; move : (Hif (eq_refl cs0)); by case .
+      + move => Hlt; apply /orP; right .
+        by apply ltB_joinlsb .
+    - rewrite /leB; case /orP .
+      + move => /eqP ->; apply /orP; left;
+          by rewrite !Bool.andb_true_r .
+      + have : ((full_adder_zip false (zip cs0 (~~# cs1))).1 = false) .
+        { by rewrite Hadder0 . }
+      have : ((full_adder_zip true (zip cs0 (~~# cs1))).1 = true) .
+        { by rewrite Hadder1 . }
+        move => H0 H1 _ .
+        move : (full_adder_zip_inv_carry Hsz);
+          case; move => _ Hif .
+        rewrite Hif; last split; done .
+  Qed .
 
   (*---------------------------------------------------------------------------
     Properties of signed comparison
@@ -1257,12 +1299,6 @@ Section Lemmas.
   (*---------------------------------------------------------------------------
     Properties of addition
     ---------------------------------------------------------------------------*)
-
-  Lemma zip_cons A B c0 c1 cs0 cs1 :
-    @zip A B (c0::cs0) (c1::cs1) = (c0, c1)::(zip cs0 cs1) .
-  Proof .
-    by rewrite {1}/zip /= -/zip .
-  Qed .
 
   Lemma full_adder_zip_B0 : forall p n, (full_adder_zip false (zip p (zeros n))).2 = unzip1 (zip p (zeros n)).
   Proof.
