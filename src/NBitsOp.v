@@ -4574,15 +4574,14 @@ Section Lemmas.
      to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
     ((to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
-    move=> Hsz Hzeros.
+    move=> _ Hzeros.
     rewrite [in RHS]Z.add_comm -to_Zpos_cat -(bv2z_shl_unsigned Hzeros). 
     rewrite -bv2z_shl_unsigned; last by rewrite high_shrB.
     rewrite shrB_shlB_cancel. 
     - rewrite -to_Zpos_low_high; [reflexivity | by rewrite size_shlB size_cat].
-    - case Hn : (n <= size bsl).
+    - case/orP: (leq_total n (size bsl)) => Hn.
       + by rewrite (low_low _ Hn) low_shlB_ss.
-      + apply negbT in Hn; rewrite leqNgt negbK in Hn; apply ltnW in Hn. 
-        by rewrite (low_shlB _ Hn) low_zeros.
+      + by rewrite (low_shlB _ Hn) low_zeros.
   Qed.
 
   Lemma bv2z_cshl_signed bsh bsl n :
@@ -4593,7 +4592,20 @@ Section Lemmas.
      to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) * 2 ^ Z.of_nat (size bsl))%Z =
     ((to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
-  Admitted.
+    case Hsh : (size bsh) => [| m].
+    - move=> Hsl. apply Logic.eq_sym in Hsl. 
+      rewrite (eqP (size0 Hsh)) (eqP (size0 Hsl)) /=. 
+      by rewrite low0 high0 shrB_nil to_Z_nil to_Zpos_nil !Z.mul_0_l Z.add_0_l.
+    - move: (ltn0Sn m). rewrite -Hsh => {Hsh} Hsh _ HhSn.
+      rewrite [in RHS]Z.add_comm -(to_Z_cat _ Hsh) -(bv2z_shl_signed HhSn). 
+      rewrite -bv2z_shl_unsigned; last by rewrite high_shrB.
+      rewrite shrB_shlB_cancel. 
+      + rewrite -(to_Z_low_high Hsh); 
+          [reflexivity | by rewrite size_shlB size_cat].
+      + case/orP: (leq_total n (size bsl)) => Hn.
+        * by rewrite (low_low _ Hn) low_shlB_ss.
+        * by rewrite (low_shlB _ Hn) low_zeros.
+  Qed.
 
   Lemma bv2z_not_unsigned bs :
     to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
