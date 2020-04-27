@@ -4448,36 +4448,97 @@ Section Lemmas.
     by rewrite Nat2Z.inj_add /= Z.add_simpl_r Z.add_0_r. 
   Qed.
 
+  Lemma to_Zpos_low_high bs n m :
+    n + m = size bs -> 
+    to_Zpos bs = (to_Zpos (low n bs) + to_Zpos (high m bs) * 2 ^ Z.of_nat n)%Z.
+  Proof.
+    move=> Hsz. by rewrite -{1}(cat_low_high Hsz) to_Zpos_cat size_low.
+  Qed.
+
+  Lemma to_Z_low_high bs n m :
+    0 < m -> n + m = size bs -> 
+    to_Z bs = (to_Zpos (low n bs) + to_Z (high m bs) * 2 ^ Z.of_nat n)%Z.
+  Proof.
+    move=> Hm Hsz. rewrite -(size_high m bs) in Hm. 
+    by rewrite -{1}(cat_low_high Hsz) (to_Z_cat _ Hm) size_low. 
+  Qed.
+
   Lemma bv2z_shl_unsigned bs n :
     high n bs == zeros n ->
     to_Zpos (bs <<# n)%bits = (to_Zpos bs * 2 ^ Z.of_nat n)%Z.
+  Proof. 
+    move/eqP=> Hhighn. case/orP: (leq_total n (size bs)) => Hsz.
+    - rewrite (shlB_cat Hsz) to_Zpos_cat to_Zpos_zeros size_zeros Z.add_0_l.
+      rewrite high_zeros_to_Zpos_low_eq; last by rewrite (subKn Hsz). 
+      reflexivity.
+    - rewrite (shlB_oversize Hsz) to_Zpos_zeros. 
+      apply (f_equal (high (size bs))) in Hhighn. 
+      rewrite (high_high _ Hsz) high_size high_zeros in Hhighn.
+      by rewrite Hhighn to_Zpos_zeros Z.mul_0_l.
+  Qed.
+
+  Lemma bv2z_shl_signed_high_zeros bs n :
+    (high (n + 1) bs == zeros (n + 1)) ->
+    to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
   Proof.
-    elim: n => [| n IHn].
-    - by rewrite /= Z.mul_1_r. 
-    - move/eqP=> HhighSn. 
-      have Hhighn : high n bs == zeros n by rewrite (high_zeros_le _ HhighSn).
-      rewrite /=. 
-      have ->: Z.pow_pos 2 (Pos.of_succ_nat n) = (2 ^ Z.of_nat n.+1)%Z by trivial.
-      rewrite to_Zpos_shlB1 (IHn Hhighn) size_shlB -Z.mul_assoc. 
-      have ->: (2 ^ Z.of_nat n * 2)%Z = (2 * 2 ^ Z.of_nat n)%Z by rewrite Z.mul_comm.
-      rewrite -Z.pow_succ_r; last exact: Nat2Z.is_nonneg.
-      rewrite -Nat2Z.inj_succ Z.mod_small; first reflexivity.
-      split.
-      + apply Z.mul_nonneg_nonneg; [ exact: to_Zpos_ge0 | by apply Z.pow_nonneg ].
-      + by apply high_zeros_to_Zpos_mul_pow2_bounded.
+    move/eqP=> HhSn. case/orP: (ltn_geq_total n (size bs)) => Hsz.
+    - rewrite (shlB_cat (ltnW Hsz)). 
+      rewrite to_Z_cat; last by rewrite size_low subn_gt0. 
+      rewrite to_Zpos_zeros size_zeros Z.add_0_l. 
+      have Hh1l : high 1 (low (size bs - n) bs) = [:: b0].
+      { 
+        rewrite high_low; [ | by rewrite subn_gt0 | exact: leq_subr].
+        by rewrite (subKn (ltnW Hsz)) HhSn low_zeros. 
+      }
+      have Hh1bs : high 1 bs = [:: b0].
+      { by rewrite -(high_high bs (leq_addl n 1)) HhSn high_zeros. }
+      apply (f_equal (high n)) in HhSn. 
+      rewrite (high_high bs (leq_addr 1 n)) high_zeros in HhSn.
+      rewrite (high1_0_to_Z Hh1l) (high1_0_to_Z Hh1bs) high_zeros_to_Zpos_low_eq. 
+      + reflexivity.
+      + rewrite subKn; [done | by apply ltnW].
+    - apply (f_equal (high n)) in HhSn. 
+      rewrite (high_high bs (leq_addr 1 n)) high_zeros in HhSn.
+      rewrite (high_oversize_zeros Hsz HhSn).
+      by rewrite shlB_zeros to_Z_zeros Z.mul_0_l.
+  Qed.
+
+  Lemma bv2z_shl_signed_high_ones bs n :
+    (high (n + 1) bs == ones (n + 1)) ->
+    to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
+  Proof.
+    move=> HhSn. move: HhSn (high_ones_le_size HhSn). 
+    rewrite {3}addn1 => /eqP HhSn Hsz. rewrite (shlB_cat (ltnW Hsz)). 
+    rewrite to_Z_cat; last by rewrite size_low subn_gt0. 
+    rewrite to_Zpos_zeros size_zeros Z.add_0_l. 
+    have Hh1l : high 1 (low (size bs - n) bs) = [:: b1].
+    { 
+      rewrite high_low; [ | by rewrite subn_gt0 | exact: leq_subr].
+      rewrite (subKn (ltnW Hsz)) HhSn low1_lsb lsb_ones; last by rewrite addn1. 
+      reflexivity.
+    }
+    have Hh1bs : high 1 bs = [:: b1].
+    { 
+      rewrite -(high_high bs (leq_addl n 1)) HhSn high1_msb.
+      rewrite msb_ones; last by rewrite addn1. reflexivity. 
+    }
+    apply (f_equal (high n)) in HhSn. 
+    rewrite (high_high bs (leq_addr 1 n)) addn1 -ones_cons high_cons in HhSn;
+      last by rewrite size_ones.
+    rewrite (high1_1_to_Z Hh1l) (high1_1_to_Z Hh1bs) high_ones_to_Zneg_low_eq. 
+    - reflexivity. 
+    - exact: leq_subr.
+    - rewrite subKn; 
+        [by rewrite -{2}(size_ones n) high_size in HhSn | by apply ltnW].
   Qed.
 
   Lemma bv2z_shl_signed bs n :
     (high (n + 1) bs == zeros (n + 1)) || (high (n + 1) bs == ones (n + 1)) ->
     to_Z (bs <<# n)%bits = (to_Z bs * 2 ^ Z.of_nat n)%Z.
   Proof.
-  Admitted.
-
-  Lemma to_Zpos_low_high bs n m :
-    n + m = size bs -> 
-    to_Zpos bs = (to_Zpos (low n bs) + to_Zpos (high m bs) * 2 ^ Z.of_nat n)%Z.
-  Proof.
-    move=> Hsz. by rewrite -{1}(cat_low_high Hsz) to_Zpos_cat size_low.
+    case/orP.
+    - exact: bv2z_shl_signed_high_zeros.
+    - exact: bv2z_shl_signed_high_ones.
   Qed.
 
   Lemma shlB_shrB_cancel bs n : high n bs == zeros n -> bs <<# n >># n = bs.

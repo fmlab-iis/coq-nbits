@@ -868,6 +868,20 @@ Section Lemmas.
       rewrite take_oversize; done.
   Qed.
 
+  Lemma high_oversize_zeros bs n :
+    size bs <= n -> high n bs = zeros n -> bs = zeros (size bs).
+  Proof.
+    move=> Hsz Hzeros. apply (f_equal (high (size bs))) in Hzeros.
+    by rewrite (high_high _ Hsz) high_size high_zeros in Hzeros.
+  Qed.
+
+  Lemma high_ones_le_size bs n : high n bs == ones n -> n <= size bs.
+  Proof.
+    case/orP: (ltn_geq_total (size bs) n) => Hsz.
+    - rewrite (high_oversize (ltnW Hsz)). move: Hsz; case: n => [| n] //= Hsz.
+      rewrite -addn1 -(addnBAC) // addn1 //.
+    - by trivial.
+  Qed.
 
   (* to_Zpos and to_Zneg is always non-negative *)
 
@@ -1497,6 +1511,17 @@ Section Lemmas.
   Proof.
     rewrite -(to_Zpos_invB (bs1 ++ bs2)). rewrite invB_cat to_Zpos_cat.
     rewrite !to_Zpos_invB size_invB. reflexivity.
+  Qed.
+
+  Lemma high_ones_to_Zneg_low_eq bs n :
+    n <= size bs -> high (size bs - n) bs = ones (size bs - n) -> 
+    to_Zneg (low n bs) = to_Zneg bs.
+  Proof.
+    move=> Hsz.
+    move: (@cat_low_high bs n (size bs - n)). rewrite (subnKC Hsz) => H.
+    move: (H (Logic.eq_refl (size bs))) => {H} H. rewrite -{5}H.
+    move=> ->.  rewrite to_Zneg_cat to_Zneg_ones Z.mul_0_l Z.add_0_r.
+    reflexivity.
   Qed.
 
 
