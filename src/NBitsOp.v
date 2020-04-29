@@ -4610,11 +4610,20 @@ Section Lemmas.
   Lemma bv2z_not_unsigned bs :
     to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
   Proof.
-  Admitted.
+    rewrite to_Zpos_invB. move/Z.add_move_l: (to_Zpos_add_to_Zneg bs) => ->. 
+    reflexivity.
+  Qed.
 
   Lemma bv2z_not_signed bs :
     to_Z (~~# bs)%bits = (- to_Z bs - Z.one)%Z.
   Proof.
+    Search to_Z. Search _ invB. Print to_Z.
+    case: (lastP bs) => {bs} [| bs b].
+    - admit. (* TODO: change the lemma *)
+    - rewrite invB_rcons !to_Z_rcons. case b => /=.
+      + rewrite to_Zpos_invB Z.opp_involutive Z.sub_succ_l Z.sub_1_r Z.succ_pred. 
+        reflexivity.
+      + rewrite to_Zneg_invB Z.opp_succ Z.sub_1_r. reflexivity.
   Admitted.
 
   Lemma bv2z_add_unsigned bs1 bs2 :
