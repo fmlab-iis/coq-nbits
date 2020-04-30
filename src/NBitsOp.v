@@ -4679,7 +4679,7 @@ Section Lemmas.
 
   Lemma bv2z_adcs_signed bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
-    ~~ Saddo bs1 bs2 && ~~ Saddo (bs1 +# bs2)%bits bsc ->
+    ~~ Saddo bs1 bs2 && ~~ Saddo (bs1 +# bs2)%bits (zext (size bs1 - 1) bsc) ->
     to_Z (adcB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 + to_Z bs2 + to_Zpos bsc)%Z.
   Proof.
   Admitted.
@@ -4726,7 +4726,8 @@ Section Lemmas.
 
   Lemma bv2z_sbc_unsigned bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
-    ~~ borrow_subB bs1 bs2 && ~~ borrow_subB (bs1 -# bs2)%bits ([:: b1] -# bsc)%bits ->
+    ~~ borrow_subB bs1 bs2 &&
+    ~~ borrow_subB (bs1 -# bs2)%bits (zext (size bs1 - 1)  ([:: b1] -# bsc)%bits) ->
     to_Zpos (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2 =
     (to_Zpos bs1 - to_Zpos bs2 - (1 - to_Zpos bsc))%Z.
   Proof.
@@ -4734,7 +4735,8 @@ Section Lemmas.
 
   Lemma bv2z_sbc_signed bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
-    ~~ Ssubo bs1 bs2 && ~~ Ssubo (bs1 -# bs2)%bits ([:: b1] -# bsc)%bits ->
+    ~~ Ssubo bs1 bs2 &&
+    ~~ Ssubo (bs1 -# bs2)%bits (zext (size bs1 - 1) ([:: b1] -# bsc)%bits) ->
     to_Z (adcB (to_bool bsc) bs1 (~~# bs2)%bits).2 =
     (to_Z bs1 - to_Z bs2 - (1 - to_Zpos bsc))%Z.
   Proof.
