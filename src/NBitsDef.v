@@ -1578,6 +1578,13 @@ Section Lemmas.
     rewrite to_Zneg_ones. reflexivity.
   Qed.
 
+  Lemma to_Z_copy n b : 0 < n -> to_Z (copy n b) = (- b)%Z.
+  Proof.
+    case b; rewrite /= => Hn. 
+    - have->: copy n true = ones n by reflexivity. exact: to_Z_ones. 
+    - have->: copy n false = zeros n by reflexivity. exact: to_Z_zeros.
+  Qed.
+
   Lemma to_Z_inj_ss bs1 bs2 :
     size bs1 = size bs2 -> to_Z bs1 = to_Z bs2 -> bs1 = bs2.
   Proof.
@@ -1707,6 +1714,17 @@ Section Lemmas.
         have ->: high (size bs - n) bs = zeros (size bs - n).
         { apply: (high_zeros_le _ Hz). exact: leq_addr. }
         rewrite to_Zpos_zeros /= Z.add_0_r. reflexivity.
+  Qed.
+
+  Lemma to_Z_to_Zpos bs : 
+    to_Z bs = (to_Zpos bs - (msb bs) *  2 ^ Z.of_nat (size bs))%Z.
+  Proof.
+    move: (high1_msb bs). case (msb bs) => Hmsb.
+    - rewrite (high1_1_to_Z Hmsb). rewrite Z.mul_1_l Z.opp_succ -Z.sub_1_r.
+      move/Z.add_move_r: (to_Zpos_add_to_Zneg bs) => ->. 
+      rewrite -(Z.sub_add_distr _ 1) -(Z.add_opp_r _ (1 + _)). 
+      rewrite Z.add_simpl_l Z.add_comm Z.opp_add_distr. reflexivity.
+    - rewrite (high1_0_to_Z Hmsb). rewrite /= Z.sub_0_r. reflexivity.
   Qed.
 
 
