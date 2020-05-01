@@ -4933,13 +4933,74 @@ Section Lemmas.
   Lemma bv2z_cast_uuu bs n :
     size bs < n -> to_Zpos (zext (n - size bs) bs) = to_Zpos bs.
   Proof.
-  Admitted.
+    move=> Hsz. exact: to_Zpos_zext.
+  Qed.
 
+  Lemma to_Zpos_div_pow2 bs n :
+    (to_Zpos bs / 2 ^ Z.of_nat n)%Z = to_Zpos (high (size bs - n) bs).
+  Proof.
+    case/orP: (ltn_geq_total (size bs) n) => Hsz.
+    - have Hbnd : (0 <= to_Zpos bs < 2 ^ Z.of_nat n)%Z.
+      {
+        split.
+        + exact: to_Zpos_ge0.
+        + apply (Z.lt_trans _ _ _ (to_Zpos_bounded bs)).
+          apply Z.pow_lt_mono_r; try done. 
+          * exact: Nat2Z.is_nonneg.
+          * rewrite -Nat2Z.inj_lt. by apply/ltP. 
+      }
+      rewrite (Z.div_small _ _ Hbnd). apply ltnW in Hsz. rewrite -subn_eq0 in Hsz.
+      rewrite (eqP Hsz) high0. reflexivity.
+    - move: (@to_Zpos_low_high bs n (size bs - n)).
+      rewrite (subnKC Hsz) => H. move: (H (eqP (eqxx (size bs)))) => {H} H.
+      rewrite Z.add_comm Z.mul_comm in H. apply Logic.eq_sym.
+      apply: (Z.div_unique_pos _ _ _ _ _ H). split.
+      + exact: to_Zpos_ge0.
+      + have{2}<-: size (low n bs) = n by rewrite size_low. exact: to_Zpos_bounded.
+  Qed.
+
+  Lemma to_Zpos_mod_pow2 bs n :
+    (* n <= size bs ->  *)
+    (to_Zpos bs mod 2 ^ Z.of_nat n)%Z = to_Zpos (low n bs).
+  Proof.
+    case/orP: (ltn_geq_total (size bs) n) => Hsz.
+    - have Hbnd : (0 <= to_Zpos bs < 2 ^ Z.of_nat n)%Z.
+      {
+        split.
+        + exact: to_Zpos_ge0.
+        + apply (Z.lt_trans _ _ _ (to_Zpos_bounded bs)).
+          apply Z.pow_lt_mono_r; try done. 
+          * exact: Nat2Z.is_nonneg.
+          * rewrite -Nat2Z.inj_lt. by apply/ltP. 
+      }
+      rewrite (Z.mod_small _ _ Hbnd). apply ltnW in Hsz. 
+      rewrite (low_oversize Hsz) to_Zpos_zext. reflexivity.
+    - move: (@to_Zpos_low_high bs n (size bs - n)).
+      rewrite (subnKC Hsz) => H. move: (H (eqP (eqxx (size bs)))) => {H} H.
+      rewrite Z.add_comm Z.mul_comm in H. apply Logic.eq_sym.
+      apply: (Z.mod_unique_pos _ _ _ _ _ H). split.
+      + exact: to_Zpos_ge0.
+      + have{2}<-: size (low n bs) = n by rewrite size_low. exact: to_Zpos_bounded.
+  Qed.
+
+  Lemma eta_expand_Z_div_eucl a b : Z.div_eucl a b = ((a / b)%Z, (a mod b)%Z).
+  Proof. rewrite /Z.div /Z.modulo. by case (Z.div_eucl a b). Qed.
+
+  Lemma to_Zpos_div_eucl_pow2 bs n :
+    Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat n) = 
+    (to_Zpos (high (size bs - n) bs), to_Zpos (low n bs)).
+  Proof.
+    by rewrite eta_expand_Z_div_eucl to_Zpos_div_pow2 to_Zpos_mod_pow2.
+  Qed.
+ 
   Lemma bv2z_cast_duu bs n q r  :
     n < size bs -> Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat n) = (q, r) ->
     (to_Zpos (low n bs) + q * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
   Proof.
-  Admitted.
+    move=> Hsz. rewrite to_Zpos_div_eucl_pow2. case=> <- _. 
+    rewrite (@to_Zpos_low_high bs n (size bs - n)); last exact: (subnKC (ltnW Hsz)).
+    reflexivity.
+  Qed.
 
   Lemma bv2z_cast_usu_eq bs q r :
     Z.div_eucl (to_Z bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
