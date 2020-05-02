@@ -5051,17 +5051,38 @@ Section Lemmas.
     rewrite (to_Z_mod_pow2_oversize (ltnW Hsz)). reflexivity. 
   Qed.
 
+  Lemma to_Z_mod_pow2 bs n :
+    n <= size bs  ->
+    ((to_Z bs) mod 2 ^ Z.of_nat n)%Z = to_Zpos (low n bs).
+  Proof.
+    rewrite leq_eqVlt => /orP [/eqP-> | Hsz]. 
+    - rewrite to_Z_mod_pow2_oversize; last exact: leqnn.
+      by rewrite subnn sext0 low_size.
+    - rewrite (@to_Z_low_high bs n (size bs - n)); 
+        [ | by rewrite subn_gt0 | exact: (subnKC (ltnW Hsz))].
+      rewrite Z_mod_plus_full Z.mod_small; first reflexivity.
+      split; first exact: to_Zpos_ge0.
+      apply (Z.lt_stepr _ _ _ (to_Zpos_bounded (low n bs))). by rewrite size_low.
+  Qed.
+
   Lemma bv2z_cast_dsu bs n q r :
     n < size bs ->
     Z.div_eucl (to_Z bs) (2 ^ Z.of_nat n) = (q, r) ->
     (to_Zpos (low n bs) + q * 2 ^ Z.of_nat n)%Z = to_Z bs.
   Proof.
-  Admitted.
+    move=> Hsz H.
+    have Hnot0 : (2 ^ Z.of_nat n)%Z <> 0%Z.
+    { apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg]. }
+    move: (Z.div_eucl_eq (to_Z bs) _ Hnot0).
+    rewrite H. rewrite eta_expand_Z_div_eucl in H. case: H => _ <- ->.
+    rewrite Z.mul_comm Z.add_comm (to_Z_mod_pow2 (ltnW Hsz)). reflexivity. 
+  Qed.
 
   Lemma bv2z_cast_uus bs n :
     size bs < n ->  to_Z (zext (n - size bs) bs) = to_Zpos bs.
   Proof.
-  Admitted.
+    rewrite -subn_gt0 => Hsz. exact: to_Z_zext.
+  Qed.
 
   Lemma bv2z_cast_dus_eq bs q r q' r' :
     Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
@@ -5082,7 +5103,8 @@ Section Lemmas.
     size bs < n ->
     to_Z (sext (n - size bs) bs) = to_Z bs.
   Proof.
-  Admitted.
+    move=> Hsz; exact: to_Z_sext.
+  Qed.
 
   Lemma bv2z_cast_dss bs n q r q' r' :
     n < size bs ->
