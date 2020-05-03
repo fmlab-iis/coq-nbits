@@ -5023,14 +5023,17 @@ Section Lemmas.
       apply Z.pow_le_mono_r; try by trivial. apply inj_le; by apply /leP.
   Qed.
 
+  Lemma pow2_nat2z_nonzero n : (2 ^ Z.of_nat n)%Z <> 0%Z.
+  Proof.
+    apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg].
+  Qed.
+
   Lemma bv2z_cast_usu_eq bs q r :
     Z.div_eucl (to_Z bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
     (to_Z bs + - q * 2 ^ Z.of_nat (size bs))%Z = to_Zpos bs.
   Proof.
     move=> H.
-    have Hnot0 : (2 ^ Z.of_nat (size bs))%Z <> 0%Z.
-    { apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg]. }
-    move: (Z.div_eucl_eq (to_Z bs) _ Hnot0).
+    move: (Z.div_eucl_eq (to_Z bs) _ (@pow2_nat2z_nonzero (size bs))).
     rewrite H. rewrite eta_expand_Z_div_eucl in H. case: H => _ <- ->.
     rewrite Z.mul_comm Z.mul_opp_l Z.add_opp_r Z.add_simpl_l.
     rewrite to_Z_mod_pow2_oversize; last exact: leqnn.
@@ -5043,9 +5046,7 @@ Section Lemmas.
     (to_Z bs + - q * 2 ^ Z.of_nat n)%Z = to_Zpos (sext (n - size bs) bs).
   Proof.
     move=> Hsz H.
-    have Hnot0 : (2 ^ Z.of_nat n)%Z <> 0%Z.
-    { apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg]. }
-    move: (Z.div_eucl_eq (to_Z bs) _ Hnot0).
+    move: (Z.div_eucl_eq (to_Z bs) _ (@pow2_nat2z_nonzero n)).
     rewrite H. rewrite eta_expand_Z_div_eucl in H. case: H => _ <- ->.
     rewrite Z.mul_comm Z.mul_opp_l Z.add_opp_r Z.add_simpl_l.
     rewrite (to_Z_mod_pow2_oversize (ltnW Hsz)). reflexivity. 
@@ -5071,9 +5072,7 @@ Section Lemmas.
     (to_Zpos (low n bs) + q * 2 ^ Z.of_nat n)%Z = to_Z bs.
   Proof.
     move=> Hsz H.
-    have Hnot0 : (2 ^ Z.of_nat n)%Z <> 0%Z.
-    { apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg]. }
-    move: (Z.div_eucl_eq (to_Z bs) _ Hnot0).
+    move: (Z.div_eucl_eq (to_Z bs) _ (@pow2_nat2z_nonzero n)).
     rewrite H. rewrite eta_expand_Z_div_eucl in H. case: H => _ <- ->.
     rewrite Z.mul_comm Z.add_comm (to_Z_mod_pow2 (ltnW Hsz)). reflexivity. 
   Qed.
@@ -5084,12 +5083,43 @@ Section Lemmas.
     rewrite -subn_gt0 => Hsz. exact: to_Z_zext.
   Qed.
 
+  Lemma bv2z_cast_dus_le bs n q r q' r' :
+    n <= size bs ->
+    Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat n) = (q, r) ->
+    Z.div_eucl r (2 ^ (Z.of_nat n - 1)) = (q', r') ->
+    (to_Z (low n bs) + (q + q') * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
+  Proof.
+    case: n => [|n] => Hsz.
+    - rewrite low0 /= Z.mul_1_r 2!eta_expand_Z_div_eucl Z.div_1_r Zdiv_0_r. 
+      case=> <- _ [] <- _. by rewrite Z.add_0_r.
+    - rewrite {2}Nat2Z.inj_succ Z.sub_1_r Z.pred_succ => H1 H2.
+      move: (Z.div_eucl_eq (to_Zpos bs) _ (@pow2_nat2z_nonzero n.+1)).
+      move: (Z.div_eucl_eq r _ (@pow2_nat2z_nonzero n)).
+      rewrite H1 H2 => -> ->.
+      rewrite Z.mul_add_distr_r Z.add_comm Z.mul_comm -Z.add_assoc Z.add_cancel_l.
+      rewrite Nat2Z.inj_succ (Z.pow_succ_r _ _ (Nat2Z.is_nonneg n)). 
+      rewrite (Z.mul_comm 2) Z.mul_assoc -Zplus_diag_eq_mult_2 -Z.add_assoc.
+      rewrite [in RHS]Z.mul_comm Z.add_cancel_l.
+      move: H1 H2. rewrite eta_expand_Z_div_eucl to_Zpos_mod_pow2; case => _ <-.
+      rewrite to_Zpos_div_eucl_pow2; case=> <- <-. rewrite size_low subSnn. 
+      rewrite (@to_Z_low_high (low n.+1 bs) n 1); [|done|by rewrite size_low addn1].
+      rewrite -[in RHS](Z.add_0_r (to_Zpos (low n (low n.+1 bs)))). 
+      rewrite Z.add_comm -Z.add_assoc Z.add_cancel_l.
+      rewrite high1_msb; case (msb (low n.+1 bs)).
+      + have{1}->: [:: true] = ones 1 by reflexivity. 
+        rewrite Z.mul_1_l to_Z_ones; last done. 
+        rewrite Z.mul_comm -Z.opp_eq_mul_m1 Z.add_opp_diag_l. reflexivity.
+      + done.
+  Qed.
+
   Lemma bv2z_cast_dus_eq bs q r q' r' :
     Z.div_eucl (to_Zpos bs) (2 ^ Z.of_nat (size bs)) = (q, r) ->
     Z.div_eucl r (2 ^ (Z.of_nat (size bs) - 1)) = (q', r') ->
     (to_Z bs + (q + q') * 2 ^ Z.of_nat (size bs))%Z = to_Zpos bs.
   Proof.
-  Admitted.
+    have->: to_Z bs = to_Z (low (size bs) bs) by rewrite low_size.
+    by apply bv2z_cast_dus_le.
+  Qed.
 
   Lemma bv2z_cast_dus_lt bs n q r q' r' :
     n < size bs ->
@@ -5097,7 +5127,8 @@ Section Lemmas.
     Z.div_eucl r (2 ^ (Z.of_nat n - 1)) = (q', r') ->
     (to_Z (low n bs) + (q + q') * 2 ^ Z.of_nat n)%Z = to_Zpos bs.
   Proof.
-  Admitted.
+    move=> Hsz; by apply (bv2z_cast_dus_le (ltnW Hsz)).
+  Qed.
 
   Lemma bv2z_cast_uss bs n :
     size bs < n ->
