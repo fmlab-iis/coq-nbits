@@ -3478,6 +3478,23 @@ Section Lemmas.
     if ((from_nat (size n) (to_nat m)) == zeros (size n)) then (zeros (size n), n')
     else udivB_rec n (from_nat (size n) (to_nat m)) (zeros (size n)) (zeros (size n)).
 
+  Lemma size_uremB_rec : forall  n m q r, size m = size r -> size (udivB_rec n m q r).2 = size r.
+  Proof.
+    elim =>[|nhd ntl IH]m q r Hsz; first done.
+    rewrite/=(IH m (dropmsb (joinlsb (~~ (to_nat (dropmsb (joinlsb nhd r)) < to_nat m)) q))
+                 (if ~~ (to_nat (dropmsb (joinlsb nhd r)) < to_nat m)
+                  then (dropmsb (joinlsb nhd r) -# m)%bits
+                  else dropmsb (joinlsb nhd r)));
+      case H : ((to_nat (dropmsb (joinlsb nhd r)) < to_nat m)); try (by rewrite/=size_dropmsb size_joinlsb addnK|| by rewrite/=size_subB size_dropmsb size_joinlsb addnK Hsz minnn).
+  Qed.    
+
+  Lemma size_uremB : forall n m , size (udivB n m).2 = size n.
+  Proof.
+    rewrite/udivB. intros.
+    case Hm0: ((size (rev n)) -bits of (to_nat m)%bits == zeros (size (rev n))); first done. 
+    rewrite size_rev size_uremB_rec; rewrite size_zeros; first done. by rewrite size_from_nat.
+  Qed.  
+
   Lemma size_udivB_rec n m q r : size (udivB_rec n m q r).1 = size q.
   Proof.
     move : m q r.  elim n => [|nhd ntl IH]m q r/=; first done. 
@@ -3490,8 +3507,22 @@ Section Lemmas.
 
   Lemma size_udivB n m : size (udivB n m).1 = (size n).
   Proof.
-  Admitted.
+    rewrite/udivB. intros.
+    case Hm0: ((size (rev n)) -bits of (to_nat m)%bits == zeros (size (rev n)));
+                first by rewrite size_rev size_zeros.
+    by rewrite size_rev size_udivB_rec size_zeros.
+  Qed.
+
   
+  Lemma neq_zeros_to_nat_gt0 : forall bs, ~~(bs == zeros (size bs)) -> 0 < to_nat bs.
+  Proof.
+    elim . done.
+    move => hd tl Hnot0 . rewrite/= eqseq_cons negb_and. move/orP => [Hhd | Htl].
+    - rewrite eqbF_neg Bool.negb_involutive in Hhd. by rewrite Hhd.
+    - move : (Hnot0 Htl). rewrite -muln2.
+      case hd. by rewrite addnC addn1 ltn0Sn.
+      by rewrite -(ltn_pmul2r (ltn0Sn 1)) mul0n add0n.
+  Qed.
   
   Lemma udivB0 : forall n m, (udivB m (zeros n)) = (zeros (size m), m).
   Proof.
@@ -3499,7 +3530,7 @@ Section Lemmas.
   Qed.
 
 
-  Lemma udivB_rec0_aux : forall n(m : bits) s,
+  Lemma udivB_rec00 : forall n(m : bits) s,
       ~~(m==zeros(size m)) -> udivB_rec (zeros n) m (zeros s) (zeros s)= (zeros s, zeros s).
   Proof.
     elim. intros; first by done.
@@ -3520,6 +3551,7 @@ Section Lemmas.
     done.
   Qed.
 
+ 
   Lemma rev_copy : forall n (b: bool), rev (copy n b) = copy n b.
   Proof.
     elim => [| ns IH] b. done.
@@ -3534,63 +3566,35 @@ Section Lemmas.
     move => ns Hudiv Hnot0.  rewrite rev_copy udivB_rec0; first by rewrite/shlB shlB_mul2exp mul0B.
       by rewrite size_from_nat Hnot0.
   Qed.
+
   
-  Lemma size_uremB_rec : forall  n m q r, size m = size r -> size (udivB_rec n m q r).2 = size r.
+  Lemma neq_zero_size_gt0 : forall m , ~~(m==zeros(size m)) -> 0 < size m.
   Proof.
-    elim =>[|nhd ntl IH]m q r Hsz; first done.
-    rewrite/=(IH m (dropmsb (joinlsb (~~ (to_nat (dropmsb (joinlsb nhd r)) < to_nat m)) q))
-                 (if ~~ (to_nat (dropmsb (joinlsb nhd r)) < to_nat m)
-                  then (dropmsb (joinlsb nhd r) -# m)%bits
-                  else dropmsb (joinlsb nhd r)));
-      case H : ((to_nat (dropmsb (joinlsb nhd r)) < to_nat m)); try (by rewrite/=size_dropmsb size_joinlsb addnK|| by rewrite/=size_subB size_dropmsb size_joinlsb addnK Hsz minnn).
-  Qed.    
-
-  Lemma size_uremB : forall n m , size (udivB n m).2 = size n.
-  Proof.
-    rewrite/udivB. intros.
-    case Hm0: ((size (rev n)) -bits of (to_nat m)%bits == zeros (size (rev n))); first done. 
-    rewrite size_rev size_uremB_rec; rewrite size_zeros; first done. by rewrite size_from_nat.
-  Qed.  
-
-  Lemma udivB_mulAC : forall d m n, (udivB d m).2 = zeros (size d) -> udivB m (mulB d n) = udivB (mulB m n) d.
-  Proof.
-  Admitted.
-  
-
-  Lemma lt0B_size : forall b, ([::] <# b)%bits -> 0 < size b.
-  Proof.
-    elim; first done. intros; by rewrite ltn0Sn.
-  Qed.
-
-  Lemma odd_to_nat_lsb : forall b, odd (to_nat b) =lsb b.
-  Proof.
-    elim; first by rewrite/lsb/splitlsb/=.
-    move => a l IH.
-    rewrite/lsb/=odd_add odd_double-negb_eqb. case Ha : a; done.
+    elim; done. 
   Qed.
   
-  Lemma neq0_eq0_sizel : forall n (b : bits), b!=zeros (size b) -> from_nat n (to_nat b) == zeros n -> n < size b.
-  Proof.
-  (*   elim => [|ns IH] b/=; first by (rewrite-ltB0n eq_refl; move=> [Hneq Ht{Ht}]; exact (lt0B_size Hneq)). *)
-  (*   move=>[Hneq Heq]. move : (IH (droplsb b)) => Hm. *)
-  (*   have -> : (ns.+1 = ns +1) by rewrite addn1. rewrite addnC -ltn_subRL -size_droplsb. *)
-  (*   apply Hm; last rewrite to_nat_droplsb. *)
-  (*   move : Hneq. rewrite-!to_nat_zero to_nat_droplsb-!lt0n half_gt0. move => Hgt0. *)
-  (*   case Hoddb: (odd (to_nat b)); first by rewrite Hoddb eqseq_cons andFb in Heq. *)
-  (*   rewrite Hoddb/joinlsb eqseq_cons andTb in Heq. *)
-  (*   rewrite -Nat.even_succ-Nat.negb_odd in Hoddb.  *)
-  (*   move: (negbFE Hoddb)=>Hodd{Hoddb}. rewrite-Nats.ssrodd_odd in Hodd. rewrite-(ltn_add2r 1)2!addn1 in Hgt0. move : (odd_gt2 Hodd Hgt0)=> Hodd2.  move : (ltn_sub2r Hgt0 Hodd2). by rewrite!subn1/=.  *)
-  (*   rewrite eqseq_cons in Heq. move/andP : Heq=>[Hb0 Hzeq]. done. *)
-  (* Qed *)
-  Admitted.
 
   Lemma to_nat_belast_0 : forall s, to_nat (belast false (zeros s)) = 0.
   Proof.
     elim => [|ns IH]/=; first done. rewrite IH-muln2 mul0n; done.
   Qed.
 
-  Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0.
-  Proof. intros. induction n; try done.
+  Lemma to_nat_subB : forall m n, size m = size n -> to_nat (subB m n) = (to_nat m) - to_nat n.
+  Proof.
+  Admitted.
+
+  Lemma subB_same m : subB m m = zeros (size m).
+  Proof.
+  Admitted.
+
+  Lemma joinlsb_isb0 (mhd:bool) r: 0 < size r -> to_nat (dropmsb (joinlsb mhd r)) = 0 -> mhd = b0.
+  Proof.
+    case Hmhd : mhd; last done. move => Hgt0.
+    rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=. 
+    move : (odd_exp 2 (size r)). have {2}->: 2 = 1.*2 by done. rewrite odd_double orbF.
+    rewrite lt0n in Hgt0. rewrite (negbTE Hgt0). move => Hoddf.
+    move :(odd_mod ((to_nat r).*2 + 1) Hoddf). rewrite odd_add odd_double /=.
+    move => Hoddt Htonat0. by rewrite Htonat0 in Hoddt. 
   Qed.
 
   Lemma from_natSn1 n :
@@ -3600,6 +3604,15 @@ Section Lemmas.
     move => n .
     by rewrite /from_nat /= -/from_nat from_natn0
                joinlsb_false_zeros zext_zeros_bit .
+  Qed.
+
+  Lemma dropmsb_cons n b bs :
+    size bs = n.+1 ->
+    dropmsb (b::bs) == b::(dropmsb bs) .
+  Proof .
+    case bs; first done .
+    move => c cs Hsz .
+    by rewrite {1}/dropmsb /splitmsb /split_last /= .
   Qed .
     
   Lemma subB_joinmsb_dropmsb: forall b q n, size q = n.+1 -> (dropmsb (joinlsb b q) -# joinlsb b (zeros n))%bits = dropmsb (joinlsb false q).
@@ -3614,10 +3627,184 @@ Section Lemmas.
       move : (subB0 (dropmsb q));
       by rewrite Hszdrop /subB /sbbB /adcB /full_adder /= Hadder /= => -> .
   Qed .
-  
-  Lemma udivB1: forall p, udivB p (from_nat (size p) 1) = (p, from_nat (size p) 0).
+
+      
+  Lemma to_nat_shlBnm : forall n m , to_nat (shlB n m) = if (n==0) then (to_nat m) else modn (to_nat m * (2^ n)) (2^ size m).
+  Proof.
+    elim => [|ns IH] m. done.
+    rewrite/= to_nat_shlB1.
+    rewrite {1}(IH m).
+    case Hns: (ns == 0). by rewrite size_shlB -muln2 (eqP Hns) expn1.
+    by rewrite size_shlB -muln2 expnSr mulnA modnMml.
+  Qed.
+
+  Lemma shlB1_shlB : forall bs n, shlB1 (shlB n bs) = shlB n (shlB1 bs).
   Proof.
   Admitted.
+
+
+  Lemma udivB1_rec : forall m n q,
+      ~~(m == zeros (size m)) -> 0 < n -> n = size m -> n = size q ->
+      udivB_rec m (b1 :: zeros (n).-1) q (zeros n) = ((high (size m) (rev m)) ++ (low (size q - size m) q),  (shlB (size m) (zeros n))).
+  Proof.
+    intros. move : (neq_zero_size_gt0 H). move : H1.
+    case Hm : m => [|mhd mtl]; first done.
+    rewrite/= to_nat_zeros addn0. move => Hnm Hmgt0.
+    have Hsznm : size mtl < n by rewrite Hnm.
+    (*have {1 2 3 4}->: (zeros n) = shlB (size mtl) (zeros n) by rewrite shlB_zeros.*)
+    move : H0 H2 Hsznm {H Hm Hnm Hmgt0 m}. move : mtl mhd n q .
+    elim => [| mthd mttl IH] mhd n q.
+    - move => Hngt0 Hsznq Hsznm. rewrite /=.
+      case Hmhd : mhd; rewrite/=.
+      + rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=.
+        rewrite to_nat_zeros -muln2 mul0n add0n size_zeros modn_small;
+          last by rewrite -{1}(expn0 2) (ltn_exp2l _ _ (ltnSn 1)) Hsznm.
+        rewrite/=.
+        rewrite/= subB_joinmsb_dropmsb; last by rewrite -addn1 -subn1 (subnK Hngt0) size_zeros.
+        rewrite -/(shlB1 (zeros n)).
+        have ->: dropmsb (joinlsb true q) = true :: low (size q - 1) q.
+        apply/eqP; rewrite -to_nat_inj_ss;
+          last by rewrite size_dropmsb size_joinlsb addnK /= size_low -addn1 -Hsznq (subnK Hngt0).
+        rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=.
+        rewrite /low/= to_nat_cat to_nat_zeros mul0n addn0 to_nat_take -subn_gt0 -Hsznq (subKn Hngt0)/=.
+        rewrite to_nat_from_nat -!muln2 (muln_modl (ltn0Sn 1)) -expnSr -(addn1 (n - 1)) (subnK Hngt0) addnC.
+          have {4}-> : 1 = 1 %% 2^n by rewrite modn_small; last by rewrite -{1}(expn0 2) (ltn_exp2l _ _ (ltnSn 1)) Hsznm.
+        admit.
+        done.
+      + rewrite to_nat_dropmsb to_nat_joinlsb to_nat_zeros -muln2 mul0n add0n mod0n/=.
+        rewrite /shlB1.
+        have -> : dropmsb (joinlsb false q) = false :: low (size q - 1) q.
+        rewrite -cat1s -/b0. have ->: [::b0] = zeros 1 by done. rewrite -shlB_cat -/(shlB1 q). done.
+        by rewrite -Hsznq Hngt0.
+        done.
+    - move => Hngt0 Hsznq Hsznm.
+      rewrite/= to_nat_zeros -muln2 mul0n addn0 /shlB1.
+      case Hmhd : mhd ; rewrite/=.
+      + have Hszndjr : n = size (dropmsb (joinlsb mhd (zeros n))) by rewrite size_dropmsb size_joinlsb addnK size_zeros .
+        have Hszndjq : n = size (dropmsb (joinlsb true q)) by rewrite size_dropmsb size_joinlsb addnK.
+        have Hsznm' : size mttl < n by rewrite (ltn_trans (ltnSn (size mttl)) Hsznm).
+        rewrite !to_nat_dropmsb !to_nat_joinlsb !to_nat_zeros -(muln2 0) !mul0n !add0n !size_joinlsb -!subn1 !addnK !size_zeros.
+        have Hexpgt1 : 1 < 2 ^ n.
+        by rewrite -{1}(expn0 2) (ltn_exp2l _ _ (ltnSn 1)) Hngt0.
+        rewrite (modn_small Hexpgt1)/=.
+        have H01: (dropmsb (joinlsb true (zeros n)) = b1 :: zeros (n - 1)).
+        apply/eqP ; rewrite -to_nat_inj_ss;
+          last by rewrite size_dropmsb size_joinlsb /= !size_zeros addnK -addn1 (subnK Hngt0).
+        by rewrite to_nat_dropmsb to_nat_joinlsb /= !to_nat_zeros -muln2 mul0n add0n size_zeros (modn_small Hexpgt1).
+        rewrite H01 subB_same to_nat_zeros -muln2 mul0n add0n size_zeros/= size_zeros.
+        move : (IH mthd n (dropmsb (joinlsb true q)) Hngt0 Hszndjq Hsznm').
+        rewrite to_nat_dropmsb to_nat_joinlsb to_nat_zeros -muln2 mul0n add0n size_joinlsb size_zeros addn1/=.
+        rewrite -(addn1 (n -1)) (subnK Hngt0).
+        rewrite zeros_cons -(addn1 (n -1)) (subnK Hngt0) subn1. move => IHm.
+        rewrite IHm. rewrite -/(shlB1 (zeros n <<# size mttl)) shlB_zeros -/(shlB1 (shlB1 (zeros n))) !shlB1_zeros.
+        
+        have Hc1 : n - (size mttl).+1 < n. move : (leq_subr (size mttl) n). rewrite subnS. move => Hc.
+        rewrite -subn1 -(addn1 (n - size mttl - 1)) subnK; last by rewrite subn_gt0 Hsznm'. done.
+        have Hc2 : n - (size mttl).+2 < n. move : (leq_subr (size mttl).+1 n). move => Hc2. apply ltnW.
+        rewrite subnS -subn1 -( addn1(n - (size mttl).+1 - 1)) subnK; last by rewrite subn_gt0 Hsznm.
+        done.
+        have -> : (high (size mttl).+1 (rev (mthd :: mttl)) ++ low (size (dropmsb (joinlsb true q)) - (size mttl).+1) (dropmsb (joinlsb true q))
+                  = high (size mttl).+2 (rev [:: true, mthd & mttl]) ++ low (size q - (size mttl).+2) q).
+        rewrite size_dropmsb size_joinlsb addnK.
+        apply/eqP; rewrite -to_nat_inj_ss;
+          last (rewrite !size_cat !size_zeros !size_rev !subnn !add0n !drop0 !size_rev size_dropmsb size_joinlsb addnK;
+                rewrite -Hsznq/= -2!subnDA (addnC (size mttl).+1 n) (addnC (size mttl).+2 n) !subnDA subnn 2!sub0n 2!addn0;
+                rewrite !size_take size_dropmsb size_joinlsb addnK).
+        rewrite !to_nat_cat !to_nat_zeros !mul0n !addn0 !add0n !size_rev !subnn !drop0 size_zeros expn0 !muln1.
+        rewrite !size_high !rev_cons !to_nat_rcons mul1n size_rcons size_rev.
+        rewrite !to_nat_take size_dropmsb size_joinlsb addnK.
+        rewrite -Hsznq Hc1 Hc2. 
+        have -> :to_nat (n - (size mttl).+1) -bits of (to_nat (dropmsb (joinlsb true q))) * 2 ^ (size mttl).+1
+                 = 2 ^ (size mttl).+1 + to_nat (n - (size mttl).+2) -bits of (to_nat q) * 2 ^ (size mttl).+2.
+        rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=.
+        rewrite 2!to_nat_from_nat.
+        admit.
+          by rewrite (addnA (to_nat (rev mttl) + mthd * 2 ^ size mttl) (2 ^ (size mttl).+1) (to_nat (n - (size mttl).+2) -bits of (to_nat q) * 2 ^ (size mttl).+2)).
+          rewrite -Hsznq Hc1 Hc2 !addnABC. by rewrite !subnn.
+          by rewrite ltnSn. by rewrite Hsznm. by rewrite ltnSn. exact.
+          done.
+      + have Hszndjr : n = size (dropmsb (joinlsb mhd (zeros n)) -# (b1 :: zeros n.-1)) by rewrite size_subB size_dropmsb size_joinlsb /= size_zeros addnK -addn1 -subn1 size_zeros (subnK Hngt0) minnn .
+        have Hszndjq : n = size (dropmsb (joinlsb false q)) by rewrite size_dropmsb size_joinlsb addnK Hsznq.
+        have Hsznm' : size mttl < n by rewrite (ltn_trans (ltnSn (size mttl)) Hsznm).
+        move : (IH mthd n (dropmsb (joinlsb false q)) Hngt0 Hszndjq Hsznm').
+        rewrite !to_nat_dropmsb !to_nat_joinlsb to_nat_zeros -!muln2 !mul0n !addn0 !mod0n/=.
+        rewrite to_nat_dropmsb to_nat_joinlsb to_nat_zeros -!muln2 !mul0n !addn0 mod0n.
+        rewrite mul0n add0n !size_dropmsb !size_joinlsb !addnK !size_zeros.
+        have -> :(dropmsb (joinlsb false (zeros n))) = zeros n. by rewrite -/(shlB1 (zeros n)) shlB1_zeros. 
+        move => IHm. rewrite IHm.
+        admit.
+  Admitted.
+
+  Lemma neq_copy_rev_neq_copy m: ~~(m == zeros (size m)) -> ~~(rev m == zeros (size (rev m))).
+  Proof.
+    move => Hmn0.
+    have Hfeq : (rev m == (rev (zeros (size m))) -> m == zeros (size m)).
+    by move/eqP => Hrm; move : (f_equal rev Hrm) => Hm; rewrite 2!revK in Hm; apply/eqP.
+    rewrite /zeros -(rev_copy) -/(zeros (size (rev m))) size_rev. exact : (contra Hfeq Hmn0). 
+  Qed.
+
+  Lemma udivB1: forall m, ~~(m==zeros(size m)) -> udivB m (from_nat (size m) 1) = (m, zeros (size m)).
+  Proof.
+    move => m Hm. rewrite /udivB.
+    rewrite size_rev to_nat_from_nat. move : (neq_zero_size_gt0 Hm) => Hsz.
+    generalize Hsz. rewrite -(ltn_exp2l _ _ (ltnSn 1)). rewrite expn0. move => Hgt1.
+    rewrite (modn_small Hgt1).
+    have ->: (size m) -bits of (1) = b1 :: (zeros (size m).-1).
+    apply/eqP; rewrite -to_nat_inj_ss. rewrite to_nat_cons to_nat_zeros/= to_nat_from_nat (modn_small Hgt1); done.
+    rewrite size_from_nat/= size_zeros -subn1 -addn1 (subnK Hsz); done.
+    have ->: (zeros (size m) = b0::zeros (size m -1)) by rewrite zeros_cons -addn1 (subnK Hsz).
+    rewrite eqseq_cons/=. 
+    rewrite zeros_cons -addn1 (subnK Hsz).
+    rewrite -(size_rev m) in Hsz.
+    have Hsznm : size (rev m) = size (zeros (size m)) by rewrite size_rev size_zeros.
+    move : (udivB1_rec (neq_copy_rev_neq_copy Hm) Hsz (eqP (eq_refl (size (rev m)))) Hsznm) => Hudivr.
+    rewrite size_rev in Hudivr. rewrite Hudivr revK size_zeros subnn low0 cats0 high_size.
+    have -> : zeros (size m) <<# size m = zeros (size m).
+    apply/eqP; rewrite -to_nat_inj_ss; last by rewrite size_shlB .
+    rewrite to_nat_shlBnm to_nat_zeros mul0n mod0n. by case m.
+    done.
+Qed.
+
+  Lemma lt0B_size : forall b, ([::] <# b)%bits -> 0 < size b.
+  Proof.
+    elim; first done. intros; by rewrite ltn0Sn.
+  Qed.
+
+  Lemma odd_to_nat_lsb : forall b, odd (to_nat b) =lsb b.
+  Proof.
+    elim; first by rewrite/lsb/splitlsb/=.
+    move => a l IH.
+    rewrite/lsb/=odd_add odd_double-negb_eqb. case Ha : a; done.
+  Qed.
+
+
+  Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0.
+  Proof. intros. induction n; try done.
+  Qed.
+
+  Lemma rev_cons_nil : forall (hd:bool) tl, ~~ (rcons tl hd == [::]).
+  Proof.
+    intros. move : hd. elim tl;  done.
+  Qed.
+    
+  Lemma rev_nil : forall (hd:bool) tl, ~~ (rev (hd :: tl) == [::]).
+  Proof.
+    move => hd tl. rewrite rev_cons. exact : rev_cons_nil.
+  Qed.
+
+  Lemma udivB_rec_eq : forall m n q r , ~~(m==zeros(size m)) -> m = addB (mulB (udivB_rec m n q r).1 n) (udivB_rec m n q r).2.
+  Proof. 
+  Admitted.
+    
+  Lemma udivB_eq : forall m n, ~~(m==zeros(size m)) -> m = addB (mulB (udivB m n).1 n) (udivB m n).2.
+  Proof.
+  Admitted.
+
+
+  Lemma udivB_mulAC : forall d m n, (udivB d m).2 = zeros (size d) -> udivB m (mulB d n) = udivB (mulB m n) d.
+  Proof.
+  Admitted.
+
   
   Lemma shrB_div2exp:  forall i p , (iter i shrB1 p, from_nat (size p) 0) = udivB p (from_nat (size p) (2^ i)%nat).
   Proof.
@@ -3626,18 +3813,17 @@ Section Lemmas.
   Lemma udivB_def: forall q d r, ltB r d -> (udivB (addB (mulB q d) r) d).2 = r.
   Proof.
   Admitted.
-  
-  Lemma udivB_rec_to_nat : forall nhd ntl m q r, to_nat (udivB_rec (nhd::ntl) m q r).1 = addn (div.divn (addn (to_nat (shlB (size ntl).+1 r)) (to_nat (nhd::ntl))) (to_nat m)) (to_nat q).
+
+    
+  Lemma udivB_to_nat : forall m n,  (*size m = size n ->*) to_nat (udivB (rev m) n).1 = divn (to_nat (rev m)) (to_nat (from_nat (size m) (to_nat n))).
   Proof.
   Admitted.
-  
-  Lemma udivB_to_nat : forall p q,  to_nat (udivB p q).1 = (div.divn (to_nat p) (to_nat (from_nat (size p) (to_nat q)))).
-  Proof.
-  Admitted.  
+    
 
   Lemma uremB_to_nat : forall p q , to_nat (udivB p q).2 = (div.modn (to_nat p) (to_nat q)).
   Proof.  
   Admitted.
+
 
   
   Lemma udivB_negB_negB bs1 bs2 :
@@ -3670,18 +3856,6 @@ Section Lemmas.
     - reflexivity.
   Qed.
 
-
-  Definition Nat_dvdn n m := Nat.modulo n m == 0. 
-
-  Lemma modn_mod : forall n m , 0 < m -> div.modn n m = Nat.modulo n m.
-  Proof.
-  Admitted.
-
-      
-  Lemma divn_div : forall n m,  0 < m -> div.divn n m = Nat.div n m.
-  Proof.
-  Admitted.
-
   
   Definition sdivB bs1' bs2' : bits * bits :=
     let bs1 := absB bs1' in
@@ -3690,24 +3864,11 @@ Section Lemmas.
     else if (msb bs1' == msb bs2') && (msb bs1') then ((udivB bs1 bs2).1, negB (udivB bs1 bs2).2)
          else if (msb bs1' != msb bs2') && negb (msb bs1') then (negB (udivB bs1 bs2).1, (udivB bs1 bs2).2)
               else (negB (udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
-  
-  Lemma toZ_udiv ub1 ub2 : to_nat ub2 <> 0 -> size ub1 = size ub2 -> to_Zpos (udivB ub1 ub2).1 = Z.div (to_Zpos ub1) (to_Zpos ub2).
-  Proof.
-    move => Hnot0 Hsz12 .
-    rewrite !to_Zpos_nat -(div_Zdiv _ _ Hnot0) udivB_to_nat Hsz12 (to_nat_from_nat_bounded (to_nat_bounded ub2)).
-    rewrite ->Nat2Z.inj_iff. rewrite divn_div. done.
-    rewrite lt0n. by move/eqP : Hnot0.
-  Qed.
-  
-  Lemma toZ_sdivB sb1 sb2: to_Z (sdivB sb1 sb2).1 = Z.div (to_Z sb1) (to_Z sb2).
-  Proof.
-    rewrite {2 3}/to_Z /sdivB /absB.
-    case Hspmsb1 : (splitmsb sb1) => [tl1 msb1].
-    case Hspmsb2 : (splitmsb sb2) => [tl2 msb2]. rewrite /msb Hspmsb1 Hspmsb2/=.
-    case Hmsb1 : (msb1); case Hmsb2 : (msb2).
-    - rewrite udivB_negB_negB /= Zdiv_opp_opp.
-  Admitted.
 
+  
+  Lemma toZ_sdivB sb1 sb2 : to_Z sb2 <> 0%Z -> size sb1 = size sb2 -> to_Z (sdivB sb1 sb2).1 = Z.div (to_Z sb1) (to_Z sb2).
+  Proof.
+  Admitted.
 
   (*---------------------------------------------------------------------------
     Properties of signed remainder
@@ -3726,6 +3887,9 @@ Section Lemmas.
         * rewrite size_negB size_uremB size_absB. reflexivity.
   Qed.
 
+    Lemma toZ_sremB sb1 sb2 : to_Z sb2 <> 0%Z -> size sb1 = size sb2 -> to_Z (sdivB sb1 sb2).2 = Z.rem (to_Z sb1) (to_Z sb2).
+  Proof.
+  Admitted.
   (*---------------------------------------------------------------------------
     Properties of signed modulo
   ---------------------------------------------------------------------------*)
@@ -3765,7 +3929,10 @@ Section Lemmas.
     - rewrite size_sremB Hs minnn. reflexivity.
   Qed.
 
-
+    Lemma toZ_smodB sb1 sb2 : to_Z sb2 <> 0%Z -> size sb1 = size sb2 -> to_Z (smodB sb1 sb2) = Z.modulo (to_Z sb1) (to_Z sb2).
+  Proof.
+  Admitted.
+  
   (*---------------------------------------------------------------------------
     Others
   ---------------------------------------------------------------------------*)  
@@ -3788,16 +3955,6 @@ Section Lemmas.
     end .
 
   Definition sig_bits bs := sig_bits_aux (rev bs) (size bs).
-
-  Lemma rev_cons_nil : forall (hd:bool) tl, ~~ (rcons tl hd == [::]).
-  Proof.
-    intros. move : hd. elim tl;  done.
-  Qed.
-    
-  Lemma rev_nil : forall (hd:bool) tl, ~~ (rev (hd :: tl) == [::]).
-  Proof.
-    move => hd tl. rewrite rev_cons. exact : rev_cons_nil.
-  Qed.
 
   Lemma sig_bits_le : forall bs,  (sig_bits bs) <= size bs.
   Proof.
