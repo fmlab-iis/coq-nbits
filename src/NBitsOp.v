@@ -2584,6 +2584,14 @@ Section Lemmas.
   Proof .
   Admitted.
    *)
+
+  Lemma to_nat_subB : forall m n, size m = size n -> to_nat (subB m n) = to_nat m - to_nat n.
+  Proof.
+  Admitted.
+
+  Lemma subB_same m : subB m m = zeros (size m).
+  Proof.
+  Admitted.
   (*---------------------------------------------------------------------------
     Properties of multiplication
   ---------------------------------------------------------------------------*)
@@ -3579,13 +3587,6 @@ Section Lemmas.
     elim => [|ns IH]/=; first done. rewrite IH-muln2 mul0n; done.
   Qed.
 
-  Lemma to_nat_subB : forall m n, size m = size n -> to_nat (subB m n) = (to_nat m) - to_nat n.
-  Proof.
-  Admitted.
-
-  Lemma subB_same m : subB m m = zeros (size m).
-  Proof.
-  Admitted.
 
   Lemma joinlsb_isb0 (mhd:bool) r: 0 < size r -> to_nat (dropmsb (joinlsb mhd r)) = 0 -> mhd = b0.
   Proof.
@@ -3642,7 +3643,24 @@ Section Lemmas.
   Proof.
   Admitted.
 
+  Lemma low_dropmsb : forall bs , low (size bs).-1 bs = dropmsb bs.
+  Proof.
+    elim => [|bhd btl IH]. done.
+    rewrite /=/low (lock take) (lock dropmsb)/=subnS subnn -subn1 sub0n cats0 -!lock.
+    apply/eqP; rewrite -to_nat_inj_ss. rewrite to_nat_take ltnSn to_nat_dropmsb /= to_nat_from_nat.
+    apply/eqP. done.
+    by rewrite size_take ltnSn size_dropmsb/= -addn1 addnK.
+  Qed.
 
+  Lemma low_dropmsb_joinlsb : forall bs b, 0 < size bs -> b::low (size bs).-1 bs = dropmsb (joinlsb b bs).
+  Proof.
+    elim => [|bhd btl IH] b. done.
+    move => Hsz.
+    rewrite low_dropmsb.
+    apply/eqP; rewrite -to_nat_inj_ss. rewrite to_nat_dropmsb to_nat_joinlsb /=. done.
+    by rewrite /= size_dropmsb.
+  Qed.
+    
   Lemma udivB1_rec : forall m n q,
       ~~(m == zeros (size m)) -> 0 < n -> n = size m -> n = size q ->
       udivB_rec m (b1 :: zeros (n).-1) q (zeros n) = ((high (size m) (rev m)) ++ (low (size q - size m) q),  (shlB (size m) (zeros n))).
@@ -3661,16 +3679,8 @@ Section Lemmas.
           last by rewrite -{1}(expn0 2) (ltn_exp2l _ _ (ltnSn 1)) Hsznm.
         rewrite/=.
         rewrite/= subB_joinmsb_dropmsb; last by rewrite -addn1 -subn1 (subnK Hngt0) size_zeros.
-        rewrite -/(shlB1 (zeros n)).
-        have ->: dropmsb (joinlsb true q) = true :: low (size q - 1) q.
-        apply/eqP; rewrite -to_nat_inj_ss;
-          last by rewrite size_dropmsb size_joinlsb addnK /= size_low -addn1 -Hsznq (subnK Hngt0).
-        rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=.
-        rewrite /low/= to_nat_cat to_nat_zeros mul0n addn0 to_nat_take -subn_gt0 -Hsznq (subKn Hngt0)/=.
-        rewrite to_nat_from_nat -!muln2 (muln_modl (ltn0Sn 1)) -expnSr -(addn1 (n - 1)) (subnK Hngt0) addnC.
-          have {4}-> : 1 = 1 %% 2^n by rewrite modn_small; last by rewrite -{1}(expn0 2) (ltn_exp2l _ _ (ltnSn 1)) Hsznm.
-        admit.
-        done.
+        rewrite -/(shlB1 (zeros n)) /joinlsb -low_dropmsb_joinlsb; last by rewrite -Hsznq Hngt0.
+        by rewrite subn1.
       + rewrite to_nat_dropmsb to_nat_joinlsb to_nat_zeros -muln2 mul0n add0n mod0n/=.
         rewrite /shlB1.
         have -> : dropmsb (joinlsb false q) = false :: low (size q - 1) q.
@@ -3717,7 +3727,7 @@ Section Lemmas.
         have -> :to_nat (n - (size mttl).+1) -bits of (to_nat (dropmsb (joinlsb true q))) * 2 ^ (size mttl).+1
                  = 2 ^ (size mttl).+1 + to_nat (n - (size mttl).+2) -bits of (to_nat q) * 2 ^ (size mttl).+2.
         rewrite to_nat_dropmsb to_nat_joinlsb size_joinlsb addn1/=.
-        rewrite 2!to_nat_from_nat.
+        rewrite 2!to_nat_from_nat -Hsznq -muln2.
         admit.
           by rewrite (addnA (to_nat (rev mttl) + mthd * 2 ^ size mttl) (2 ^ (size mttl).+1) (to_nat (n - (size mttl).+2) -bits of (to_nat q) * 2 ^ (size mttl).+2)).
           rewrite -Hsznq Hc1 Hc2 !addnABC. by rewrite !subnn.
@@ -3791,10 +3801,6 @@ Qed.
   Proof.
     move => hd tl. rewrite rev_cons. exact : rev_cons_nil.
   Qed.
-
-  Lemma udivB_rec_eq : forall m n q r , ~~(m==zeros(size m)) -> m = addB (mulB (udivB_rec m n q r).1 n) (udivB_rec m n q r).2.
-  Proof. 
-  Admitted.
     
   Lemma udivB_eq : forall m n, ~~(m==zeros(size m)) -> m = addB (mulB (udivB m n).1 n) (udivB m n).2.
   Proof.
@@ -3814,7 +3820,11 @@ Qed.
   Proof.
   Admitted.
 
-    
+
+  Lemma udivB_rec_to_nat : forall m n ,  ~~(m==zeros(size m)) -> size m <= size n -> to_nat (udivB_rec m n (zeros (size n)) (zeros (size n))).1 = divn (to_nat (rev m)) (to_nat (from_nat (size m) (to_nat n))).
+  Proof.
+  Admitted.
+  
   Lemma udivB_to_nat : forall m n,  (*size m = size n ->*) to_nat (udivB (rev m) n).1 = divn (to_nat (rev m)) (to_nat (from_nat (size m) (to_nat n))).
   Proof.
   Admitted.
