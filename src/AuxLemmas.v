@@ -192,6 +192,14 @@ Proof.
       exact: (b2n_high_geq_nltn2 _ H2 H1).
 Qed.
 
+Lemma eta_expand_Z_div_eucl a b : Z.div_eucl a b = ((a / b)%Z, (a mod b)%Z).
+Proof. rewrite /Z.div /Z.modulo. by case (Z.div_eucl a b). Qed.
+
+Lemma pow2_nat2z_nonzero n : (2 ^ Z.of_nat n)%Z <> 0%Z.
+Proof.
+  apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg].
+Qed.
+
 
 Section SeqLemmas.
 
