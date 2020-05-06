@@ -4839,11 +4839,24 @@ Qed.
     - rewrite to_Zneg_invB Z.opp_succ Z.sub_1_r. reflexivity.
   Qed.
 
+  Lemma to_nat_addB_safe bs1 bs2 :
+    size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
+    to_nat (bs1 +# bs2)%bits = (to_nat bs1 + to_nat bs2).
+  Proof.
+    move/eqP=> Hsz. rewrite -(eqP (to_nat_addB_zext1 Hsz)).
+    move/eqP in Hsz. rewrite (eqP (addB_zext1_catB Hsz)).
+    rewrite /carry_addB /joinmsb to_nat_rcons => Hcarry.
+    rewrite (negbTE Hcarry) mul0n addn0. reflexivity.
+  Qed.
+
   Lemma bv2z_add_unsigned bs1 bs2 :
     size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
     to_Zpos (bs1 +# bs2)%bits = (to_Zpos bs1 + to_Zpos bs2)%Z.
   Proof.
-  Admitted.
+    move=> Hsz Hov. move: (to_nat_addB_safe Hsz Hov) => Hnat.
+    apply (f_equal Z.of_nat) in Hnat. rewrite -to_Zpos_nat in Hnat.
+    rewrite Hnat !to_Zpos_nat Nat2Z.inj_add. reflexivity.
+  Qed.
 
   Lemma bv2z_add_signed bs1 bs2 :
     size bs1 = size bs2 -> ~~ Saddo bs1 bs2 ->
