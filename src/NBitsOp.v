@@ -4930,7 +4930,8 @@ Qed.
     apply (f_equal Z.of_nat) in Hnat. move: Hnat.
     rewrite !Nat2Z.inj_add Nat2Z.inj_mul Nat2Z_inj_expn. rewrite -!to_Zpos_nat /=.
     have->: Z.of_nat c = c by case c.
-    have->: Z.of_nat (adcB c bs1 bs2).1 = (adcB c bs1 bs2).1 by case (adcB c bs1 bs2).1.
+    have->: Z.of_nat (adcB c bs1 bs2).1 = (adcB c bs1 bs2).1 
+      by case (adcB c bs1 bs2).1.
     done.
   Qed.    
 
@@ -4960,13 +4961,17 @@ Qed.
      odd (carry_addB bs1 bs2) * 2 ^ Z.of_nat (size bs1))%Z =
     (to_Zpos bs1 + to_Zpos bs2)%Z.
   Proof.
-  Admitted.
+    have->: odd (carry_addB bs1 bs2) = carry_addB bs1 bs2 
+      by case (carry_addB bs1 bs2).
+    exact: to_Zpos_addB.
+  Qed.
 
   Lemma bv2z_adds_signed bs1 bs2 :
     size bs1 = size bs2 -> ~~ Saddo bs1 bs2 ->
     to_Z (bs1 +# bs2)%bits = (to_Z bs1 + to_Z bs2)%Z.
   Proof.
-  Admitted.
+    exact: bv2z_add_signed.
+  Qed.
 
   Lemma bv2z_adc_unsigned bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
@@ -4975,6 +4980,9 @@ Qed.
     to_Zpos (adcB (to_bool bsc) bs1 bs2).2 =
     (to_Zpos bs1 + to_Zpos bs2 + to_Zpos bsc)%Z.
   Proof.
+    Check to_Zpos_adcB.
+    move=> Hsz Hszc. move/Z.add_move_r: (to_Zpos_adcB (to_bool bsc) Hsz) => ->.
+    Search adcB.
   Admitted.
 
   Lemma bv2z_adc_signed bs1 bs2 bsc :
@@ -4991,7 +4999,13 @@ Qed.
      odd (adcB (to_bool bsc) bs1 bs2).1 * 2 ^ Z.of_nat (size bs1))%Z =
     (to_Zpos bs1 + to_Zpos bs2 + to_Zpos bsc)%Z.
   Proof.
-  Admitted.
+    move=> Hsz. case: bsc => [|c tl] //=.
+    move/eqP; rewrite eqSS; move/eqP => Htl. apply size0 in Htl. 
+    rewrite (eqP Htl) /= Z.add_0_r. 
+    have->: odd (adcB (to_bool [::c]) bs1 bs2).1 = (adcB (to_bool [::c]) bs1 bs2).1
+      by case (adcB (to_bool [::c]) bs1 bs2).1.
+    rewrite (to_Zpos_adcB _ Hsz) [in RHS]Z.add_comm Z.add_assoc. by case c.
+  Qed.
 
   Lemma bv2z_adcs_signed bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
