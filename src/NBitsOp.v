@@ -4837,16 +4837,7 @@ Qed.
     - rewrite to_Zpos_invB Z.opp_involutive Z.sub_succ_l Z.sub_1_r Z.succ_pred. 
       reflexivity.
     - rewrite to_Zneg_invB Z.opp_succ Z.sub_1_r. reflexivity.
-  Qed.
-
-(*
-  Lemma to_nat_addB_full bs1 bs2 :
-    size bs1 = size bs2 -> 
-    to_nat (bs1 +# bs2) + (carry_addB bs1 bs2) * 2 ^ size bs1 
-    = to_nat bs1 + to_nat bs2.
-  Proof.
-    Admitted.
-*)
+  Qed. 
 
   Lemma to_nat_addB_safe bs1 bs2 :
     size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
@@ -4955,45 +4946,57 @@ Qed.
     exact: bv2z_add_signed.
   Qed.
 
-  (* Problematic: 
-  Lemma carry_adcB_eq_carry_addB bs1 bs2 c :
-    size bs1 = size bs2 ->
-    (adcB c bs1 bs2).1 = 
-    carry_addB bs1 bs2 || carry_addB (bs1 +# bs2) (zext (size bs1 - 1) [:: c]).
+  Lemma msb_rcons bs b : msb (rcons bs b) = b.
+  Proof. by rewrite /msb splitmsb_rcons. Qed.
+
+  Lemma adcB_addB_addB bs1 bs2 c :
+    0 < size bs1 -> size bs1 = size bs2 ->
+    (adcB c bs1 bs2).2 = bs1 +# bs2 +# zext (size bs1 - 1) [:: c].
   Proof.
-    case: (lastP bs1) => {bs1} [|bs1 b1]; case: (lastP bs2) => {bs2} [|bs2 b2];
-    rewrite ?size_rcons //=.
-    - move=> _ . rewrite sub0n zext0 /addB /carry_addB /=.
-    rewrite /carry_addB /addB /adcB /full_adder =>/eqP Hsz. rewrite eqSS in Hsz.
-    rewrite (zip_rcons _ _ (eqP Hsz)) -cats1.
-    have->: [:: (b1, b2)] = zip [:: b1] [:: b2] by reflexivity.
-    rewrite (eqP (full_adder_zip_cat _ _ _ (eqP Hsz))) /=.
-    rewrite /msb splitmsb_joinmsb !splitmsb_rcons /=.
-    by case b1; case b2; case (full_adder_zip false (zip bs1 bs2)).1.
-  Admitted.
-  *)
-  
-  (* Problematic when bs1 = bs2 = nil *)
+    move=> Hsz0 Hsz. have{1}<-: to_bool [::c] = c by case c.    
+    rewrite -(adcB_zext1_lown _ Hsz). 
+    have H1 : size bs1 <= size (zext 1 bs1 +# zext 1 bs2)
+      by rewrite size_addB 2!size_zext Hsz minnn addn1 leqnSn.
+    have H2 : size bs1 <= size (zext (size bs1) [:: c])
+      by rewrite size_zext /= addnC addn1 leqnSn.
+    rewrite (low_addB H1 H2) low_addB ?size_zext ?addn1 ?Hsz ?leqnSn //=.
+    rewrite -{1}Hsz 2!low_zext. rewrite Hsz in Hsz0.
+    rewrite -{2}(prednK Hsz0) zext_Sn subn1 low_size_cat; first reflexivity. 
+    by rewrite size_zext /= addnC addn1 (prednK Hsz0).
+  Qed.
+
   Lemma bv2z_adc_unsigned bs1 bs2 bsc :
+    0 < size bs1 ->
     size bs1 = size bs2 -> size bsc = 1 ->
     ~~ carry_addB bs1 bs2 &&
     ~~ carry_addB (bs1 +# bs2)%bits (zext (size bs1 - 1) bsc) ->
     to_Zpos (adcB (to_bool bsc) bs1 bs2).2 =
     (to_Zpos bs1 + to_Zpos bs2 + to_Zpos bsc)%Z.
   Proof.
-    Check to_Zpos_adcB.
-    move=> Hsz Hszc. move/Z.add_move_r: (to_Zpos_adcB (to_bool bsc) Hsz) => ->.
-    Search adcB.
-  Admitted.
+    move=> Hsz0 Hsz Hc. rewrite (size1_lsb Hc) => /andP [Hov1 Hov2].
+    rewrite (adcB_addB_addB _ Hsz0 Hsz).
+    have->: to_bool [:: lsb bsc] = lsb bsc by case (lsb bsc).
+    rewrite (bv2z_add_unsigned _ Hov2); 
+      last by rewrite size_addB -Hsz minnn size_zext /= addnC (subnK Hsz0).
+    rewrite to_Zpos_zext (bv2z_add_unsigned Hsz Hov1). reflexivity.
+  Qed.
 
-  (* Problematic when bs1 = bs2 = nil *)
   Lemma bv2z_adc_signed bs1 bs2 bsc :
+    1 < size bs1 ->
     size bs1 = size bs2 -> size bsc = 1 ->
     ~~ Saddo bs1 bs2 &&
     ~~ Saddo (bs1 +# bs2)%bits (zext (size bs1 - 1) bsc) ->
     to_Z (adcB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 + to_Z bs2 + to_Zpos bsc)%Z.
   Proof.
-  Admitted.
+    move=> Hsz1 Hsz Hc. rewrite (size1_lsb Hc) => /andP [Hov1 Hov2].
+    have Hsz0 : 0 < size bs1 by apply (@ltn_trans 1). 
+    rewrite (adcB_addB_addB _ Hsz0 Hsz).
+    have->: to_bool [:: lsb bsc] = lsb bsc by case (lsb bsc).
+    rewrite (bv2z_add_signed _ Hov2); 
+      last by rewrite size_addB -Hsz minnn size_zext /= addnC (subnK Hsz0).
+    rewrite to_Z_zext; last by rewrite -subn_gt0 in Hsz1.
+    rewrite (bv2z_add_signed Hsz Hov1). reflexivity.
+  Qed.
 
   Lemma bv2z_adcs_unsigned bs1 bs2 bsc :
     size bs1 = size bs2 -> size bsc = 1 ->
@@ -5010,11 +5013,13 @@ Qed.
   Qed.
 
   Lemma bv2z_adcs_signed bs1 bs2 bsc :
+    1 < size bs1 ->
     size bs1 = size bs2 -> size bsc = 1 ->
     ~~ Saddo bs1 bs2 && ~~ Saddo (bs1 +# bs2)%bits (zext (size bs1 - 1) bsc) ->
     to_Z (adcB (to_bool bsc) bs1 bs2).2 = (to_Z bs1 + to_Z bs2 + to_Zpos bsc)%Z.
   Proof.
-  Admitted.
+    exact: bv2z_adc_signed.
+  Qed.
 
   (* TODO. But maybe no needed *)
   Lemma Z2Nat_inj_pow2 z : (0 <= z)%Z -> Z.to_nat (2 ^ z) = (2 ^ Z.to_nat z).
