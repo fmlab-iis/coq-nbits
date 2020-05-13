@@ -399,6 +399,9 @@ Section Lemmas.
   Lemma msb_joinmsb bs b : msb (joinmsb bs b) = b.
   Proof. by rewrite /msb splitmsb_joinmsb. Qed.
 
+  Lemma msb_rcons bs b : msb (rcons bs b) = b.
+  Proof. by rewrite /msb splitmsb_rcons. Qed.
+
   Lemma joinlsb_splitlsb bs :
     0 < size bs ->
     joinlsb (splitlsb bs).1 (splitlsb bs).2 = bs.
@@ -1023,6 +1026,11 @@ Section Lemmas.
     - rewrite zext0 add0n. reflexivity.
     - rewrite zext_Sn IHn -zext_Sn. rewrite -addn1 -addnA (addnC m) addnA addn1.
       reflexivity.
+  Qed.
+
+  Lemma low_zext : forall n p, low (size p) (zext n p) = p.
+  Proof.
+    intros; by rewrite /low/zext size_cat subnDA subnn sub0n cats0 take_cat ltnn subnn take0 cats0. 
   Qed.
 
 

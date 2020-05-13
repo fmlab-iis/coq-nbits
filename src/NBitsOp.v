@@ -1493,6 +1493,43 @@ Section Lemmas.
 
 
   (*---------------------------------------------------------------------------
+    Properties of inversion
+  ---------------------------------------------------------------------------*)
+
+(*
+  Lemma invB_cons p ps :
+    invB (p::ps) == (~~ p)::(invB ps) .
+  Proof .
+    by case p => /= .
+  Qed .
+*)
+
+  Lemma to_nat_invB bs :
+    to_nat (~~# bs) = 2 ^ (size bs) - 1 - to_nat bs.
+  Proof.
+    elim: bs => [// | b bs IH]. rewrite /= IH -!mul2n !mulnBr expnS muln1 subnDA.
+    have Hle :  2 * to_nat bs <= 2 * 2 ^ size bs - 2.
+    {
+      move: (to_nat_bounded bs). 
+      rewrite -{1}(prednK (exp2n_gt0 (size bs))) ltnS -subn1.
+      move=> H. apply (@leq_mul 2 _ 2 _) in H; last done.
+      rewrite mulnBr muln1 in H. exact: H.
+    }
+    rewrite (addnBA _ Hle) addnC -(subnDA 1 _ b). case b => /=.
+    - rewrite addn0 addn1. reflexivity.
+    - rewrite addn0 addn1 subnSK; first reflexivity. 
+      rewrite mul2n. apply double_gt1. exact: exp2n_gt0. 
+  Qed.
+
+  Lemma to_Zpos_invB_full bs :
+    to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
+  Proof.
+    rewrite to_Zpos_invB. move/Z.add_move_l: (to_Zpos_add_to_Zneg bs) => ->. 
+    reflexivity.
+  Qed.
+
+
+  (*---------------------------------------------------------------------------
     Properties of addition
     ---------------------------------------------------------------------------*)
 
@@ -2230,16 +2267,137 @@ Section Lemmas.
     move=> ->. rewrite low_joinmsb. rewrite to_bool_bit. reflexivity.
   Qed.
 
+  Lemma low_adcB n ps qs :
+    n <= size ps -> n <= size qs ->
+    forall b,
+      low n (adcB b ps qs).2 = (adcB b (low n ps) (low n qs)).2  .
+  Proof .
+    elim : n ps qs => [ ps qs _ _ b | n IH ps qs ]; first by rewrite !low0 /addB .
+    case : ps => [ | p ps ]; first by trivial .
+    rewrite size_joinlsb addn1 ltnS => Hnps .
+    case : qs => [ | q qs ]; first by trivial .
+    rewrite size_joinlsb addn1 ltnS => Hnqs .
+    rewrite !low_cons .
+    move : (IH _ _ Hnps Hnqs) => {IH} IH b .
+    move : IH; case b; case p; case q;
+      rewrite /addB /adcB /full_adder /= => IH;
+      move : (IH true) (IH false);
+      dcase (full_adder_zip true (zip ps qs))
+      => [[c0] tl0] Hadder0;
+      dcase (full_adder_zip true (zip (low n ps) (low n qs)))
+      => [[c1] tl1] Hadder1;
+      dcase (full_adder_zip false (zip ps qs))
+      => [[c2] tl2] Hadder2;
+      dcase (full_adder_zip false (zip (low n ps) (low n qs)))
+      => [[c3] tl3] Hadder3 /=;
+      rewrite low_cons;
+      try (by move => -> _ || by move => _ ->) .
+  Qed .
+      
+  Lemma low_addB n ps qs :
+    n <= size ps -> n <= size qs ->
+    low n (ps +# qs) = (low n ps) +# (low n qs) .
+  Proof .
+    move => Hnps Hnqs .
+    rewrite /addB .
+    by rewrite (low_adcB Hnps Hnqs) .
+  Qed .
+
+  Lemma adcB_addB_addB bs1 bs2 c :
+    0 < size bs1 -> size bs1 = size bs2 ->
+    (adcB c bs1 bs2).2 = bs1 +# bs2 +# zext (size bs1 - 1) [:: c].
+  Proof.
+    move=> Hsz0 Hsz. have{1}<-: to_bool [::c] = c by case c.    
+    rewrite -(adcB_zext1_lown _ Hsz). 
+    have H1 : size bs1 <= size (zext 1 bs1 +# zext 1 bs2)
+      by rewrite size_addB 2!size_zext Hsz minnn addn1 leqnSn.
+    have H2 : size bs1 <= size (zext (size bs1) [:: c])
+      by rewrite size_zext /= addnC addn1 leqnSn.
+    rewrite (low_addB H1 H2) low_addB ?size_zext ?addn1 ?Hsz ?leqnSn //=.
+    rewrite -{1}Hsz 2!low_zext. rewrite Hsz in Hsz0.
+    rewrite -{2}(prednK Hsz0) zext_Sn subn1 low_size_cat; first reflexivity. 
+    by rewrite size_zext /= addnC addn1 (prednK Hsz0).
+  Qed.
+
+
+  Lemma to_nat_adcB_full bs1 bs2 c :
+    size bs1 = size bs2 -> 
+    to_nat (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ size bs1
+    = c + to_nat bs1 + to_nat bs2.
+  Proof.
+    move/eqP=> Hsz. 
+    have->: to_nat (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ size bs1
+            = to_nat (joinmsb (adcB c bs1 bs2).2 (adcB c bs1 bs2).1)
+      by rewrite to_nat_joinmsb size_adcB (eqP Hsz) minnn addnC. 
+    rewrite -(eqP (addB_addB_adcB _ Hsz)) (eqP (addB_addB_zext_adcB _ Hsz)).
+    rewrite to_nat_adcB 2!to_nat_zext to_nat_from_nat_bounded; first reflexivity. 
+    rewrite size_adcB 2!size_zext (eqP Hsz) minnn.
+    move: (leq_b1 c) (to_nat_bounded bs1) (to_nat_bounded bs2).
+    rewrite -(prednK (exp2n_gt0 (size bs1))) -(prednK (exp2n_gt0 (size bs2))) !ltnS.
+    move=> Hc Hbs1 Hbs2. move: (leq_add (leq_add Hc Hbs1) Hbs2). 
+    rewrite -subn1 subnKC; last exact: exp2n_gt0. rewrite (eqP Hsz). 
+    rewrite -(prednK (exp2n_gt0 (size bs2 + 1))) ltnS addn1 expnS mul2n -addnn. 
+    rewrite -subn1 (addnBA _ (exp2n_gt0 (size bs2))) subn1. done.
+  Qed.
+
+  Lemma to_Zpos_adcB bs1 bs2 c :
+    size bs1 = size bs2 -> 
+    (to_Zpos (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ Z.of_nat (size bs1))%Z
+    = (c + to_Zpos bs1 + to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz. move: (to_nat_adcB_full c Hsz) => Hnat. 
+    apply (f_equal Z.of_nat) in Hnat. move: Hnat.
+    rewrite !Nat2Z.inj_add Nat2Z.inj_mul Nat2Z_inj_expn. rewrite -!to_Zpos_nat /=.
+    have->: Z.of_nat c = c by case c.
+    have->: Z.of_nat (adcB c bs1 bs2).1 = (adcB c bs1 bs2).1 
+      by case (adcB c bs1 bs2).1.
+    done.
+  Qed.    
+
+  Lemma to_Zpos_addB bs1 bs2 :
+    size bs1 = size bs2 -> 
+    (to_Zpos (bs1 +# bs2)%bits + (carry_addB bs1 bs2) * 2 ^ Z.of_nat (size bs1))%Z
+    = (to_Zpos bs1 + to_Zpos bs2)%Z.
+  Proof.
+    move=> Hsz. rewrite /addB /carry_addB (to_Zpos_adcB _ Hsz). reflexivity.
+  Qed.
+
+  Lemma full_adder_zip_cat ps0 ps1 b0 b1 c :
+    size ps0 = size ps1 ->
+    full_adder_zip c ((zip ps0 ps1) ++ zip [:: b0] [:: b1]) ==
+    ((bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).1,
+     joinmsb (full_adder_zip c (zip ps0 ps1)).2
+           (bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).2) .
+  Proof .
+    move => Hszeq .
+    move : ps0 ps1 Hszeq c; apply : seq_ind2;
+      first by case; case b0; case b1.
+    move => p0 p1 ps0 ps1 Hszeq .
+    case b0; case b1 => /= IH; case p0; case p1; case => /=;
+      rewrite !(eqP (IH _));
+      try (by dcase_full_adder_zip false ps0 ps1 => /=);
+      try (by dcase_full_adder_zip true ps0 ps1 => /=) .
+  Qed .
+
+  Lemma carry_addB_eq_msbs bs1 bs2 :
+    size bs1 = size bs2 ->
+    carry_addB bs1 bs2 = (msb bs1 && ~~ msb bs2 && ~~ msb (bs1 +# bs2))
+                         || (~~ msb bs1 && msb bs2 && ~~ msb (bs1 +# bs2))
+                         || (msb bs1 && msb bs2).
+  Proof.
+    case: (lastP bs1) => {bs1} [|bs1 b1]; case: (lastP bs2) => {bs2} [|bs2 b2];
+    rewrite ?size_rcons //=.
+    rewrite /carry_addB /addB /adcB /full_adder =>/eqP Hsz. rewrite eqSS in Hsz. 
+    rewrite (zip_rcons _ _ (eqP Hsz)) -cats1.
+    have->: [:: (b1, b2)] = zip [:: b1] [:: b2] by reflexivity. 
+    rewrite (eqP (full_adder_zip_cat _ _ _ (eqP Hsz))) /=.
+    rewrite /msb splitmsb_joinmsb !splitmsb_rcons /=.
+    by case b1; case b2; case (full_adder_zip false (zip bs1 bs2)).1.
+  Qed.
 
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
-
-  Lemma invB_cons p ps :
-    invB (p::ps) == (~~ p)::(invB ps) .
-  Proof .
-    by case p => /= .
-  Qed .
 
   Lemma succB0 bs : succB (b0 :: bs) == b1 :: bs .
   Proof .
@@ -2261,7 +2419,7 @@ Section Lemmas.
     apply : seq_ind2 .
     - by rewrite !zip_nil .
     - move => c0 c1 cs0 cs1 Hsz IH .
-      case c0; case c1; rewrite (eqP (@invB_cons _ _));
+      case c0; case c1; rewrite invB_cons;
       [ rewrite (eqP (@succB0 _))
       | rewrite (eqP (@succB1 _))
       | rewrite (eqP (@succB0 _))
@@ -2296,7 +2454,7 @@ Section Lemmas.
     - move => p q ps qs Hsz IH .
       rewrite /subB /sbbB /addB /adcB /negB /full_adder;
         case p; case q;
-        rewrite !(eqP (@invB_cons _ _));
+        rewrite !invB_cons;
         [ rewrite (eqP (@succB0 _))
         | rewrite (eqP (@succB1 _))
         | rewrite (eqP (@succB0 _))
@@ -2324,23 +2482,6 @@ Section Lemmas.
                 -[res0]/((c0, res0).2) -[res1]/((c1, res1).2)
                 -Hadder0 -Hadder1 -(eqP (@full_adder_zip_succB _ _ _));
           [ done | by rewrite Hsz ] .
-  Qed .
-
-  Lemma full_adder_zip_cat ps0 ps1 b0 b1 c :
-    size ps0 = size ps1 ->
-    full_adder_zip c ((zip ps0 ps1) ++ zip [:: b0] [:: b1]) ==
-    ((bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).1,
-     joinmsb (full_adder_zip c (zip ps0 ps1)).2
-           (bool_adder (full_adder_zip c (zip ps0 ps1)).1 b0 b1).2) .
-  Proof .
-    move => Hszeq .
-    move : ps0 ps1 Hszeq c; apply : seq_ind2;
-      first by case; case b0; case b1.
-    move => p0 p1 ps0 ps1 Hszeq .
-    case b0; case b1 => /= IH; case p0; case p1; case => /=;
-      rewrite !(eqP (IH _));
-      try (by dcase_full_adder_zip false ps0 ps1 => /=);
-      try (by dcase_full_adder_zip true ps0 ps1 => /=) .
   Qed .
       
   Lemma sbbB_zext1_catB p1 p2 c :
@@ -2412,7 +2553,7 @@ Section Lemmas.
     elim n .
     - done .
     - move => m IH .
-      rewrite /negB -zeros_cons (eqP (@invB_cons _ _)) .
+      rewrite /negB -zeros_cons invB_cons.
       by rewrite (eqP (@succB1 _)) invB_zeros (eqP (@succB_ones_zeros _)) .
   Qed .
   
@@ -2643,11 +2784,6 @@ Section Lemmas.
         have-> :(((size ptl).+1 + n0.+1) = (n0.+1 + (size ptl).+1)) by rewrite addnC. done.
   Qed.  
 
-  Lemma low_zext : forall n p, low (size p) (zext n p) = p.
-  Proof.
-    intros; by rewrite /low/zext size_cat subnDA subnn sub0n cats0 take_cat ltnn subnn take0 cats0. 
-  Qed.
-
   Lemma mulB1 p n: if (n == 0) then mulB p (from_nat n 1) = zeros (size p) else mulB p (from_nat n 1) = p.
   Proof. 
     move : (full_mulB1 p n). rewrite/mulB.
@@ -2825,42 +2961,6 @@ Section Lemmas.
     rewrite -[low (size ps) (full_mul ps ((size ps).+1 -bits of (m)))]/
             (mulB ps (from_nat (size ps).+1 m)) .
     by rewrite joinlsb0_addB .
-  Qed .
-
-  Lemma low_adcB n ps qs :
-    n <= size ps -> n <= size qs ->
-    forall b,
-      low n (adcB b ps qs).2 = (adcB b (low n ps) (low n qs)).2  .
-  Proof .
-    elim : n ps qs => [ ps qs _ _ b | n IH ps qs ]; first by rewrite !low0 /addB .
-    case : ps => [ | p ps ]; first by trivial .
-    rewrite size_joinlsb addn1 ltnS => Hnps .
-    case : qs => [ | q qs ]; first by trivial .
-    rewrite size_joinlsb addn1 ltnS => Hnqs .
-    rewrite !low_cons .
-    move : (IH _ _ Hnps Hnqs) => {IH} IH b .
-    move : IH; case b; case p; case q;
-      rewrite /addB /adcB /full_adder /= => IH;
-      move : (IH true) (IH false);
-      dcase (full_adder_zip true (zip ps qs))
-      => [[c0] tl0] Hadder0;
-      dcase (full_adder_zip true (zip (low n ps) (low n qs)))
-      => [[c1] tl1] Hadder1;
-      dcase (full_adder_zip false (zip ps qs))
-      => [[c2] tl2] Hadder2;
-      dcase (full_adder_zip false (zip (low n ps) (low n qs)))
-      => [[c3] tl3] Hadder3 /=;
-      rewrite low_cons;
-      try (by move => -> _ || by move => _ ->) .
-  Qed .
-      
-  Lemma low_addB n ps qs :
-    n <= size ps -> n <= size qs ->
-    low n (ps +# qs) = (low n ps) +# (low n qs) .
-  Proof .
-    move => Hnps Hnqs .
-    rewrite /addB .
-    by rewrite (low_adcB Hnps Hnqs) .
   Qed .
 
   Lemma low_zext_low n m bs :
@@ -4825,8 +4925,7 @@ Qed.
   Lemma bv2z_not_unsigned bs :
     to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
   Proof.
-    rewrite to_Zpos_invB. move/Z.add_move_l: (to_Zpos_add_to_Zneg bs) => ->. 
-    reflexivity.
+    exact: to_Zpos_invB_full.
   Qed.
 
   Lemma bv2z_not_signed bs :
@@ -4839,6 +4938,7 @@ Qed.
     - rewrite to_Zneg_invB Z.opp_succ Z.sub_1_r. reflexivity.
   Qed. 
 
+  (*
   Lemma to_nat_addB_safe bs1 bs2 :
     size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
     to_nat (bs1 +# bs2)%bits = (to_nat bs1 + to_nat bs2).
@@ -4848,72 +4948,14 @@ Qed.
     rewrite /carry_addB /joinmsb to_nat_rcons => Hcarry.
     rewrite (negbTE Hcarry) mul0n addn0. reflexivity.
   Qed.
+  *)
 
   Lemma bv2z_add_unsigned bs1 bs2 :
     size bs1 = size bs2 -> ~~ carry_addB bs1 bs2 ->
     to_Zpos (bs1 +# bs2)%bits = (to_Zpos bs1 + to_Zpos bs2)%Z.
   Proof.
-    move=> Hsz Hov. move: (to_nat_addB_safe Hsz Hov) => Hnat.
-    apply (f_equal Z.of_nat) in Hnat. rewrite -to_Zpos_nat in Hnat.
-    rewrite Hnat !to_Zpos_nat Nat2Z.inj_add. reflexivity.
-  Qed.
-
-  Lemma carry_addB_eq_msbs bs1 bs2 :
-    size bs1 = size bs2 ->
-    carry_addB bs1 bs2 = (msb bs1 && ~~ msb bs2 && ~~ msb (bs1 +# bs2))
-                         || (~~ msb bs1 && msb bs2 && ~~ msb (bs1 +# bs2))
-                         || (msb bs1 && msb bs2).
-  Proof.
-    case: (lastP bs1) => {bs1} [|bs1 b1]; case: (lastP bs2) => {bs2} [|bs2 b2];
-    rewrite ?size_rcons //=.
-    rewrite /carry_addB /addB /adcB /full_adder =>/eqP Hsz. rewrite eqSS in Hsz. 
-    rewrite (zip_rcons _ _ (eqP Hsz)) -cats1.
-    have->: [:: (b1, b2)] = zip [:: b1] [:: b2] by reflexivity. 
-    rewrite (eqP (full_adder_zip_cat _ _ _ (eqP Hsz))) /=.
-    rewrite /msb splitmsb_joinmsb !splitmsb_rcons /=.
-    by case b1; case b2; case (full_adder_zip false (zip bs1 bs2)).1.
-  Qed.
-
-  Lemma to_nat_adcB_full bs1 bs2 c :
-    size bs1 = size bs2 -> 
-    to_nat (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ size bs1
-    = c + to_nat bs1 + to_nat bs2.
-  Proof.
-    move/eqP=> Hsz. 
-    have->: to_nat (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ size bs1
-            = to_nat (joinmsb (adcB c bs1 bs2).2 (adcB c bs1 bs2).1)
-      by rewrite to_nat_joinmsb size_adcB (eqP Hsz) minnn addnC. 
-    rewrite -(eqP (addB_addB_adcB _ Hsz)) (eqP (addB_addB_zext_adcB _ Hsz)).
-    rewrite to_nat_adcB 2!to_nat_zext to_nat_from_nat_bounded; first reflexivity. 
-    rewrite size_adcB 2!size_zext (eqP Hsz) minnn.
-    move: (leq_b1 c) (to_nat_bounded bs1) (to_nat_bounded bs2).
-    rewrite -(prednK (exp2n_gt0 (size bs1))) -(prednK (exp2n_gt0 (size bs2))) !ltnS.
-    move=> Hc Hbs1 Hbs2. move: (leq_add (leq_add Hc Hbs1) Hbs2). 
-    rewrite -subn1 subnKC; last exact: exp2n_gt0. rewrite (eqP Hsz). 
-    rewrite -(prednK (exp2n_gt0 (size bs2 + 1))) ltnS addn1 expnS mul2n -addnn. 
-    rewrite -subn1 (addnBA _ (exp2n_gt0 (size bs2))) subn1. done.
-  Qed.
-
-  Lemma to_Zpos_adcB bs1 bs2 c :
-    size bs1 = size bs2 -> 
-    (to_Zpos (adcB c bs1 bs2).2 + (adcB c bs1 bs2).1 * 2 ^ Z.of_nat (size bs1))%Z
-    = (c + to_Zpos bs1 + to_Zpos bs2)%Z.
-  Proof.
-    move=> Hsz. move: (to_nat_adcB_full c Hsz) => Hnat. 
-    apply (f_equal Z.of_nat) in Hnat. move: Hnat.
-    rewrite !Nat2Z.inj_add Nat2Z.inj_mul Nat2Z_inj_expn. rewrite -!to_Zpos_nat /=.
-    have->: Z.of_nat c = c by case c.
-    have->: Z.of_nat (adcB c bs1 bs2).1 = (adcB c bs1 bs2).1 
-      by case (adcB c bs1 bs2).1.
-    done.
-  Qed.    
-
-  Lemma to_Zpos_addB bs1 bs2 :
-    size bs1 = size bs2 -> 
-    (to_Zpos (bs1 +# bs2)%bits + (carry_addB bs1 bs2) * 2 ^ Z.of_nat (size bs1))%Z
-    = (to_Zpos bs1 + to_Zpos bs2)%Z.
-  Proof.
-    move=> Hsz. rewrite /addB /carry_addB (to_Zpos_adcB _ Hsz). reflexivity.
+    move=> Hsz Hov. move/Z.add_move_r: (to_Zpos_addB Hsz) => ->.
+    apply negbTE in Hov. rewrite Hov Z.mul_0_l Z.sub_0_r. reflexivity.
   Qed.
 
   Lemma bv2z_add_signed bs1 bs2 :
@@ -4944,25 +4986,6 @@ Qed.
     to_Z (bs1 +# bs2)%bits = (to_Z bs1 + to_Z bs2)%Z.
   Proof.
     exact: bv2z_add_signed.
-  Qed.
-
-  Lemma msb_rcons bs b : msb (rcons bs b) = b.
-  Proof. by rewrite /msb splitmsb_rcons. Qed.
-
-  Lemma adcB_addB_addB bs1 bs2 c :
-    0 < size bs1 -> size bs1 = size bs2 ->
-    (adcB c bs1 bs2).2 = bs1 +# bs2 +# zext (size bs1 - 1) [:: c].
-  Proof.
-    move=> Hsz0 Hsz. have{1}<-: to_bool [::c] = c by case c.    
-    rewrite -(adcB_zext1_lown _ Hsz). 
-    have H1 : size bs1 <= size (zext 1 bs1 +# zext 1 bs2)
-      by rewrite size_addB 2!size_zext Hsz minnn addn1 leqnSn.
-    have H2 : size bs1 <= size (zext (size bs1) [:: c])
-      by rewrite size_zext /= addnC addn1 leqnSn.
-    rewrite (low_addB H1 H2) low_addB ?size_zext ?addn1 ?Hsz ?leqnSn //=.
-    rewrite -{1}Hsz 2!low_zext. rewrite Hsz in Hsz0.
-    rewrite -{2}(prednK Hsz0) zext_Sn subn1 low_size_cat; first reflexivity. 
-    by rewrite size_zext /= addnC addn1 (prednK Hsz0).
   Qed.
 
   Lemma bv2z_adc_unsigned bs1 bs2 bsc :
@@ -5028,23 +5051,6 @@ Qed.
     rewrite /=. rewrite /Z.le.
     rewrite /Z.pow_pos/=. rewrite /= /Z.pow_pos in IH.
   Admitted.
-
-  Lemma to_nat_invB bs :
-    to_nat (~~# bs) = 2 ^ (size bs) - 1 - to_nat bs.
-  Proof.
-    elim: bs => [// | b bs IH]. rewrite /= IH -!mul2n !mulnBr expnS muln1 subnDA.
-    have Hle :  2 * to_nat bs <= 2 * 2 ^ size bs - 2.
-    {
-      move: (to_nat_bounded bs). 
-      rewrite -{1}(prednK (exp2n_gt0 (size bs))) ltnS -subn1.
-      move=> H. apply (@leq_mul 2 _ 2 _) in H; last done.
-      rewrite mulnBr muln1 in H. exact: H.
-    }
-    rewrite (addnBA _ Hle) addnC -(subnDA 1 _ b). case b => /=.
-    - rewrite addn0 addn1. reflexivity.
-    - rewrite addn0 addn1 subnSK; first reflexivity. 
-      rewrite mul2n. apply double_gt1. exact: exp2n_gt0. 
-  Qed.
 
   Lemma to_Zpos_sbbB bs1 bs2 b :
     size bs1 = size bs2 -> 
