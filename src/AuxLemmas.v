@@ -200,6 +200,12 @@ Proof.
   apply Z.pow_nonzero; [done | exact: Nat2Z.is_nonneg].
 Qed.
 
+Lemma oddb (b : bool) : odd b = b.
+Proof. by case b. Qed.
+
+Lemma sub1oddb (b:bool) : (1 - Z.b2z (odd b))%Z = Z.b2z (~~ b).
+Proof. by case b. Qed.
+
 
 Section SeqLemmas.
 
