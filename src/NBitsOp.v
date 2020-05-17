@@ -4219,7 +4219,7 @@ Qed.
   Lemma shl_add_mod_mod :
     forall b a d ,
       size b <= size a -> size a = size d-> a <# d = false ->
-    (((to_Zpos (b) + 2 ^ Z.of_nat (size b) * (to_Zpos (a -# d) + to_Zpos d))
+    (((to_Zpos (b) + 2 ^ Z.of_nat (size b) * (to_Zpos (a -# d) + to_Zpos d))mod 2 ^ Z.of_nat (size d)
      mod to_Zpos d) =
     (((to_Zpos (b) + 2 ^ Z.of_nat (size b) * to_Zpos (a -# d))
       mod 2 ^ Z.of_nat (size d)) mod to_Zpos d))%Z.
@@ -4447,20 +4447,41 @@ Qed.
           by rewrite size_dropmsb size_joinlsb addnK Hsznr .
         rewrite -{1}(subB_addB (dropmsb (joinlsb mhd r)) n) (to_Zpos_subB_cancel Hszaux Hcondaux). 
         rewrite Zplus_mod_idemp_r.
-        rewrite (Z.mod_small (to_Zpos (rev mtl) + 2 ^ Z.of_nat (size mtl) * (to_Zpos (dropmsb (joinlsb mhd r) -# n) + to_Zpos n)) (2 ^ Z.of_nat (size n))).
+        (*rewrite (Z.mod_small (to_Zpos (rev mtl) + 2 ^ Z.of_nat (size mtl) * (to_Zpos (dropmsb (joinlsb mhd r) -# n) + to_Zpos n)) (2 ^ Z.of_nat (size n))).*)
         move : (@shl_add_mod_mod (rev mtl) (dropmsb (joinlsb mhd r)) n Hszaux1 Hszaux2 Hcondlt).
         rewrite size_rev. 
         move => {Hszaux}{Hcondaux}{Hszaux1}.
-        move => Haux. rewrite Haux. done.
-        split. rewrite -{1}(Z.add_0_l 0). apply Z.add_le_mono.
-        exact : to_Zpos_ge0. apply Z.mul_nonneg_nonneg. apply Z.pow_nonneg. omega.
-        apply Z.add_nonneg_nonneg; exact : to_Zpos_ge0. 
-        
+        move => Haux. rewrite -Haux. done.
+  Qed.
 
+  Lemma to_Zpos_from_Zpos (bs:bits) z: (to_Zpos (from_Zpos (size (bs)) z) = z mod (2 ^ Z.of_nat (size bs)))%Z.
+  Proof.
+  Admitted.
 
-Admitted.
+  Lemma to_Zpos_uremB : forall m n , size n = size m -> ~~(n == zeros (size n)) ->
+                                     to_Zpos (udivB (rev m) n).2 = (Zmod (to_Zpos (rev m)) (to_Zpos n)).
+  Proof.
+    intros. rewrite/udivB revK /=.
+    case Hcond : ((size m) -bits of (to_nat n) == zeros (size m)); rewrite/= -H from_nat_to_nat in Hcond.
+    - by rewrite Hcond in H0.
+    - move : (negbT Hcond) => Hnnot0. rewrite -H from_nat_to_nat. move : (neq_zero_size_gt0 Hnnot0) => Hszn.
+      have Hsznm : (size m <= size n). rewrite leq_eqVlt. move/eqP : H => H. by rewrite eq_sym (H) orTb.
+      have Hszr : (size n = size (zeros (size n))) by rewrite size_zeros H.
+      move : (neq_zeros_to_nat_gt0 Hnnot0). rewrite -(to_nat_zeros (size m)) -ltB_to_nat ; move => Hltrn.
+      move/eqP : Hszr. rewrite eq_sym; move/eqP => Hszr. rewrite -H in Hltrn.
+      rewrite (@to_Zpos_udivB_rec_rem m n (zeros (size n)) (zeros (size n)) Hszn Hsznm Hszr Hnnot0 Hltrn).
+      rewrite to_Zpos_zeros Z.mul_0_r Z.add_0_r size_zeros H -(size_rev m) to_Zpos_mod_pow2 low_size.
+      rewrite to_Zpos_from_Zpos size_rev -H.
+      move/ltP : (neq_zeros_to_nat_gt0 Hnnot0) => Hltcoq. move : (inj_lt _ _ Hltcoq).
+      rewrite Nat2Z.inj_0 -to_Zpos_nat.  move => Hnlt0z.
+      move : (Zmod_le (to_Zpos (rev m)) (to_Zpos n) Hnlt0z (@to_Zpos_ge0 _)) => Hmodle.
+      move : (to_Zpos_bounded (rev m)). rewrite size_rev -H => Hlt.
+      move : (Z.le_lt_trans _ _ _ Hmodle Hlt) => Hmodsm.
+      rewrite (Z.mod_small). done.
+      split. move : (Z.mod_pos_bound (to_Zpos (rev m)) _ Hnlt0z) => [H1 H2].
+      done. done.
+  Qed.
 
- 
   
   (*---------------------------------------------------------------------------
     Properties of signed division    
