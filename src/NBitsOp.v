@@ -2779,8 +2779,16 @@ Section Lemmas.
 
   Lemma subB_same m : subB m m = zeros (size m).
   Proof.
-  Admitted.
-
+    elim : m; first done .
+    move => b bs .
+    rewrite /subB .
+    case : b; rewrite /sbbB /adcB /full_adder /=;
+      dcase (full_adder_zip true (zip bs (~~# bs))) 
+      => [[c] ret] Hadder;
+      by rewrite -[(_,ret).2]/(ret)
+                 -[(_, false::ret).2]/(false::ret) => -> /= .
+  Qed .
+  
   Lemma to_Zpos_sbbB bs1 bs2 b :
     size bs1 = size bs2 -> 
     to_Zpos (sbbB b bs1 bs2).2 
@@ -3837,7 +3845,10 @@ Section Lemmas.
 
   Lemma shlB1_shlB : forall bs n, shlB1 (shlB n bs) = shlB n (shlB1 bs).
   Proof.
-  Admitted.
+    move => bs; elim; first done .
+    move => n IH /= .
+    by rewrite IH .
+  Qed .
 
   Lemma low_dropmsb : forall bs , low (size bs).-1 bs = dropmsb bs.
   Proof.
