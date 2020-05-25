@@ -4054,17 +4054,16 @@ Qed.
     by rewrite from_natn0 subB0 -Hsznq Hsznm.
   Qed.
 
-  Lemma subB_addB : forall bs1 bs2, addB (subB bs1 bs2) bs2 = bs1.
+  Lemma subB_addB : forall bs1 bs2, size bs1 = size bs2 -> addB (subB bs1 bs2) bs2 = bs1.
   Proof.
   Admitted.
 
-  
   Lemma udivB_negB_negB bs1 bs2 :
     size bs1 = size bs2 -> udivB (negB bs1) (negB bs2) = ((udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
   Proof.
   Admitted.
 
-    Lemma from_Zpos_to_Zpos bs : from_Zpos (size bs) (to_Zpos bs) = bs.
+  Lemma from_Zpos_to_Zpos bs : from_Zpos (size bs) (to_Zpos bs) = bs.
   Proof.
   Admitted.
 
@@ -4202,7 +4201,8 @@ Qed.
         rewrite size_dropmsb size_joinlsb addnK Hsznq.
         symmetry.
         rewrite -NBitsDef.low_dropmsb; last by rewrite size_joinlsb Hsznr addn1 ltnS leq_subr.
-        rewrite -{1}(subB_addB (dropmsb (joinlsb mhd r)) n) shlB1_shlB.
+        have Hsznr'' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK Hsznr.
+        rewrite -{1}(subB_addB Hsznr'') shlB1_shlB. 
         rewrite 2!to_Zpos_cat.
         have Haux : (dropmsb (joinlsb true q)) == succB (shlB1 q).
         rewrite -to_nat_inj_ss; last by rewrite size_dropmsb size_joinlsb addnK size_succB size_shlB1.
@@ -4362,15 +4362,14 @@ Qed.
           by rewrite size_dropmsb size_joinlsb addnK Hsznr size_rev (ltnW Hsznm).
         have Hszaux2 : size (dropmsb (joinlsb mhd r)) = size n
           by rewrite size_dropmsb size_joinlsb addnK Hsznr .
-        rewrite -{1}(subB_addB (dropmsb (joinlsb mhd r)) n) (to_Zpos_subB_cancel Hszaux Hcondaux). 
+        have Hsznr'' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK Hsznr.
+        rewrite -{1}(subB_addB Hsznr'') (to_Zpos_subB_cancel Hszaux Hcondaux). 
         rewrite Zplus_mod_idemp_r.
-        (*rewrite (Z.mod_small (to_Zpos (rev mtl) + 2 ^ Z.of_nat (size mtl) * (to_Zpos (dropmsb (joinlsb mhd r) -# n) + to_Zpos n)) (2 ^ Z.of_nat (size n))).*)
         move : (@shl_add_mod_mod (rev mtl) (dropmsb (joinlsb mhd r)) n Hszaux1 Hszaux2 Hcondlt).
         rewrite size_rev. 
         move => {Hszaux}{Hcondaux}{Hszaux1}.
         move => Haux. rewrite -Haux. done.
   Qed.
-
 
   Lemma to_Zpos_uremB : forall m n , size n = size m -> ~~(n == zeros (size n)) ->
                                      to_Zpos (udivB (rev m) n).2 = (Zmod (to_Zpos (rev m)) (to_Zpos n)).
