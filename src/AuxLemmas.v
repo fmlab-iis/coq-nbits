@@ -206,6 +206,14 @@ Proof. by case b. Qed.
 Lemma sub1oddb (b:bool) : (1 - Z.b2z (odd b))%Z = Z.b2z (~~ b).
 Proof. by case b. Qed.
 
+Lemma Z_nonzero_opp z :
+  z <> 0%Z <-> (- z)%Z <> 0%Z.
+Proof.
+  split;
+    move=> Hnon0 H0; apply (f_equal Z.opp) in H0;
+    rewrite ?Z.opp_involutive Z.opp_0 in H0; exact: (Hnon0 H0).
+Qed.
+
 
 Section SeqLemmas.
 
