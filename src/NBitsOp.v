@@ -3442,6 +3442,34 @@ Section Lemmas.
       by rewrite size_cat size_zeros subnDA subnn take0 sub0n !cats0.
   Qed.
 
+  Lemma to_nat_full_mul' bs1 bs2 :
+    to_nat (full_mul bs1 bs2) = to_nat bs1 * to_nat bs2.
+  Proof.
+    rewrite to_nat_full_mul size_full_mul. apply to_nat_from_nat_bounded.
+    rewrite expnD; apply ltn_mul; exact: to_nat_bounded.
+  Qed.
+
+  Lemma to_Zpos_full_mul bs1 bs2 :
+    to_Zpos (full_mul bs1 bs2) = (to_Zpos bs1 * to_Zpos bs2)%Z.
+  Proof.
+    move: (to_nat_full_mul' bs1 bs2) => Hnat.
+    apply (f_equal Z.of_nat) in Hnat. rewrite Nat2Z.inj_mul -!to_Zpos_nat in Hnat.
+    exact: Hnat.
+  Qed.
+
+  Lemma full_mul_mulB_zext bs1 bs2 :
+    full_mul bs1 bs2 = zext (size bs2) bs1 *# zext (size bs1) bs2.
+  Proof.
+    move: (to_nat_mulB (zext (size bs2) bs1) (zext (size bs1) bs2))
+          (to_nat_full_mul' bs1 bs2).
+    rewrite size_zext 2!to_nat_zext to_nat_from_nat_bounded;
+      last (rewrite expnD; apply ltn_mul; exact: to_nat_bounded).
+    move=> <- /eqP H. 
+    rewrite to_nat_inj_ss in H; last by rewrite size_full_mul size_mulB size_zext. 
+    exact: (eqP H). 
+  Qed.
+
+
   (*---------------------------------------------------------------------------
     Properties of bitwise and
     ---------------------------------------------------------------------------*)
@@ -5956,45 +5984,180 @@ Qed.
     exact: bv2z_sbb_signed.
   Qed.
 
+
+  (* TO CHECK: the following is the semantics of Umulo *)
+  Lemma umulo_to_Zpos bs1 bs2 :
+    size bs1 = size bs2 ->
+    ~~ Umulo bs1 bs2 -> (to_Zpos bs1 * to_Zpos bs2 < 2 ^ Z.of_nat (size bs1))%Z.
+  Admitted.
+
+  (* TO CHECK: the following is the semantics of Smulo *)
+  Lemma smulo_to_Z bs1 bs2 :
+    size bs1 = size bs2 ->
+    ~~ Smulo bs1 bs2 -> 
+    (- 2 ^ (Z.of_nat (size bs1) - 1)
+     <= to_Z bs1 * to_Z bs2 < 2 ^ (Z.of_nat (size bs1) - 1))%Z.
+  Admitted.
+
+  (* TO CHECK *)
+  Lemma msb_mulB_signed bs1 bs2 :
+    size bs1 = size bs2 ->
+    ~~ Smulo bs1 bs2 -> 
+    ~~ (bs1 == zeros (size bs1)) -> ~~ (bs2 == zeros (size bs2)) ->
+    msb (bs1 *# bs2) = ~~ (msb bs1 == msb bs2).
+  Admitted.
+
+  Lemma smulo_sext bs1 bs2 :
+    ~~ Smulo (sext (size bs2) bs1) (sext (size bs1) bs2).
+  Proof.
+  Admitted.
+
+
+  Lemma Z_mul_to_Z_msb_same bs1 bs2 :
+    msb bs1 == msb bs2 -> (0 <= to_Z bs1 * to_Z bs2)%Z.
+  Proof.
+    case Hmsb1 : (msb bs1); case Hmsb2 : (msb bs2); move=> //= _.
+    - rewrite high1_1_to_Z; last by rewrite high1_msb Hmsb1.
+      rewrite high1_1_to_Z; last by rewrite high1_msb Hmsb2.
+      rewrite Z.mul_opp_opp.
+      apply Z.mul_nonneg_nonneg; apply Z.le_le_succ_r; exact: to_Zneg_ge0.
+    - rewrite high1_0_to_Z; last by rewrite high1_msb Hmsb1.
+      rewrite high1_0_to_Z; last by rewrite high1_msb Hmsb2.
+      apply Z.mul_nonneg_nonneg; exact: to_Zpos_ge0.
+  Qed.
+
+  Lemma Z_mul_to_Z_msb_diff bs1 bs2 :
+    ~~ (msb bs1 == msb bs2) -> (to_Z bs1 * to_Z bs2 <= 0)%Z.
+  Proof.
+    case Hmsb1 : (msb bs1); case Hmsb2 : (msb bs2); move=> //= _.
+    - rewrite high1_1_to_Z; last by rewrite high1_msb Hmsb1.
+      rewrite high1_0_to_Z; last by rewrite high1_msb Hmsb2.
+      apply Z.mul_nonpos_nonneg; last exact: to_Zpos_ge0.
+      rewrite Z.opp_nonpos_nonneg. apply Z.le_le_succ_r; exact: to_Zneg_ge0.
+    - rewrite high1_0_to_Z; last by rewrite high1_msb Hmsb1.
+      rewrite high1_1_to_Z; last by rewrite high1_msb Hmsb2.
+      apply Z.mul_nonneg_nonpos; first exact: to_Zpos_ge0.
+      rewrite Z.opp_nonpos_nonneg. apply Z.le_le_succ_r; exact: to_Zneg_ge0.
+  Qed.
+
+
   Lemma bv2z_mul_unsigned bs1 bs2 :
     size bs1 = size bs2 -> ~~ Umulo bs1 bs2 ->
     to_Zpos (bs1 *# bs2)%bits = (to_Zpos bs1 * to_Zpos bs2)%Z.
   Proof.
-  Admitted.
+    move: (to_Zpos_full_mul bs1 bs2) => H. 
+    apply (f_equal (fun z => Z.modulo z (2 ^ Z.of_nat (size bs1)))) in H. move: H.
+    rewrite to_Zpos_mod_pow2 /mulB => -> Hsz Hov.
+    rewrite Z.mod_small; first reflexivity. split.
+    - apply Z.mul_nonneg_nonneg; exact: to_Zpos_ge0.
+    - exact: umulo_to_Zpos.
+  Qed.
 
   Lemma bv2z_mul_signed bs1 bs2 :
     size bs1 = size bs2 -> ~~ Smulo bs1 bs2 ->
     to_Z (bs1 *# bs2)%bits = (to_Z bs1 * to_Z bs2)%Z.
   Proof.
-  Admitted.
+    case Hbs1 : (bs1 == zeros (size bs1)); 
+      first by rewrite (eqP Hbs1) mul0B to_Z_zeros Z.mul_0_l.
+    case Hbs2 : (bs2 == zeros (size bs2));
+      first by rewrite (eqP Hbs2) mulB0' 2!to_Z_zeros Z.mul_0_r.
+    move=> Hsz Hov. move: (to_Zpos_full_mul bs1 bs2).
+    move/Z.add_move_r: (to_Z_to_Zpos (full_mul bs1 bs2)).
+    move/Z.add_move_r: (to_Z_to_Zpos bs1); move/Z.add_move_r: (to_Z_to_Zpos bs2).
+    move=> <- <- <-. 
+    rewrite size_full_mul Nat2Z.inj_add Z.pow_add_r; try exact: Nat2Z.is_nonneg.
+    rewrite Z.mul_add_distr_r 2!Z.mul_add_distr_l -Hsz. 
+    rewrite [(_*_*_)%Z](Z.mul_comm _ (to_Z bs2)) !Z.mul_assoc -!Z.add_assoc
+            -!Z.mul_add_distr_r => H.
+    apply (f_equal (fun z => Z.modulo z (2 ^ Z.of_nat (size bs1)))) in H; move: H.
+    repeat (rewrite Z.mod_add; last exact: pow2_nat2z_nonzero).
+    rewrite to_Z_mod_pow2; last by rewrite size_full_mul leq_addr.
+    rewrite (to_Z_to_Zpos (_ *# _)) size_mulB => ->.
+    apply negbT in Hbs1; apply negbT in Hbs2. 
+    case Hmsb : (msb bs1 == msb bs2); 
+      rewrite (msb_mulB_signed Hsz Hov Hbs1 Hbs2) Hmsb /negb ?Z.mul_0_l ?Z.mul_1_l.
+    - rewrite Z.sub_0_r Z.mod_small; first reflexivity.
+      split; first exact: Z_mul_to_Z_msb_same.
+      move: (smulo_to_Z Hsz Hov) => [_ Hbnd]. apply (Z.lt_trans _ _ _ Hbnd).
+      apply Z.pow_lt_mono_r; try done;
+        [ exact: Nat2Z.is_nonneg | rewrite Z.sub_1_r; exact: Z.lt_pred_l].
+    - apply negbT in Hmsb. move: (Z_mul_to_Z_msb_diff Hmsb) => Hle0.
+      have Hmul : ((to_Z bs1 * to_Z bs2) mod - 2 ^ Z.of_nat (size bs1))%Z = 
+                  (to_Z bs1 * to_Z bs2)%Z.
+      { 
+        rewrite -(Z.mod_unique _ _ 0 (to_Z bs1 * to_Z bs2)); first reflexivity.
+        + right. split; last exact: Hle0.
+          move: (smulo_to_Z Hsz Hov) => [Hbnd _]. 
+          apply: (Z.lt_le_trans _ _ _ _ Hbnd). rewrite -Z.opp_lt_mono.
+          apply Z.pow_lt_mono_r; try done;
+            [ exact: Nat2Z.is_nonneg | rewrite Z.sub_1_r; exact: Z.lt_pred_l].
+        + by rewrite Z.mul_0_r Z.add_0_l.
+      }
+      rewrite -{1}(Z.opp_involutive (2 ^ _)) Z.mod_opp_r_nz.
+      + rewrite Hmul Z.sub_opp_r Z.add_simpl_r. reflexivity. 
+      + rewrite -Z_nonzero_opp. exact: pow2_nat2z_nonzero.
+      + rewrite Hmul Z.mul_eq_0. 
+        case=> H0; apply to_Z0 in H0; [move: Hbs1 | move: Hbs2]; 
+          by rewrite {1}H0 eqxx. 
+  Qed.
 
   Lemma bv2z_mull_unsigned bs1 bs2 :
     size bs1 = size bs2 ->
-    (to_Zpos (low (size bs2) (full_mul bs1 bs2)) +
-     to_Zpos (high (size bs1) (full_mul bs1 bs2)) * 2 ^ Z.of_nat (size bs2))%Z =
+    (to_Zpos (low (size bs2) (zext (size bs1) bs1 *# zext (size bs1) bs2)%bits) +
+     to_Zpos (high (size bs1) (zext (size bs1) bs1 *# zext (size bs1) bs2)%bits) *
+     2 ^ Z.of_nat (size bs2))%Z = 
     (to_Zpos bs1 * to_Zpos bs2)%Z.
   Proof.
-  Admitted.
+    move=> Hsz. rewrite {1 4}Hsz -full_mul_mulB_zext. 
+    rewrite -to_Zpos_full_mul -to_Zpos_low_high; first reflexivity.
+    by rewrite size_full_mul addnC.
+  Qed.
 
+  (*
   Lemma bv2z_mull_signed bs1 bs2 :
     size bs1 = size bs2 ->
     (to_Zpos (low (size bs2) (full_mul bs1 bs2)) +
      to_Z (high (size bs1) (full_mul bs1 bs2)) * 2 ^ Z.of_nat (size bs2))%Z =
     (to_Z bs1 * to_Z bs2)%Z.
   Proof.
+    case Hsz1 : (size bs1) => [|n]. 
+    - move=> Hsz2. apply Logic.eq_sym in Hsz2. 
+      rewrite (eqP (size0 Hsz1)) (eqP (size0 Hsz2)) //=.
+    - move=> Hsz2. 
+      rewrite -to_Z_low_high; try done; last by rewrite -Hsz1 size_full_mul addnC.
   Admitted.
+   *)
+  
+  Lemma bv2z_mull_signed bs1 bs2 :
+    0 < size bs1 ->
+    size bs1 = size bs2 ->
+    (to_Zpos (low (size bs2) (sext (size bs1) bs1 *# sext (size bs1) bs2)%bits) +
+     to_Z (high (size bs1) (sext (size bs1) bs1 *# sext (size bs1) bs2)%bits) *
+     2 ^ Z.of_nat (size bs2))%Z = 
+    (to_Z bs1 * to_Z bs2)%Z.
+  Proof.
+    move=> Hbs1 Hsz. 
+    rewrite -(to_Z_low_high Hbs1); last by rewrite size_mulB size_sext Hsz.
+    rewrite bv2z_mul_signed; [by rewrite 2!to_Z_sext | by rewrite 2!size_sext Hsz |].
+    by rewrite {1}Hsz smulo_sext.
+  Qed.
 
   Lemma bv2z_mulj_unsigned bs1 bs2 :
-    size bs1 = size bs2 ->
-    to_Zpos (full_mul bs1 bs2) = (to_Zpos bs1 * to_Zpos bs2)%Z.
+    size bs1 = size bs2 ->    
+    to_Zpos (zext (size bs1) bs1 *# zext (size bs1) bs2)%bits =
+    (to_Zpos bs1 * to_Zpos bs2)%Z.
   Proof.
-  Admitted.
+    move=> Hsz. rewrite {1}Hsz -full_mul_mulB_zext. exact: to_Zpos_full_mul.
+  Qed.
 
   Lemma bv2z_mulj_signed bs1 bs2 :
     size bs1 = size bs2 ->
-    to_Z (full_mul bs1 bs2) = (to_Z bs1 * to_Z bs2)%Z.
+    to_Z (sext (size bs1) bs1 *# sext (size bs1) bs2)%bits = (to_Z bs1 * to_Z bs2)%Z.
   Proof.
-  Admitted.
+    move=> Hsz.
+    rewrite bv2z_mul_signed; [by rewrite 2!to_Z_sext | by rewrite 2!size_sext Hsz |].
+    by rewrite {1}Hsz smulo_sext.
+  Qed.
 
   Lemma bv2z_split_unsigned bs n :
     (to_Zpos (bs <<# (size bs - n) >># (size bs - n))%bits +
@@ -6174,6 +6337,6 @@ Qed.
         rewrite Z.mul_comm -Z.opp_eq_mul_m1 Z.add_opp_diag_l. reflexivity.
       + done.
   Qed.
-SearchAbout modn.
+
 End Lemmas.
  
