@@ -1262,6 +1262,22 @@ Section Lemmas.
     move=> Hsz. rewrite -(subnK Hsz) -sarB_add sarB_size sarB_copy. reflexivity.
   Qed.
 
+  Lemma sarB1_is_sarB bs : sarB1 bs = sarB 1 bs.
+  Proof. reflexivity. Qed.
+
+  Lemma sarB1_sarB_succ bs n : sarB1 (sarB n bs) = sarB (n.+1) bs.
+  Proof. reflexivity. Qed.
+
+  Lemma sarB_sarB1_succ bs n : sarB n (sarB1 bs) = sarB (n.+1) bs.
+  Proof.
+    rewrite sarB1_is_sarB. rewrite sarB_add. rewrite addn1. reflexivity.
+  Qed.
+
+  Lemma sarB1_sarB_comm bs n : sarB1 (sarB n bs) =  sarB n (sarB1 bs).
+  Proof.
+    rewrite !sarB1_is_sarB. rewrite !sarB_add. rewrite addnC. reflexivity.
+  Qed.
+
 
   (*---------------------------------------------------------------------------
     Properties of logic shift right
@@ -1366,11 +1382,26 @@ Section Lemmas.
     move=> Hsz. by rewrite -(high_high _ Hsz) high_shrB_ss high_zeros.
   Qed.
 
+  Lemma shrB1_is_shrB bs : shrB1 bs = shrB 1 bs.
+  Proof. reflexivity. Qed.
+
+  Lemma shrB1_shrB_succ bs n : shrB1 (shrB n bs) = shrB (n.+1) bs.
+  Proof. reflexivity. Qed.
+
+  Lemma shrB_shrB1_succ bs n : shrB n (shrB1 bs) = shrB (n.+1) bs.
+  Proof.
+    rewrite shrB1_is_shrB. rewrite shrB_add. rewrite addn1. reflexivity.
+  Qed.
+
+  Lemma shrB1_shrB_comm bs n : shrB1 (shrB n bs) =  shrB n (shrB1 bs).
+  Proof.
+    rewrite !shrB1_is_shrB. rewrite !shrB_add. rewrite addnC. reflexivity.
+  Qed.
 
   (*---------------------------------------------------------------------------
     Properties of shift left
     ---------------------------------------------------------------------------*)
-  
+
   Lemma shlB_add bs i j :
     shlB i (shlB j bs) = shlB (i + j) bs .
   Proof .
@@ -1515,6 +1546,29 @@ Section Lemmas.
     - rewrite (shrB_oversize Hsz) shlB_zeros.
       move/eqP in Hzeros. apply (f_equal (low (size bs))) in Hzeros.
       rewrite (low_low _ Hsz) low_size low_zeros in Hzeros. done.
+  Qed.
+
+  Lemma shlB1_shlB bs n : shlB1 (shlB n bs) = shlB n (shlB1 bs).
+  Proof.
+    elim: n; first done .
+    move => n IH /= .
+    by rewrite IH .
+  Qed .
+
+  Lemma shlB1_is_shlB bs : shlB1 bs = shlB 1 bs.
+  Proof. reflexivity. Qed.
+
+  Lemma shlB1_shlB_succ bs n : shlB1 (shlB n bs) = shlB (n.+1) bs.
+  Proof. reflexivity. Qed.
+
+  Lemma shlB_shlB1_succ bs n : shlB n (shlB1 bs) = shlB (n.+1) bs.
+  Proof.
+    rewrite shlB1_is_shlB. rewrite shlB_add. rewrite addn1. reflexivity.
+  Qed.
+
+  Lemma shlB1_shlB_comm bs n : shlB1 (shlB n bs) =  shlB n (shlB1 bs).
+  Proof.
+    rewrite !shlB1_is_shlB. rewrite !shlB_add. rewrite addnC. reflexivity.
   Qed.
 
 
@@ -3860,7 +3914,7 @@ Section Lemmas.
       by rewrite Hszdrop /subB /sbbB /adcB /full_adder /= Hadder /= => -> .
   Qed .
 
-      
+
   Lemma to_nat_shlBnm : forall n m , to_nat (shlB n m) = if (n==0) then (to_nat m) else modn (to_nat m * (2^ n)) (2^ size m).
   Proof.
     elim => [|ns IH] m. done.
@@ -3869,13 +3923,6 @@ Section Lemmas.
     case Hns: (ns == 0). by rewrite size_shlB -muln2 (eqP Hns) expn1.
     by rewrite size_shlB -muln2 expnSr mulnA modnMml.
   Qed.
-
-  Lemma shlB1_shlB : forall bs n, shlB1 (shlB n bs) = shlB n (shlB1 bs).
-  Proof.
-    move => bs; elim; first done .
-    move => n IH /= .
-    by rewrite IH .
-  Qed .
 
   Lemma low_dropmsb : forall bs , low (size bs).-1 bs = dropmsb bs.
   Proof.
