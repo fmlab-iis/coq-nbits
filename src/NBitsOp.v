@@ -4669,6 +4669,7 @@ Qed.
         generalize Hcondlt. move/negbT => Hcondle. rewrite (ltBNle Hsznr'') Bool.negb_involutive in Hcondle. 
         have Haux: 0 < size (dropmsb (joinlsb mhd r)) by rewrite Hsznr''.
         rewrite -{1}(subB_addB Haux Hsznr''). 
+
         rewrite 2!to_Zpos_cat. move => {Haux}.
         (*have Haux : (dropmsb (joinlsb true q)) == succB (shlB1 q).
         rewrite -to_nat_inj_ss; last by rewrite size_dropmsb size_joinlsb addnK size_succB size_shlB1.
@@ -5268,9 +5269,12 @@ Qed.
         by rewrite high1_0_to_Z; last by rewrite high1_msb Hm1.
   Qed. 
 
-  Lemma to_Z_negB_from_Zpos1 n : 0<n -> to_Z (negB (from_Zpos n 1)) = (- Z.one)%Z.
+  Lemma to_Z_negB_from_Zpos1 n : 0 < n -> to_Z (negB (from_Zpos n 1)) = (- Z.one)%Z.
   Proof.
-  Admitted.
+    have->: from_Zpos n 1 = from_nat n 1.
+    { case: n => [| n] //=. by rewrite -zeros_from_Zpos from_natn0. }
+    move=> Hn. rewrite (eqP (negB1_ones _)) (to_Z_ones Hn). reflexivity.
+  Qed.
   
   Lemma to_Zpos_sdivB_diff_msb sb1 sb2 :
     0 < size sb1 -> size sb1 = size sb2 -> 
