@@ -4196,6 +4196,17 @@ Section Lemmas.
     exact: (eqP H). 
   Qed.
 
+  Lemma to_Zpos_mulB bs1 bs2 :
+    size bs1 = size bs2 -> ~~ Umulo bs1 bs2 ->
+    to_Zpos (bs1 *# bs2)%bits = (to_Zpos bs1 * to_Zpos bs2)%Z.
+  Proof.
+    move: (to_Zpos_full_mul bs1 bs2) => H. 
+    apply (f_equal (fun z => Z.modulo z (2 ^ Z.of_nat (size bs1)))) in H. move: H.
+    rewrite to_Zpos_mod_pow2 /mulB => -> Hsz Hov.
+    rewrite Z.mod_small; first reflexivity. split.
+    - apply Z.mul_nonneg_nonneg; exact: to_Zpos_ge0.
+    - by apply umulo_to_Zpos.
+  Qed.
 
   Lemma umulo_fasle_eq : forall bs1 bs2, size bs1 = size bs2 -> Umulo bs1 bs2 = false -> to_nat bs1 * (to_nat bs2) = to_nat (mulB bs1 bs2).
   Proof.  
@@ -4561,11 +4572,10 @@ Section Lemmas.
   Lemma mul_sext bs0 bs1 :
     full_mul bs0 bs1 ==
     ((sext (size bs0) bs0) *# (sext (size bs0) bs1))%bits .
-  Admitted .
+  Abort.
 
 
   (******************** Free Region End ********************)
-  
 
   
   (*---------------------------------------------------------------------------
@@ -5352,6 +5362,15 @@ Qed.
       (*rewrite (Z.mod_0_l _ (Z.neq_sym _ _ (Z.lt_neq _ _ Hltrnz))) (Z.div_0_l _ (Z.neq_sym _ _ (Z.lt_neq _ _ Hltrnz))) !Z.add_0_r.
       done. *)
   Qed.
+
+  Lemma to_Zpos_udivB' : forall m n , 
+      size n = size m -> ~~ (n == zeros (size n)) ->
+      to_Zpos (udivB m n).1 = (Zdiv (to_Zpos m) (to_Zpos n)).
+  Proof.
+    move=> m n Hsz Hn. rewrite -(revK m). rewrite -(size_rev m) in Hsz.
+    exact: to_Zpos_udivB.
+  Qed.
+
 
   (*---------------------------------------------------------------------------
     Properties of unsigned modulo
@@ -6247,19 +6266,56 @@ Qed.
         * rewrite size_negB size_uremB size_absB. reflexivity.
   Qed.
 
-  Lemma udivB_mulB_leB bs1 bs2 : 
-    0 < size bs1 -> size bs1 = size bs2 -> (udivB bs1 bs2).1 *# bs2 <=# bs1.
-  Proof. Admitted.
+  Lemma mulB_udivB_Numulo bs1 bs2 : 
+    size bs1 = size bs2 -> ~~ Umulo (udivB bs1 bs2).1 bs2 .
+  Proof.
+    move=> Hsz. symmetry in Hsz. rewrite umulo_to_Zpos size_udivB //=. 
+    case Hbs2 : (bs2 == zeros (size bs2)).
+    - rewrite (eqP Hbs2) to_Zpos_zeros Z.mul_0_r.
+      apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+    - apply negbT in Hbs2. rewrite (to_Zpos_udivB' Hsz Hbs2).
+      apply (Z.le_lt_trans _ (to_Zpos bs1)); last exact: to_Zpos_bounded.
+      rewrite Z.mul_comm. apply Z.mul_div_le. 
+      rewrite -ltB0n in Hbs2. apply ltB_to_Zpos in Hbs2. exact: Hbs2.
+  Qed.
 
-  Lemma udivB_mulB_umulo sb1 sb2 : 0 < size sb1 -> size sb1 = size sb2 ->
-                                   ~~ Umulo (udivB sb1 sb2).1 sb2 .
-  Proof. Admitted.
+  Lemma mulB_udivB_leB bs1 bs2 : 
+    size bs1 = size bs2 -> (udivB bs1 bs2).1 *# bs2 <=# bs1.
+  Proof. 
+    move=> Hsz. apply leB_to_Zpos; first by rewrite size_mulB size_udivB. 
+    rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz)); last by rewrite size_udivB.
+    case Hbs2 : (bs2 == zeros (size bs2)).
+    - rewrite (eqP Hbs2) to_Zpos_zeros Z.mul_0_r. exact: to_Zpos_ge0.
+    - apply negbT in Hbs2. symmetry in Hsz. rewrite (to_Zpos_udivB' Hsz Hbs2).
+      rewrite Z.mul_comm. apply Z.mul_div_le. 
+      rewrite -ltB0n in Hbs2. apply ltB_to_Zpos in Hbs2. exact: Hbs2.
+  Qed.
 
-  Lemma to_Zpos_mulB bs1 bs2 :
-    size bs1 = size bs2 -> ~~ Umulo bs1 bs2 ->
-    to_Zpos (bs1 *# bs2)%bits = (to_Zpos bs1 * to_Zpos bs2)%Z.
-  Proof. Admitted.
-  
+  Lemma dropmsb_invB bs : dropmsb (invB bs) = invB (dropmsb bs).
+  Proof.
+    case (lastP bs) => {bs} [//= | bs b].
+    rewrite invB_rcons !dropmsb_joinmsb. reflexivity.
+  Qed.
+
+  Lemma dropmsb_negB bs : dropmsb (-# bs) = -# (dropmsb bs).
+  Proof.
+    elim: bs => [//= | b bs IH]. rewrite /negB. case Hsz : (size bs) => [|n].
+    - rewrite (eqP (size0 Hsz)) /=. by case b.
+    - rewrite (eqP (dropmsb_cons _ Hsz)) !invB_cons /succB -/succB. case b => /=.
+      + rewrite -size_invB in Hsz. rewrite (eqP (dropmsb_cons _ Hsz)) dropmsb_invB.
+        reflexivity.
+      + rewrite -size_invB -size_succB in Hsz. rewrite (eqP (dropmsb_cons _ Hsz)) IH.
+        reflexivity.
+  Qed.
+
+  Lemma dropmsb_negB_nonzeros bs :
+    ~~ (dropmsb bs == zeros (size bs - 1)) ->
+    ~~ (dropmsb (-# bs) == zeros (size bs - 1)).
+  Proof. 
+    rewrite dropmsb_negB. rewrite -size_dropmsb. generalize (dropmsb bs) => bs'.
+    apply contraNN. exact: negB_zeros'.
+  Qed.
+
   Lemma uremB_eq sb1 sb2 : 
     0 < size sb1 -> size sb1 = size sb2 -> 
     ~~(sb2 == zeros (size sb2))->
@@ -6271,8 +6327,8 @@ Qed.
     rewrite revK to_Zpos_subB; last by rewrite size_mulB size_udivB.
     rewrite -ltB_equiv_borrow_subB; last by rewrite size_mulB size_udivB.
     rewrite ltBNle; last by rewrite size_mulB size_udivB.
-    rewrite (udivB_mulB_leB H H0)/= (to_Zpos_mulB);
-      [|by rewrite size_udivB H0| apply (udivB_mulB_umulo H H0)]. 
+    rewrite (mulB_udivB_leB H0)/= (to_Zpos_mulB);
+      [|by rewrite size_udivB H0| apply (mulB_udivB_Numulo H0)]. 
     rewrite Z.mod_eq; last (move : (neq_zeros_to_Z_gt0 H1); rewrite ltB_to_Zpos to_Zpos_zeros; omega).
     rewrite Z.mul_comm -{4}(revK sb1) (to_Zpos_udivB _ H1); last by rewrite size_rev H0.
     by rewrite revK.
@@ -6832,12 +6888,7 @@ Qed.
     size bs1 = size bs2 -> ~~ Umulo bs1 bs2 ->
     to_Zpos (bs1 *# bs2)%bits = (to_Zpos bs1 * to_Zpos bs2)%Z.
   Proof.
-    move: (to_Zpos_full_mul bs1 bs2) => H. 
-    apply (f_equal (fun z => Z.modulo z (2 ^ Z.of_nat (size bs1)))) in H. move: H.
-    rewrite to_Zpos_mod_pow2 /mulB => -> Hsz Hov.
-    rewrite Z.mod_small; first reflexivity. split.
-    - apply Z.mul_nonneg_nonneg; exact: to_Zpos_ge0.
-    - by apply umulo_to_Zpos.
+    exact: to_Zpos_mulB.
   Qed.
 
   Lemma bv2z_mul_signed bs1 bs2 :
