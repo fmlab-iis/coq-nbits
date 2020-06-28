@@ -1,6 +1,6 @@
 
 From Coq Require Import ZArith Arith Nat List.
-From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq.
+From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq div.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -212,6 +212,29 @@ Proof.
   split;
     move=> Hnon0 H0; apply (f_equal Z.opp) in H0;
     rewrite ?Z.opp_involutive Z.opp_0 in H0; exact: (Hnon0 H0).
+Qed.
+
+Lemma lt1_eq0 : forall (n : nat), n < 1 -> n = 0.
+Proof. 
+  intros. induction n; try done.
+Qed.
+
+Lemma rev_cons_nil : forall (hd : bool) tl, ~~ (rcons tl hd == [::]).
+Proof.
+  intros. move : hd. elim tl;  done.
+Qed.
+    
+Lemma rev_nil : forall (hd : bool) tl, ~~ (rev (hd :: tl) == [::]).
+Proof.
+  move => hd tl. rewrite rev_cons. exact : rev_cons_nil.
+Qed.
+
+Lemma modn_neq : forall m d, d > 0 -> d <= m -> ~~ (m %% d == m).
+Proof.
+  intros.
+  rewrite -(ltn_mod m) in H.
+  move : (ltn_leq_trans H H0) => Hgt.
+  rewrite ltn_neqAle in Hgt. move/andP : Hgt => [Hne Hle]. exact.
 Qed.
 
 

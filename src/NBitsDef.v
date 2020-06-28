@@ -453,17 +453,6 @@ Section Lemmas.
   Qed.
 
 
-  (* Lemmas about copy *)
-
-  Lemma copy_cons (b : bool) n : b::copy n b = copy (n.+1) b.
-  Proof. reflexivity. Qed.
-
-  Lemma copy_rcons (b : bool) n : rcons (copy n b) b = copy (n.+1) b.
-  Proof.
-    elim: n => [| n IH] //=. rewrite IH. rewrite copy_cons. reflexivity.
-  Qed.
-
-
   (* Lemmas about zeros and ones *)
 
   Lemma zeros0 : zeros 0 = [::].
@@ -490,6 +479,9 @@ Section Lemmas.
 
   Lemma zeros_addn n m : zeros (n + m) = zeros n ++ zeros m.
   Proof. rewrite /zeros. exact: copy_addn. Qed.
+
+  Lemma zeros_cats : forall m n, zeros m ++ zeros n = zeros (m + n).
+  Proof. elim => [|m IH] n. done. by rewrite addSn -!zeros_cons cat_cons -IH. Qed.
 
   Lemma ones_addn n m : ones (n + m) = ones n ++ ones m.
   Proof. rewrite /ones. exact: copy_addn. Qed.
@@ -547,6 +539,27 @@ Section Lemmas.
 
   Lemma take_ones n m : take n (ones m) = ones (minn n m).
   Proof. rewrite /ones. rewrite take_nseq. reflexivity. Qed.
+
+  Lemma joinlsb_false_zeros : forall n, joinlsb false (zeros n) = zeros n.+1.
+  Proof. elim; done. Qed.
+
+
+  (* Lemmas about copy *)
+
+  Lemma copy_cons (b : bool) n : b::copy n b = copy (n.+1) b.
+  Proof. reflexivity. Qed.
+
+  Lemma copy_rcons (b : bool) n : rcons (copy n b) b = copy (n.+1) b.
+  Proof.
+    elim: n => [| n IH] //=. rewrite IH. rewrite copy_cons. reflexivity.
+  Qed.
+
+  Lemma rev_copy : forall n (b: bool), rev (copy n b) = copy n b.
+  Proof.
+    elim => [| ns IH] b. done.
+    rewrite/=-{1}(IH b) rev_cons revK.
+    case b. by rewrite-/b1 ones_rcons. by rewrite-/b0 zeros_rcons. 
+  Qed.
 
 
   (* from_bool and to_bool *)
@@ -1033,6 +1046,9 @@ Section Lemmas.
     intros; by rewrite /low/zext size_cat subnDA subnn sub0n cats0 take_cat ltnn subnn take0 cats0. 
   Qed.
 
+  Lemma zext_zero : forall m n, zext m (zeros n) = zeros (m + n).
+  Proof. intros. by rewrite /zext zeros_cats addnC. Qed.
+
 
   (* Lemmas about sext *)
 
@@ -1206,9 +1222,9 @@ Section Lemmas.
     - by rewrite mul0n addn0 (div.modn_small (to_nat_bounded (rev l))).
   Qed.
 
-  Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0.
-  Proof. intros. induction n; try done.
-  Qed.
+  (* Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0. *)
+  (* Proof. intros. induction n; try done. *)
+  (* Qed. *)
 
   Lemma to_nat_from_nat_bounded : forall n m, m < 2^n -> to_nat (from_nat n m) = m.
   Proof.
