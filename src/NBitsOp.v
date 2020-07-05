@@ -6847,13 +6847,37 @@ Qed.
     ((to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl) * 2 ^ Z.of_nat n)%Z.
   Proof.
     move=> _ Hzeros.
-    rewrite [in RHS]Z.add_comm -to_Zpos_cat -(bv2z_shl_unsigned Hzeros). 
+    rewrite [in RHS]Z.add_comm -to_Zpos_cat -(bv2z_shl_unsigned Hzeros).
     rewrite -bv2z_shl_unsigned; last by rewrite high_shrB.
-    rewrite shrB_shlB_cancel. 
+    rewrite shrB_shlB_cancel.
     - rewrite -to_Zpos_low_high; [reflexivity | by rewrite size_shlB size_cat].
     - case/orP: (leq_total n (size bsl)) => Hn.
       + by rewrite (low_low _ Hn) low_shlB_ss.
       + by rewrite (low_shlB _ Hn) low_zeros.
+  Qed.
+
+  Lemma bv2z_cshl_unsigned' bsh bsl n :
+    size bsh = size bsl ->
+    n <= size bsl ->
+    high n (bsl ++ bsh) == zeros n ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
+     to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
+     2 ^ Z.of_nat (size bsl - n))%Z =
+    (to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+  Proof.
+    move=> Hs Hn Hzeros.
+    apply: (proj1
+              (Z.mul_cancel_r
+                 (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n) +
+                  to_Zpos (high (size bsh) ((bsl ++ bsh) <<# n)) *
+                  2 ^ Z.of_nat (size bsl - n))%Z
+                 (to_Zpos bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z
+                 (2 ^ Z.of_nat n)%Z (@pow2_nat2z_nonzero n))).
+    rewrite Z.mul_add_distr_r. rewrite -Z.mul_assoc.
+    rewrite -(Z.pow_add_r _ _ _ (Nat2Z.is_nonneg _) (Nat2Z.is_nonneg _)).
+    rewrite -Nat2Z.inj_add. replace (size bsl - n + n)%coq_nat with
+                                (size bsl - n + n)%N by reflexivity.
+    rewrite (subnK Hn). exact: (bv2z_cshl_unsigned Hs Hzeros).
   Qed.
 
   Lemma bv2z_cshl_signed bsh bsl n :
@@ -6877,6 +6901,31 @@ Qed.
       + case/orP: (leq_total n (size bsl)) => Hn.
         * by rewrite (low_low _ Hn) low_shlB_ss.
         * by rewrite (low_shlB _ Hn) low_zeros.
+  Qed.
+
+  Lemma bv2z_cshl_signed' bsh bsl n :
+    size bsh = size bsl ->
+    n <= size bsl ->
+    (high (n + 1) (bsl ++ bsh) == zeros (n + 1))
+    || (high (n + 1) (bsl ++ bsh) == ones (n + 1)) ->
+    (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n)%bits +
+     to_Z (high (size bsh) ((bsl ++ bsh) <<# n)%bits) *
+     2 ^ Z.of_nat (size bsl - n))%Z =
+    (to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z.
+  Proof.
+    move=> Hs Hn Hzeros.
+    apply: (proj1
+              (Z.mul_cancel_r
+                 (to_Zpos (low (size bsl) ((bsl ++ bsh) <<# n) >># n) +
+                  to_Z (high (size bsh) ((bsl ++ bsh) <<# n)) *
+                  2 ^ Z.of_nat (size bsl - n))%Z
+                 (to_Z bsh * 2 ^ Z.of_nat (size bsl) + to_Zpos bsl)%Z
+                 (2 ^ Z.of_nat n)%Z (@pow2_nat2z_nonzero n))).
+    rewrite Z.mul_add_distr_r. rewrite -Z.mul_assoc.
+    rewrite -(Z.pow_add_r _ _ _ (Nat2Z.is_nonneg _) (Nat2Z.is_nonneg _)).
+    rewrite -Nat2Z.inj_add. replace (size bsl - n + n)%coq_nat with
+                                (size bsl - n + n)%N by reflexivity.
+    rewrite (subnK Hn). exact: (bv2z_cshl_signed Hs Hzeros).
   Qed.
 
   Lemma bv2z_not_unsigned bs :
