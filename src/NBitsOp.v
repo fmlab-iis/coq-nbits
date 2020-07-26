@@ -4974,10 +4974,19 @@ Qed.
   Proof.
     intro bs; case bs; try done.
   Qed.    
-  
-  Lemma Zmod_odd' : forall m d : Z, Z.odd d = false -> Z.odd (m mod d) = Z.odd m. 
+
+  Lemma Zmod_odd' : forall m d : Z, 
+      d <> 0%Z -> Z.odd d = false -> Z.odd (m mod d) = Z.odd m.
   Proof.
-  Admitted.
+    move=> m d Hd H. 
+    rewrite [in RHS](Z.div_mod m d Hd) Z.add_comm Z.odd_add_mul_even; first done.
+    by rewrite -Z.even_spec -Z.negb_odd H. 
+  Qed.
+
+  Lemma pow2_nat2z_gt0 n : (0 < (2 ^ Z.of_nat n))%Z.
+  Proof.
+    apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+  Qed.
 
   Lemma ltB_dropmsb_joinlsb_ltB :
     forall m n b, size m = size n -> ltB m n ->
@@ -5004,7 +5013,7 @@ Qed.
       rewrite /Z.succ (Z.mul_comm 2 (to_Zpos n)).
       move : (Zle_lt_or_eq _ _ Hle') => [Hlt|Heq]; first done.
       have Haux : (Z.odd (2 ^ Z.of_nat (size m)) = false)%Z by omega.
-      move : (Zmod_odd' ((to_Zpos m * 2 + true)) Haux). 
+      move : (Zmod_odd' (to_Zpos m * 2 + true) (@pow2_nat2z_nonzero (size m)) Haux). 
       by rewrite Z.odd_add Z.odd_mul/= andbF /= Heq Z.odd_mul/=andbF.
     - rewrite Z.add_0_r (Z.mul_comm 2 (to_Zpos n)).
       move : (Z.mul_nonneg_nonneg _ _ (@to_Zpos_ge0 m) (Z.le_0_2)) => Haux.
@@ -5078,13 +5087,6 @@ Qed.
     rewrite -{2 3}(joinmsb_splitmsb H) to_Zpos_joinmsb.
     by rewrite size_splitmsb msb_joinmsb Z.add_simpl_l -/(dropmsb bs).
   Qed.
-
-
-  Lemma low_subB_carry : forall bs1 bs2 n m, bs2 <=# bs1 -> (carry_addB (low (n - m) (bs1 -# bs2)) (low (n -m) bs2) + to_Zpos (high (m) bs2) = 0)%Z.
-  Proof. Admitted.
-
-  Lemma low_subB_carry' : forall bs1 bs2 n m, bs2 <=# bs1 -> (carry_addB (low (n - m) (bs1 -# bs2)) (low (n -m) bs2) = b0)%Z.
-  Proof. Admitted.
 
   Lemma uremB_ltB :
     forall m d q r , size m <= size d -> size r = size d ->size q = size d ->
@@ -5288,14 +5290,8 @@ Qed.
     by rewrite is_zero_eq_zeros andbC.
   Qed. 
 
-  Lemma addB1_joinlsb_b1 bs : dropmsb (joinlsb b1 bs) = succB bs.
-  Proof. Admitted.
-
   (* Lemma addB_shlB_distr bs1 bs2 n : shlB n (bs1 +# bs2) = shlB n bs1 +# shlB n bs2. *)
   (* Proof. Admitted. *)
-
-  Lemma to_Zpos_shlBn n m : n < m -> to_Zpos (shlB n (from_nat m 1)) = Z.of_nat (2 ^ n).
-  Proof. Admitted.
 
   Lemma from_Zpos_to_Zpos bs : from_Zpos (size bs) (to_Zpos bs) = bs.
   Proof.
@@ -5331,12 +5327,6 @@ Qed.
       rewrite Nat2Z.inj_succ (Z.pow_succ_r _ _ (Nat2Z.is_nonneg n)) Z.mul_comm in Hz.
       apply: (Z.le_lt_trans _ _ _ _ Hz). rewrite Z.mul_comm Z.div2_div.
       by apply Z.mul_div_le.
-  Qed.
-
-  
-  Lemma pow2_nat2z_gt0 n : (0 < (2 ^ Z.of_nat n))%Z.
-  Proof.
-    apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
   Qed.
 
   Lemma to_Zpos_from_Zpos n z : 
@@ -5426,10 +5416,6 @@ Qed.
       by rewrite Z.mul_assoc.
   Qed.
 
-  Lemma low_mulB bs1 bs2 n : n <= size bs1 -> n <= size bs2
-                             -> low n (bs1 *# bs2) = low n bs1 *# low n bs2.
-  Proof. Admitted.
-  
   Lemma from_Zpos_from_nat_1 n : 0 < n ->(from_Zpos n 1) = (from_nat n 1).
   Proof.
     intros.
@@ -5466,7 +5452,77 @@ Qed.
   Proof.
     rewrite from_natSn_from_nat from_nat_to_nat addB1. reflexivity.
   Qed.
-  
+
+  Lemma to_Zpos_addB' bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_Zpos (bs1 +# bs2) = ((to_Zpos bs1 + to_Zpos bs2) mod 2 ^ Z.of_nat (size bs1))%Z.
+  Proof.
+    move=> Hsz. 
+    rewrite -(to_Zpos_addB Hsz) Z.mod_add; last exact: pow2_nat2z_nonzero.
+    rewrite Z.mod_small; first reflexivity.
+    split; first exact: to_Zpos_ge0.
+    have<-: size (bs1 +# bs2) = size bs1 by rewrite size_addB Hsz minnn.
+    exact: to_Zpos_bounded.
+  Qed.
+
+  Lemma to_Zpos_udivB_rec_nil :
+    forall n q r,
+      size r = size n ->
+      size q = size n ->
+      r <# n ->
+      to_Zpos (udivB_rec [::] n q r).1 =
+      Z.div (to_Zpos (low (size r) (addB r (mulB q n)))) (to_Zpos n)%Z.
+  Proof.
+    intros.
+    rewrite /= low_addB; [|done|rewrite size_mulB H H0//].
+    rewrite low_low; last rewrite H H0//.
+    rewrite -low_addB; [|rewrite//|rewrite size_full_mul H H0 leq_addr//].
+    rewrite ->ltB_to_Zpos in H1. move : (@to_Zpos_ge0 r) => Hge0r.
+    case Hq0 : (q == zeros (size q)).
+    - move : (f_equal to_Zpos (eqP Hq0)); rewrite to_Zpos_zeros; move => Hq0z.
+      rewrite Hq0z (eqP Hq0) full_mul0B addB0 unzip1_zip; last rewrite size_zeros H H0 leq_addr//.
+      rewrite low_size Z.div_small//; by split.
+    - rewrite low_addB; [|done|rewrite size_full_mul H H0 leq_addr//].
+      rewrite {2}H -H0 -/(mulB q n).
+      have Hsz : size r = size (r +# (q *# n)) by rewrite size_addB size_mulB H H0 minnn.
+      have Hsz' : size r = size (q *# n) by rewrite size_mulB H H0.
+      move : (to_Zpos_addB' Hsz') => Haddz'.
+      rewrite low_size Haddz' -to_Zpos_mod_pow2 to_Zpos_full_mul.
+      rewrite H H0 Zplus_mod_idemp_r.
+      move : (Z.le_lt_trans _ _ _ Hge0r H1) => Hgt0n.
+      move : (@to_Zpos_ge0 q) => Hge0q.
+      move : (Z.mul_nonneg_nonneg _ _ Hge0q (Z.lt_le_incl _ _ Hgt0n)) => Hmge0.
+      move : (to_Zpos_bounded n) => Hbdn.
+      case Hgt : (Z.ltb (to_Zpos r + to_Zpos q * to_Zpos n) (2 ^ Z.of_nat (size n))).
+      + rewrite ->Z.ltb_lt in Hgt.
+        rewrite Z.mod_small; last (split; [omega| done]).
+        rewrite Z.div_add;
+        [|exact : (Z.neq_sym _ _ (Z.lt_neq _ _(Z.le_lt_trans _ _ _ Hge0r H1)))].
+        rewrite Z.div_small; last by split. omega.
+      + rewrite ->Z.ltb_ge in Hgt.
+        move : (Z.mod_eq (to_Zpos q * to_Zpos n + to_Zpos r) _ (@pow2_nat2z_nonzero (size n))) => Hmeq.
+        rewrite Z.add_comm Hmeq -Z.add_opp_r -Z.add_assoc Z.div_add_l; last omega.
+        symmetry. rewrite Z.add_move_l Z.sub_diag Z.add_opp_r.
+        have -> : (to_Zpos r - (2 ^ Z.of_nat (size n) * ((to_Zpos q * to_Zpos n + to_Zpos r) / 2 ^ Z.of_nat (size n)))
+                   = ((to_Zpos q * to_Zpos n) + (to_Zpos r) - 2 ^ Z.of_nat (size n) * ((to_Zpos q * to_Zpos n + to_Zpos r) / 2 ^ Z.of_nat (size n))) - (to_Zpos q * to_Zpos n) )%Z.
+        omega.
+        rewrite -Hmeq.
+        move : (Z.lt_le_trans _ _ _ (pow2_nat2z_gt0 (size n)) Hgt) => Hgt0.
+        move : (Z.mod_le _ _ (Z.lt_le_incl _ _ Hgt0) (pow2_nat2z_gt0 (size n))) => Haux.
+        move : (Z.le_refl (to_Zpos q * to_Zpos n)) => Haux'.
+        move : (Z.sub_le_mono _ _ _ _ Haux Haux'). rewrite Z.add_simpl_r => Hle.
+        move : (Z.le_lt_trans _ _ _ Hle H1) => Htran.
+        case Hcond : (Z.leb 0 ((to_Zpos q * to_Zpos n + to_Zpos r) mod 2 ^ Z.of_nat (size n) - to_Zpos q * to_Zpos n))%Z.
+        rewrite ->Z.leb_le in Hcond.
+        rewrite Z.div_small; last (split; [done|move : (Z.le_lt_trans _ _ _ Hle H1); rewrite Z.add_comm//]). done.
+        rewrite ->Z.leb_gt in Hcond.
+        apply Z.opp_inj. rewrite Z.opp_0.
+        case Hmod0: (Z.eqb (((to_Zpos q * to_Zpos n + to_Zpos r) mod 2 ^ Z.of_nat (size n) - to_Zpos q * to_Zpos n) mod to_Zpos n) 0)%Z.
+        rewrite ->Z.eqb_eq in Hmod0.
+        rewrite -(Z_div_zero_opp_full); last apply Hmod0.
+        rewrite Z.opp_sub_distr Z.add_comm Z.add_opp_r.
+  Admitted.
+        
   Lemma to_Zpos_udivB_rec_div :
     forall m n q r , size m <= size n -> size r = size n ->size q = size n ->
                      ~~(n == zeros (size n)) ->
@@ -5479,29 +5535,25 @@ Qed.
   Proof. 
     elim => [|mhd mtl IH] n q r Hsznm Hsznr Hsznq Hnneq0 Hltrn .
     - rewrite /= subn0.
-      have -> : size r = size (r +# (q *# n)) by rewrite size_addB size_mulB Hsznq -Hsznr minnn.
-      rewrite low_size. apply to_Zpos_inj_ss; first by rewrite size_from_Zpos Hsznq.
+      have Hszadd : size r = size (r +# (q *# n)) by rewrite size_addB size_mulB Hsznq -Hsznr minnn.
+      rewrite Hszadd low_size. apply to_Zpos_inj_ss; first by rewrite size_from_Zpos Hsznq.
       generalize Hnneq0; rewrite -ltB0n -(ltB_zeros_l (size n)) ltB_to_Zpos to_Zpos_zeros.
       move/Z.lt_gt => Hgt0z.
       have Hsz : size r =  (size (q *# n)) by rewrite size_mulB Hsznr Hsznq.
-      (* rewrite /= -(to_Zpos_zeros (size (q*#n))) in Hlt. rewrite<-leB_to_Zpos in Hlt; last by rewrite size_zeros. *)
-       admit.
-      (* move : (to_Zpos_addB Hsz); rewrite Z.add_move_r; move => Hadd. *)
-      (* rewrite Hadd to_Zpos_mulB'. *)
-      (* case Hc : (carry_addB r (q *# n)). rewrite Z.mul_1_l Hsznr Hsznq. *)
-      (* move : (Z.lt_gt _ _ (pow2_nat2z_gt0 (size n))) => Haux. *)
-      (* move : (Z_mod_lt (to_Zpos q * to_Zpos n) _ Haux) => [H1 H2].  *)
-      (* case Hu : ((to_Zpos q * to_Zpos n) <? 2 ^ Z.of_nat (size n))%Z; first rewrite ->Z.ltb_lt in Hu. *)
-      (* move : (@to_Zpos_ge0 q) => Hge0q. move : (@to_Zpos_ge0 n) => Hge0n.  *)
-      (* rewrite Z.mod_small; last (split; [by apply Z.mul_nonneg_nonneg|done]).  *)
-      (* rewrite Z.add_sub_swap.  *)
-      (* rewrite (Z.quot_add _ _ _ (Z.neq_sym _ _ (Z.lt_neq _ _ (Z.gt_lt _ _ Hgt0z)))) -Hsznr; *)
-      (* last apply Z.mul_nonpos_nonpos. *)
-      (* move : (to_Zpos_bounded r); rewrite -Z.lt_0_sub. *)
-      (* SearchAbout Z.div. *)
-    (* by rewrite (Z_div_plus _ _ _ Hgt0z) Z.div_small; *)
-      (*   [rewrite Z.add_0_l to_Zpos_from_Zpos_bounded; [|apply to_Zpos_ge0|rewrite -Hsznq; apply to_Zpos_bounded] *)
-      (*   |split; [apply to_Zpos_ge0|by rewrite ->ltB_to_Zpos in Hltrn]]. *)
+      case Hn1 : (Z.eqb 1 (to_Zpos n)). rewrite ->Z.eqb_eq in Hn1. rewrite -Hn1 Z.div_1_r.
+      rewrite to_Zpos_from_Zpos_bounded; [|apply to_Zpos_ge0|rewrite -Hsznr Hszadd; apply to_Zpos_bounded].
+      move : (to_Zpos_udivB_rec_nil Hsznr Hsznq Hltrn).
+      rewrite/= Hszadd low_size -Hn1 Z.div_1_r//.
+      rewrite ->Z.eqb_neq in Hn1.
+      rewrite/= to_Zpos_from_Zpos_bounded;
+        [|apply Z.div_pos; [apply to_Zpos_ge0|omega]|].
+      move  : (to_Zpos_udivB_rec_nil Hsznr Hsznq Hltrn).
+      rewrite/= Hszadd low_size//.
+      move : (to_Zpos_bounded (r +# (q *# n))); rewrite size_addB size_mulB Hsznr Hsznq minnn; move => Haux. SearchAbout (_/_<=_)%Z. 
+      have Haux' : (0 < 1 <= to_Zpos n)%Z. omega.
+      move : (Z.div_le_compat_l _ _ _ (@to_Zpos_ge0 (r +# (q *# n))) Haux').
+      rewrite Z.div_1_r; move => Hle.
+      exact : (Z.le_lt_trans _ _ _ Hle Haux).
     - case Hcond : (to_nat (dropmsb (joinlsb mhd r)) < to_nat n); rewrite /= Hcond /=.
       + rewrite -ltB_to_nat in Hcond.
         have Hsznq' : size (dropmsb (joinlsb false q)) = size n by rewrite size_dropmsb size_joinlsb addnK.
@@ -5568,78 +5620,78 @@ Qed.
           rewrite -low_dropmsb size_joinlsb size_addB size_mulB Hsznr Hsznq minnn addn1/= addBC//.
         }
         done.
-  Admitted.
+  Qed.
         
-  Lemma to_Zpos_udivB_rec_div_temp :
-    forall m n q r , size m <= size n -> size r = size n ->size q = size n ->
-                     ~~(n == zeros (size n)) ->
-                     ltB r n ->
-                     ~~ Umulo (shlB (size m) q) n ->
-                     (*carry_addB (rev m ++ low (size r - size m) r) (shlB (size m) q *# n) = false ->*)
-                     (udivB_rec m n q r).1
-                     = from_Zpos (size n) (Z.div (to_Zpos (rev m ++ low (size r - size m) r)
-                      + to_Zpos (shlB (size m) q *# n)) (to_Zpos n)) .
-  Proof.
-    elim => [|mhd mtl IH] n q r Hsznm Hsznr Hsznq Hnneq0 Hltrn Humulo.
-    - rewrite /= subn0 low_size.
-      apply to_Zpos_inj_ss; first by rewrite size_from_Zpos Hsznq.
-      generalize Hnneq0; rewrite -ltB0n -(ltB_zeros_l (size n)) ltB_to_Zpos to_Zpos_zeros.
-      move/Z.lt_gt => Hgt0z. rewrite /size /shlB /= in Humulo.
-      rewrite (to_Zpos_mulB Hsznq Humulo).
-      by rewrite (Z_div_plus _ _ _ Hgt0z) Z.div_small;
-        [rewrite Z.add_0_l to_Zpos_from_Zpos_bounded; [|apply to_Zpos_ge0|rewrite -Hsznq; apply to_Zpos_bounded]
-        |split; [apply to_Zpos_ge0|by rewrite ->ltB_to_Zpos in Hltrn]].
-    - case Hcond : (to_nat (dropmsb (joinlsb mhd r)) < to_nat n); rewrite /= Hcond /=.
-      + rewrite -ltB_to_nat in Hcond.
-        have Hsznq' : size (dropmsb (joinlsb false q)) = size n by rewrite size_dropmsb size_joinlsb addnK.
-        have Hsznr' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK.
-        rewrite /= shlB1_shlB /shlB1 in Humulo.
-        rewrite (IH n (dropmsb (joinlsb false q)) (dropmsb (joinlsb mhd r)) (ltnW Hsznm) Hsznr' Hsznq' Hnneq0 Hcond Humulo).
-        rewrite Hsznr' Hsznr /= subnS.
-        rewrite rev_cons cat_rcons.
-        generalize Hsznm; rewrite -(subn_gt0 (size mtl) (size n)) -Hsznr; move => Hsublt0n.
-        rewrite NBitsDef.low_dropmsb; last by rewrite size_joinlsb addn1 ltnS leq_subr.
-        rewrite -/joinlsb -low_joinlsb (ltn_predK Hsublt0n).
-        rewrite -/(shlB1 q) shlB1_shlB //.
-      + rewrite ltnNge in Hcond; move/negbFE : Hcond => Hcond.
-        rewrite -leB_to_nat in Hcond; last by rewrite size_dropmsb size_joinlsb addnK.
-        have Hsznq' : size (dropmsb (joinlsb true q)) = size n by rewrite size_dropmsb size_joinlsb addnK.
-        have Hsznr' : size (dropmsb (joinlsb mhd r) -# n) = size n
-          by rewrite size_subB size_dropmsb size_joinlsb addnK Hsznr minnn.
-        move : (ltB_dropmsb_joinlsb_ltB mhd Hsznr Hltrn);
-          (rewrite -ltB_equiv_borrow_subB; last by rewrite size_dropmsb size_joinlsb addnK).
-        have Hsznr'' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK.
-        rewrite (ltBNle Hsznr'') Hcond -cat_rcons cats0 ltB_rcons0_r/=; move => Hcond'.
-        have Humulo' : ~~ Umulo (dropmsb (joinlsb true q) <<# size mtl) n. admit.
-        rewrite (IH n (dropmsb (joinlsb true q)) (dropmsb (joinlsb mhd r) -# n) (ltnW Hsznm)
-                    Hsznr' Hsznq' Hnneq0 Hcond' Humulo').
-        rewrite Hsznr' /= subnS.
-        rewrite rev_cons cat_rcons.
-        generalize Hsznm; rewrite -(subn_gt0 (size mtl) (size n)) -Hsznr; move => Hsublt0n.
-        symmetry.
-        have Haux : 0 < size (mhd :: mtl) by done.
-        move : (leq_trans Haux Hsznm) => Hngt0.
-        rewrite -NBitsDef.low_dropmsb;
-          last (rewrite -subnS -{2}(subn0 (size r)) ltn_sub2l; [done|by rewrite Hsznr|done]).
-        rewrite -/joinlsb -low_joinlsb (ltn_predK Hsublt0n).
-        rewrite -dropmsb_joinlsb; last by rewrite Hsznr.
-        symmetry. rewrite mulBC; last by rewrite size_shlB Hsznq'.
-        (* rewrite low_subB; [|rewrite Hsznr'' Hsznr leq_subr//|rewrite Hsznr leq_subr//]. *)
-        (* have -> : (n *# (dropmsb (joinlsb true q) <<# size mtl)) = (n <<# size mtl *# dropmsb (joinlsb true q)) by rewrite -mulB_shlB_swap. *)
-        rewrite to_Zpos_cat. 
-        rewrite -to_Zpos_mod_pow2 (to_Zpos_subB Hsznr'') -(ltB_equiv_borrow_subB Hsznr'').
-        rewrite (ltBNle Hsznr'') Hcond Z.mul_0_l Z.add_0_l size_rev.
-        (* rewrite -Z.mul_mod_distr_r; *)
-        (*   [|exact :(Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 (size r - size mtl)))) *)
-        (*    |exact :(Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 (size mtl))))]. *)
-        (* rewrite -Z.pow_add_r; try apply Nat2Z.is_nonneg. *)
-        (* rewrite -Nat2Z.inj_add. *)
-        (* have -> : (size r - size mtl + size mtl)%coq_nat = (size r - size mtl + size mtl) by done. *)
-        (* rewrite subnK; last by rewrite Hsznr (ltnW Hsznm). *)
-        rewrite {2}/joinlsb -succB_shlB1 -addB1 -mulB_shlB_assoc;
-          last rewrite size_addB size_from_nat minnn size_shlB1 Hsznq//. 
-        move : (foo_aux 0 (lsb_shlB1 q)); rewrite /=; move => Hadd.
-  Admitted.
+  (* Lemma to_Zpos_udivB_rec_div_temp : *)
+  (*   forall m n q r , size m <= size n -> size r = size n ->size q = size n -> *)
+  (*                    ~~(n == zeros (size n)) -> *)
+  (*                    ltB r n -> *)
+  (*                    ~~ Umulo (shlB (size m) q) n -> *)
+  (*                    (*carry_addB (rev m ++ low (size r - size m) r) (shlB (size m) q *# n) = false ->*) *)
+  (*                    (udivB_rec m n q r).1 *)
+  (*                    = from_Zpos (size n) (Z.div (to_Zpos (rev m ++ low (size r - size m) r) *)
+  (*                     + to_Zpos (shlB (size m) q *# n)) (to_Zpos n)) . *)
+  (* Proof. *)
+  (*   elim => [|mhd mtl IH] n q r Hsznm Hsznr Hsznq Hnneq0 Hltrn Humulo. *)
+  (*   - rewrite /= subn0 low_size. *)
+  (*     apply to_Zpos_inj_ss; first by rewrite size_from_Zpos Hsznq. *)
+  (*     generalize Hnneq0; rewrite -ltB0n -(ltB_zeros_l (size n)) ltB_to_Zpos to_Zpos_zeros. *)
+  (*     move/Z.lt_gt => Hgt0z. rewrite /size /shlB /= in Humulo. *)
+  (*     rewrite (to_Zpos_mulB Hsznq Humulo). *)
+  (*     by rewrite (Z_div_plus _ _ _ Hgt0z) Z.div_small; *)
+  (*       [rewrite Z.add_0_l to_Zpos_from_Zpos_bounded; [|apply to_Zpos_ge0|rewrite -Hsznq; apply to_Zpos_bounded] *)
+  (*       |split; [apply to_Zpos_ge0|by rewrite ->ltB_to_Zpos in Hltrn]]. *)
+  (*   - case Hcond : (to_nat (dropmsb (joinlsb mhd r)) < to_nat n); rewrite /= Hcond /=. *)
+  (*     + rewrite -ltB_to_nat in Hcond. *)
+  (*       have Hsznq' : size (dropmsb (joinlsb false q)) = size n by rewrite size_dropmsb size_joinlsb addnK. *)
+  (*       have Hsznr' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK. *)
+  (*       rewrite /= shlB1_shlB /shlB1 in Humulo. *)
+  (*       rewrite (IH n (dropmsb (joinlsb false q)) (dropmsb (joinlsb mhd r)) (ltnW Hsznm) Hsznr' Hsznq' Hnneq0 Hcond Humulo). *)
+  (*       rewrite Hsznr' Hsznr /= subnS. *)
+  (*       rewrite rev_cons cat_rcons. *)
+  (*       generalize Hsznm; rewrite -(subn_gt0 (size mtl) (size n)) -Hsznr; move => Hsublt0n. *)
+  (*       rewrite NBitsDef.low_dropmsb; last by rewrite size_joinlsb addn1 ltnS leq_subr. *)
+  (*       rewrite -/joinlsb -low_joinlsb (ltn_predK Hsublt0n). *)
+  (*       rewrite -/(shlB1 q) shlB1_shlB //. *)
+  (*     + rewrite ltnNge in Hcond; move/negbFE : Hcond => Hcond. *)
+  (*       rewrite -leB_to_nat in Hcond; last by rewrite size_dropmsb size_joinlsb addnK. *)
+  (*       have Hsznq' : size (dropmsb (joinlsb true q)) = size n by rewrite size_dropmsb size_joinlsb addnK. *)
+  (*       have Hsznr' : size (dropmsb (joinlsb mhd r) -# n) = size n *)
+  (*         by rewrite size_subB size_dropmsb size_joinlsb addnK Hsznr minnn. *)
+  (*       move : (ltB_dropmsb_joinlsb_ltB mhd Hsznr Hltrn); *)
+  (*         (rewrite -ltB_equiv_borrow_subB; last by rewrite size_dropmsb size_joinlsb addnK). *)
+  (*       have Hsznr'' : size (dropmsb (joinlsb mhd r)) = size n by rewrite size_dropmsb size_joinlsb addnK. *)
+  (*       rewrite (ltBNle Hsznr'') Hcond -cat_rcons cats0 ltB_rcons0_r/=; move => Hcond'. *)
+  (*       have Humulo' : ~~ Umulo (dropmsb (joinlsb true q) <<# size mtl) n. admit. *)
+  (*       rewrite (IH n (dropmsb (joinlsb true q)) (dropmsb (joinlsb mhd r) -# n) (ltnW Hsznm) *)
+  (*                   Hsznr' Hsznq' Hnneq0 Hcond' Humulo'). *)
+  (*       rewrite Hsznr' /= subnS. *)
+  (*       rewrite rev_cons cat_rcons. *)
+  (*       generalize Hsznm; rewrite -(subn_gt0 (size mtl) (size n)) -Hsznr; move => Hsublt0n. *)
+  (*       symmetry. *)
+  (*       have Haux : 0 < size (mhd :: mtl) by done. *)
+  (*       move : (leq_trans Haux Hsznm) => Hngt0. *)
+  (*       rewrite -NBitsDef.low_dropmsb; *)
+  (*         last (rewrite -subnS -{2}(subn0 (size r)) ltn_sub2l; [done|by rewrite Hsznr|done]). *)
+  (*       rewrite -/joinlsb -low_joinlsb (ltn_predK Hsublt0n). *)
+  (*       rewrite -dropmsb_joinlsb; last by rewrite Hsznr. *)
+  (*       symmetry. rewrite mulBC; last by rewrite size_shlB Hsznq'. *)
+  (*       (* rewrite low_subB; [|rewrite Hsznr'' Hsznr leq_subr//|rewrite Hsznr leq_subr//]. *) *)
+  (*       (* have -> : (n *# (dropmsb (joinlsb true q) <<# size mtl)) = (n <<# size mtl *# dropmsb (joinlsb true q)) by rewrite -mulB_shlB_swap. *) *)
+  (*       rewrite to_Zpos_cat.  *)
+  (*       rewrite -to_Zpos_mod_pow2 (to_Zpos_subB Hsznr'') -(ltB_equiv_borrow_subB Hsznr''). *)
+  (*       rewrite (ltBNle Hsznr'') Hcond Z.mul_0_l Z.add_0_l size_rev. *)
+  (*       (* rewrite -Z.mul_mod_distr_r; *) *)
+  (*       (*   [|exact :(Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 (size r - size mtl)))) *) *)
+  (*       (*    |exact :(Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 (size mtl))))]. *) *)
+  (*       (* rewrite -Z.pow_add_r; try apply Nat2Z.is_nonneg. *) *)
+  (*       (* rewrite -Nat2Z.inj_add. *) *)
+  (*       (* have -> : (size r - size mtl + size mtl)%coq_nat = (size r - size mtl + size mtl) by done. *) *)
+  (*       (* rewrite subnK; last by rewrite Hsznr (ltnW Hsznm). *) *)
+  (*       rewrite {2}/joinlsb -succB_shlB1 -addB1 -mulB_shlB_assoc; *)
+  (*         last rewrite size_addB size_from_nat minnn size_shlB1 Hsznq//.  *)
+  (*       move : (foo_aux 0 (lsb_shlB1 q)); rewrite /=; move => Hadd. *)
+  (* Admitted. *)
 
   (* Lemma to_Zpos_udivB_rec_div' : *)
   (*   forall m n q r , size m <= size n -> size r = size n ->size q = size n -> *)
@@ -5796,7 +5848,7 @@ Qed.
   (*   rewrite Zmod_eq; last (apply Z.lt_gt; apply Z.pow_pos_nonneg; try omega). *)
   (*   rewrite -!Z.add_opp_r Z.mul_comm.  *)
   (*   rewrite Z_div_plus_full_l; last (apply nesym; apply (Z.lt_neq _ _ H)).  *)
-  (* Admitted. *)
+  (* Admitted *)
   
   Lemma to_Zpos_udivB_rec_rem :
     forall m n q r , size m <= size n -> size r = size n ->size q = size n ->
@@ -5887,6 +5939,14 @@ Admitted.
       rewrite size_zeros H subnn low0 cats0.  
       done. 
   Qed.
+
+  Lemma to_Zpos_uremB' : forall m n , 
+      size n = size m -> ~~ (n == zeros (size n)) ->
+      to_Zpos (uremB m n) = (Zmod (to_Zpos m) (to_Zpos n)).
+  Proof.
+    move=> m n Hsz Hn. rewrite -(revK m). rewrite -(size_rev m) in Hsz.
+    exact: to_Zpos_uremB.
+  Qed.
   
   (*---------------------------------------------------------------------------
     Properties of signed division    
@@ -5906,7 +5966,7 @@ Admitted.
     let bs2 := absB bs2' in
     if (((dropmsb bs1' ==  (zeros (size bs1' - 1))) &&
         (dropmsb bs2' == (ones (size bs2' - 1)))) && (msb bs1' == msb bs2') && msb bs1')
-    then (zeros (size bs1'), (udivB bs1 bs2).2)
+    then (zeros (size bs1'), negB (udivB bs1 bs2).2)
     else
       if (msb bs1' == msb bs2') && negb (msb bs1') then udivB bs1 bs2
       else if (msb bs1' == msb bs2') && (msb bs1')
@@ -5948,10 +6008,10 @@ Admitted.
         [exact: to_Zpos_ge0| done].
   Qed.
 
-  Lemma to_Z_zmod_same sb1 sb2:
-      msb sb1 == msb sb2 -> ~~ (sb2 == zeros (size sb2)) ->
-      (to_Z sb1 mod to_Z sb2 <= 0)%Z.
-  Proof. Admitted.
+  (* Lemma to_Z_zmod_same sb1 sb2: *)
+  (*     msb sb1 == msb sb2 -> ~~ (sb2 == zeros (size sb2)) -> *)
+  (*     (to_Z sb1 mod to_Z sb2 <= 0)%Z. *)
+  (* Proof. Admitted. *)
 
   Lemma to_Z_zdiv_diff sb1 sb2:
       ~~ (msb sb1 == msb sb2) -> ~~ (sb2 == zeros (size sb2)) ->
@@ -5990,10 +6050,10 @@ Admitted.
         apply Z.div_pos; [apply to_Zpos_ge0| apply Zle_lt_succ; exact: to_Zneg_ge0]. 
   Qed.
 
-  Lemma to_Z_zmod_diff sb1 sb2:
-      ~~ (msb sb1 == msb sb2) -> ~~ (sb2 == zeros (size sb2)) ->
-      (to_Z sb1 mod to_Z sb2 <= 0)%Z.
-  Proof. Admitted.
+  (* Lemma to_Z_zmod_diff sb1 sb2: *)
+  (*     ~~ (msb sb1 == msb sb2) -> ~~ (sb2 == zeros (size sb2)) -> *)
+  (*     (to_Z sb1 mod to_Z sb2 <= 0)%Z. *)
+  (* Proof. Admitted .*)
 
   Lemma msb_cons b bs :
     0 < size bs -> msb (b :: bs) = msb bs.
@@ -6011,6 +6071,12 @@ Admitted.
     move=> Hb Hz. rewrite {1}(to_Z0 Hz) eqxx in Hb. discriminate. 
   Qed.
 
+  Lemma neq_zeros_to_Zpos_neq0 bs : ~~ (bs == zeros (size bs)) -> (to_Zpos bs <> 0)%Z.
+  Proof.
+    move=> Hb Hz. rewrite -(to_Zpos_zeros (size bs)) in Hz. have Hsz : size bs = size (zeros (size bs)) by rewrite size_zeros.
+    move/eqP : (to_Zpos_inj_ss Hsz Hz) => H. by rewrite H in Hb.
+  Qed.
+
   Lemma msb_invB bs : 0 < size bs -> ~~ msb bs = (msb (invB bs)).
   Proof.
     case (lastP bs) => {bs} [//= | bs b _].
@@ -6025,13 +6091,14 @@ Admitted.
   Qed.
 
   Lemma negB_zeros' bs : 
-    (-# bs == zeros (size bs)) = true ->
-    (bs == zeros (size bs)) = true.
+    (bs == zeros (size bs)) <-> (-# bs == zeros (size (negB bs))) .
   Proof.
-    move/eqP=> H. apply (f_equal negB) in H. 
-    rewrite negB_involutive (eqP (negB_zeros _)) in H. by apply /eqP.
+    case Hz : (bs == zeros (size bs));
+    [move : (f_equal negB (eqP Hz)); move => Hng; rewrite Hng size_negB size_zeros negB_zeros//
+    |split; [done
+            |intro; move : (f_equal negB (eqP H)); rewrite negB_involutive (eqP (negB_zeros _)) size_negB//;
+                                                           move => H'; rewrite H' size_zeros eq_refl// in Hz]].
   Qed.
-
 
   Lemma neq_zeros_cons b bs :
     ~~ (b :: bs == zeros (size bs).+1) = ((b == b1) || ~~ (bs == zeros (size bs))).
@@ -6173,10 +6240,9 @@ Admitted.
                         -> ~~ (absB sb1 == zeros (size (sb1))).
   Proof.
     rewrite /absB. case (msb sb1); last done.
-    case H: (-# sb1 == zeros (size sb1)); try done.
-    by rewrite (negB_zeros' H).
+    apply contraNN; rewrite (negB_zeros' sb1) size_negB//.
   Qed.
-  
+
   Lemma to_Zpos_negB bs :
     to_Zpos (negB bs) = ((- to_Zpos bs) mod 2 ^ Z.of_nat (size bs))%Z.
   Proof.
@@ -6231,13 +6297,12 @@ Admitted.
     generalize H1. rewrite ltB_zeros_l ltB0n ; move => Hneq02.
     split.
     - move => Hudiv. move: (f_equal to_Zpos (eqP Hudiv)).
-      have Hsz : size bs2 = size (rev bs1) by rewrite size_rev H.
-      rewrite -{1}(revK bs1) (to_Zpos_udivB Hsz Hneq02) revK to_Zpos_zeros.
+      rewrite (to_Zpos_udivB' _ Hneq02); last done. 
       move : H0; rewrite leB_to_Zpos; last by rewrite size_zeros. rewrite to_Zpos_zeros ; move => Hge0.
       move : H1; rewrite ltB_to_Zpos to_Zpos_zeros; move => Hgt0.
       rewrite Z.Private_NZDiv.div_small_iff; try done.
         by rewrite ltB_to_Zpos.
-      move => Hlt. by move/eqP : (udivB_small H Hneq02 Hlt). 
+    - move => Hlt. by move/eqP : (udivB_small H Hneq02 Hlt). 
   Qed.
 
   Lemma uremB_small_iff bs1 bs2 : size bs1 = size bs2 ->
@@ -6246,7 +6311,18 @@ Admitted.
   Proof.
     intros.
     generalize H1. rewrite ltB_zeros_l ltB0n ; move => Hneq02.
-  Admitted.
+    split.
+    - move => Hudiv. move: (f_equal to_Zpos (eqP Hudiv)); rewrite (to_Zpos_uremB' _ Hneq02); last done.
+      move : Hneq02.
+      rewrite -ltB0n -(ltB_zeros_l (size bs2)) !ltB_to_Zpos to_Zpos_zeros.
+      move => Hneq.
+      rewrite (Z.mod_small_iff _ _ (Z.neq_sym _ _ (Z.lt_neq _ _ Hneq))).
+      move => [[Hge0 Hlt]| [Hle0 Hlt]]; try omega.
+    - rewrite ltB_to_Zpos; move => Hlt. apply/eqP; apply to_Zpos_inj_ss; first by rewrite size_uremB.
+      rewrite (to_Zpos_uremB' _ Hneq02); last done.
+      move : (@to_Zpos_ge0 bs1) => Hge0.
+      rewrite Z.mod_small; by split.
+  Qed.
 
   Lemma msb_ltB_aux bs : bs <# joinmsb (zeros (size bs - 1)) b1 <-> msb bs = b0.
   Proof.
@@ -6331,20 +6407,16 @@ Admitted.
             
   Lemma to_Z_sdivB_same_msb sb1 sb2 :
     0 < size sb1 -> size sb1 = size sb2 ->
-    (~~(dropmsb sb1 == zeros (size sb1 -1)) (*|| ~~(sb2 == ones (size sb2))*)) ->
+    ~~(dropmsb sb1 == zeros (size sb1 -1)) ->
     msb sb1 == msb sb2 ->
     to_Z (sdivB sb1 sb2).1 = Z.quot (to_Z sb1) (to_Z sb2).
   Proof.
     intros.
-    rewrite /sdivB. (* move/orP: H1 => [Hdz1 | Hn1]. *)
+    rewrite /sdivB.
     - move : H2. have H' : 0 < size sb2 by rewrite -H0.
       move : (zeros_msb_dropmsb sb1).
       move : (zeros_msb_dropmsb sb2).
       case Hm1 : (msb sb1); case Hm2 : (msb sb2); move => //= Hz2 Hz1  _.
-      + case  Hnz1 : (-# sb1 == zeros (size (sb1))).
-          by rewrite (negB_zeros' Hnz1) in Hz1. 
-        case  Hnz2 : (-# sb2 == zeros (size (sb2))).
-          by rewrite (negB_zeros' Hnz2) in Hz2.
         * move : (neq_zeros_to_Z_neq0 (negbT Hz2)) => Hneq02.
           rewrite (Z.quot_div _ _ Hneq02) (to_Z_sgn_msb (negbT Hz1)) (to_Z_sgn_msb (negbT Hz2)). 
           rewrite Hm1 Hm2. symmetry.
@@ -6442,19 +6514,17 @@ Admitted.
     have Hszabs : size (absB sb1) = size (absB sb2) by rewrite !size_absB H0.
     move : (zeros_msb_dropmsb sb1); move : (zeros_msb_dropmsb sb2).
     case Hm1 : (msb sb1); case Hm2 : (msb sb2);  move => //= Hz2 Hz1 _.
-    - case  Hnz1 : ((-# sb1) == zeros (size (sb1))).
-      move : (negB_zeros' Hnz1). by rewrite Hz1. 
+    - move/iffRL/contra: (negB_zeros' sb1) => Hnz1; rewrite Hz1 in Hnz1. 
       move : (absB_neq0 (negbT Hz1)) => Hanz1.
       rewrite -(size_absB sb1) in Hanz1.
-      rewrite -(size_negB sb1) in Hnz1.
       rewrite/absB Hm1 Hm2.
       have Hszn12 : size sb2 = size (-# sb1) by rewrite size_negB H0.
       case Hgt1 : (from_Zpos (size (sb2)) 1 <# (sb2)).
-      + symmetry in Hszn12.
-        move : (udivB_lt Hszn12 (negbT Hnz1) Hgt1) => Hdivlt.
+      + symmetry in Hszn12. 
+        move : (udivB_lt Hszn12 (Hnz1 isT) Hgt1) => Hdivlt.
         move : (msb_negB H1); rewrite Hm1/=; move => Hnm1; symmetry in Hnm1.
         move : (msb_ltB (size_udivB (-# sb1) sb2) Hnm1 Hdivlt) => Hmu.
-        move : (neq_zeros_to_Z_gt0 (negbT Hnz1)). rewrite ltB_to_Zpos to_Zpos_zeros.
+        move : (neq_zeros_to_Z_gt0 (Hnz1 isT)). rewrite ltB_to_Zpos to_Zpos_zeros.
         move => Hngt0.
         move : (Z.lt_le_incl _ _ Hngt0).
         rewrite -{1}(to_Zpos_zeros (size sb1)) -leB_to_Zpos; last by rewrite size_zeros size_negB.
@@ -6524,15 +6594,13 @@ Admitted.
         have Haux : (size (sb2) = size (from_Zpos (size (sb2)) 1)) by rewrite size_from_Zpos.
         move : (to_Zpos_inj_ss Haux Heq) => {Haux} Heqn.
         rewrite Heqn -H0 from_Zpos_from_nat_1; last done.
-        rewrite andbF andFb/= -{1}(size_negB sb1) (udivB1 (negbT Hnz1))/= negB_involutive.
+        rewrite andbF andFb/= -{1}(size_negB sb1) (udivB1 (Hnz1 isT))/= negB_involutive.
         have Hm2' : msb (from_Zpos (size sb1) 1) = b0 by rewrite H0 -Heqn Hm2.
         rewrite -from_Zpos_from_nat_1; last done.
         rewrite (to_Z_to_Zpos (from_Zpos (size sb1) 1)) Hm2' Z.mul_0_l Z.sub_0_r (to_Zpos_from_Zpos_1 H).
         by rewrite Z.quot_1_r.
     - rewrite (negbTE H1) in Hz1.
-      case  Hnz2 : (-# sb2 == zeros (size (sb2))).
-      move : (negB_zeros' Hnz2). by rewrite Hz2. 
-      rewrite -(size_negB sb2) in Hnz2.
+      move/iffRL/contra: (negB_zeros' sb2) => Hnz2; rewrite Hz2 in Hnz2.
       rewrite/absB Hm1 Hm2.
       have Hszn12 : size (-# sb2) = size (sb1) by rewrite size_negB H0.
       case Hgt1 : (from_Zpos (size (-# sb2)) 1 <# (-# sb2)).
@@ -6544,7 +6612,7 @@ Admitted.
         move : (Z.lt_le_incl _ _ Hgt0).
         rewrite -{1}(to_Zpos_zeros (size sb1)) -leB_to_Zpos; last by rewrite size_zeros.
         move => Hge0. 
-        move : (neq_zeros_to_Z_gt0 (negbT Hnz2)) => Hngt0.
+        move : (neq_zeros_to_Z_gt0 (Hnz2 isT)) => Hngt0.
         move : (udivB_small_iff Hszn12 Hge0 Hngt0).
         case Hlt12 : (sb1 <# -# sb2).
         * move => [_ Hudiv]. rewrite (eqP (Hudiv isT)).
@@ -6583,7 +6651,7 @@ Admitted.
           rewrite (neq_zeros_to_Z_gt0 Hudiv) Z.mul_1_l to_Zpos_zeros Z.add_0_r.
           rewrite size_subB size_zeros minnn size_udivB -Z.sub_add_distr Z.add_comm.
           rewrite Z.sub_add_distr Z.sub_diag Z.sub_0_l -{1}(revK (sb1)).
-          rewrite (to_Zpos_udivB _ (negbT Hnz2)); last by rewrite size_rev size_negB.
+          rewrite (to_Zpos_udivB _ (Hnz2 isT)); last by rewrite size_rev size_negB.
           rewrite revK.
           rewrite -(Z.opp_involutive (to_Z sb2)) Z.quot_opp_r; last (move: (neq_zeros_to_Z_neq0 (negbT Hz2)); by rewrite Z_nonzero_opp).
           rewrite (to_Z_to_Zpos sb2) -Z.add_opp_r Z.add_comm -Z.opp_sub_distr Hm2 Z.mul_1_l Z.opp_involutive.
@@ -6597,7 +6665,7 @@ Admitted.
         rewrite leB_to_Zpos_eqn; last by rewrite size_negB size_from_Zpos.
         rewrite Z.leb_le . move/Zle_lt_or_eq => [Hlt|Heq].
         rewrite to_Zpos_from_Zpos_1 in Hlt; last by rewrite size_negB H'.
-        move : (neq_zeros_to_Z_gt0 (negbT Hnz2)).
+        move : (neq_zeros_to_Z_gt0 (Hnz2 isT)).
         rewrite ltB_to_Zpos to_Zpos_zeros. omega.
         have Haux : (size (-# sb2) = size (from_Zpos (size (-# sb2)) 1)) by rewrite size_negB size_from_Zpos.
         move : (to_Zpos_inj_ss Haux Heq) => {Haux} Heqn.
@@ -6637,7 +6705,7 @@ Admitted.
     ~~ (dropmsb (-# bs) == zeros (size bs - 1)).
   Proof. 
     rewrite dropmsb_negB. rewrite -size_dropmsb. generalize (dropmsb bs) => bs'.
-    apply contraNN. exact: negB_zeros'.
+    apply contraNN. rewrite -{1}(size_negB _); by rewrite <-negB_zeros'.
   Qed.
   
   Lemma sdivB_negB_negB bs1 bs2 : 
@@ -6654,18 +6722,14 @@ Admitted.
     have Hn12 : size (-# bs1) = size (-#bs2) by rewrite !size_negB H0.
     move : (zeros_msb_dropmsb bs1); rewrite (negbTE H1) andbF; move => Hz1.
     move : (zeros_msb_dropmsb bs2); rewrite (negbTE H2) andbF; move => Hz2.
-    case  Hnz1 : ((-# bs1) == zeros (size (bs1))).
-    move : (negB_zeros' Hnz1). by rewrite Hz1. 
-    case  Hnz2 : (-# bs2 == zeros (size (bs2))).
-    move : (negB_zeros' Hnz2). by rewrite Hz2.
+    move/iffRL/contra : (negB_zeros' bs1) => Hnz1; rewrite Hz1 in Hnz1.
+    move/iffRL/contra : (negB_zeros' bs2) => Hnz2; rewrite Hz2 in Hnz2.
     move : H3; case Hm1 : (msb bs1); case Hm2 : (msb bs2); move => //=_.
     - move : (msb_negB H1); rewrite Hm1/=; move=> Hmn1; symmetry in Hmn1.
       move : (msb_negB H2); rewrite Hm2/=; move=> Hmn2; symmetry in Hmn2.
-      move : (zeros_msb_dropmsb (-#bs1)); rewrite size_negB Hnz1 Hmn1/=; move => Hdz1; symmetry in Hdz1.
-      move : (zeros_msb_dropmsb (-#bs2)); rewrite size_negB Hnz2 Hmn2/=; move => Hdz2; symmetry in Hdz2.
-      rewrite -(size_negB bs1) in Hdz1; 
-        rewrite -(size_negB bs2) in Hdz2.
-      rewrite (to_Z_sdivB_same_msb Hn1 Hn12 (negbT Hdz1)); last by rewrite Hmn1 Hmn2.
+      move : (dropmsb_negB_nonzeros H1) => Hdz1. move : (dropmsb_negB_nonzeros H2) => Hdz2.
+      rewrite -(size_negB bs1) in Hdz1; rewrite -(size_negB bs2) in Hdz2.
+      rewrite (to_Z_sdivB_same_msb Hn1 Hn12 Hdz1); last by rewrite Hmn1 Hmn2.
       rewrite (to_Z_sdivB_same_msb H H0 H1); last by rewrite Hm1 Hm2.
       rewrite high1_0_to_Z; last by rewrite high1_msb Hmn1.
       rewrite high1_0_to_Z; last by rewrite high1_msb Hmn2.
@@ -6681,10 +6745,8 @@ Admitted.
       by rewrite Z.quot_opp_opp; last by move/Z.lt_neq/Z.neq_sym : Hlts2.
     - move : (msb_negB H1); rewrite Hm1/=; move=> Hmn1; symmetry in Hmn1.
       move : (msb_negB H2); rewrite Hm2/=; move=> Hmn2; symmetry in Hmn2.
-      move : (dropmsb_negB_nonzeros H1) => Hdz1.
-      move : (dropmsb_negB_nonzeros H2) => Hdz2.
-      rewrite -(size_negB bs1) in Hdz1; 
-        rewrite -(size_negB bs2) in Hdz2.
+      move : (dropmsb_negB_nonzeros H1) => Hdz1. move : (dropmsb_negB_nonzeros H2) => Hdz2.
+      rewrite -(size_negB bs1) in Hdz1; rewrite -(size_negB bs2) in Hdz2.
       rewrite (to_Z_sdivB_same_msb Hn1 Hn12 (Hdz1)); last by rewrite Hmn1 Hmn2.
       rewrite (to_Z_sdivB_same_msb H H0 H1); last by rewrite Hm1 Hm2.
       symmetry.
@@ -6706,14 +6768,14 @@ Admitted.
   Qed.
 
   Lemma udivB_same bs : ~~(bs == zeros (size bs))->
-                        (udivB bs bs).1 = from_Zpos (size bs) 1.
+                        (udivB bs bs) = (from_Zpos (size bs) 1, zeros (size bs)).
   Proof.
-    intros.
-    apply to_Zpos_inj_ss; first by rewrite size_udivB size_from_Zpos.
-    rewrite -{1}(revK bs) (to_Zpos_udivB _ H); last by rewrite size_rev.
-    rewrite revK Z.div_same; first by rewrite (to_Zpos_from_Zpos_1 (neq_zero_size_gt0 H)).
-    move : (neq_zeros_to_Z_gt0 H); rewrite ltB_to_Zpos to_Zpos_zeros; move/Z.lt_neq => Hne.
-    omega.
+    intros. 
+    move : (neq_zeros_to_Z_gt0 H); rewrite ltB_to_Zpos to_Zpos_zeros; move => Hgt0.
+    apply injective_projections; apply to_Zpos_inj_ss;
+      [rewrite size_udivB size_from_Zpos//| |rewrite size_uremB size_zeros//|].
+    - rewrite (to_Zpos_udivB' (eqP (eq_refl _)) H) Z.div_same; first by rewrite (to_Zpos_from_Zpos_1 (neq_zero_size_gt0 H)). omega. 
+    - rewrite (to_Zpos_uremB' (eqP (eq_refl (size bs))) H) (Z.mod_same); first by rewrite to_Zpos_zeros. omega.
   Qed.
 
   Lemma to_Z_from_Zpos_1 n : 1 < n -> to_Z (from_Zpos n 1) = 1%Z.
@@ -6764,6 +6826,31 @@ Admitted.
     rewrite size_rcons -ones_rcons msb_rcons dropmsb_joinmsb subn1 -pred_Sn andbC.
     exact: eqseq_rcons.
   Qed.
+
+  Lemma sdiv0B bs : (sdivB (zeros (size bs)) bs) = (zeros (size bs), zeros (size bs)).
+  Proof.
+    rewrite/sdivB/absB size_zeros subn1 dropmsb_zeros msb_zeros/= !andbF !andbT.
+    case (msb bs); rewrite /=udiv0B;
+      try (done||by rewrite (eqP (negB_zeros (size bs))) ||by rewrite size_negB).
+  Qed.
+
+  Lemma sdivB0 bs : 1 < size bs -> (sdivB bs (zeros (size bs))) = (zeros (size bs), bs).
+  Proof.
+    intros. move : (ltn_sub2r H H); rewrite subnn; move => H1. 
+    rewrite /sdivB/absB msb_zeros dropmsb_zeros size_zeros -!subn1 -{2 3}(ltn_predK H1) -zeros_cons -ones_cons eqseq_cons !andbF !andFb.
+    case (msb bs); [rewrite udivB0 size_negB (eqP (negB_zeros _)) negB_involutive//|rewrite udivB0//].
+  Qed.
+
+  Lemma sdivB_same bs : 1 < size bs -> ~~(bs == zeros (size bs)) -> sdivB bs bs = (from_Zpos (size bs) 1, zeros (size bs)).
+  Proof.
+    intros. rewrite /sdivB/absB eq_refl /=.
+    move : (ltn_sub2r H H) => H'; rewrite subnn in H'.
+    move/iffRL/contra : (negB_zeros' bs); rewrite H0; move => Hng.
+    case Hdz : (dropmsb bs == zeros (size bs - 1)); case Hdo : (dropmsb bs == ones (size bs - 1));
+      try (case Hm' : (msb bs); [rewrite (udivB_same (Hng isT)) size_negB (eqP (negB_zeros _))//
+                                |rewrite (udivB_same H0) (eqP (negB_zeros _))//]).
+    by rewrite (eqP Hdz) -(ltn_predK H') -zeros_cons -ones_cons eqseq_cons in Hdo.
+  Qed.
   
   Lemma to_Z_sdiv_full bs1 bs2 :
     1 < size bs1 -> size bs1 = size bs2 ->
@@ -6777,19 +6864,25 @@ Admitted.
       case His1 : (bs2 == ones (size bs2)); move => //= . by rewrite orbT.
     rewrite orbF andbT.
     case Hm12 : (msb bs1 == msb bs2).
-    - 
-      rewrite /sdivB Hm12/=. move/negbTE => Hm1. 
-      + 
-        rewrite /absB -(eqP Hm12) Hm1 Hd1 andbF/=.
-        move : (zeros_msb_dropmsb bs1); rewrite Hm1/= Hd1; move => Hz1.
-        rewrite (eqP Hz1) (udiv0B H0) to_Z_zeros.
-        case H02: (Z.eqb 0 (to_Z bs2) )%Z. rewrite ->Z.eqb_eq in H02.
-          by rewrite -H02 /Z.quot /=.
-        rewrite ->Z.eqb_neq in H02.
-        by rewrite (Z.quot_0_l _ (Z.neq_sym _ _ H02)).
+    - rewrite /sdivB Hm12/=. move/negbTE => Hm1. 
+      rewrite /absB -(eqP Hm12) Hm1 Hd1 andbF/=.
+      move : (zeros_msb_dropmsb bs1); rewrite Hm1/= Hd1; move => Hz1.
+      rewrite (eqP Hz1) (udiv0B H0) to_Z_zeros.
+      case H02: (Z.eqb 0 (to_Z bs2))%Z;
+        [rewrite ->Z.eqb_eq in H02; by rewrite -H02 /Z.quot /=
+        |rewrite ->Z.eqb_neq in H02; by rewrite (Z.quot_0_l _ (Z.neq_sym _ _ H02))].
     - move/negbTE => Hm1.
-        case Hnz1: (-#bs1 == zeros (size (-#bs1))). rewrite size_negB in Hnz1.
-  Admitted.
+      move : (zeros_msb_dropmsb bs1); rewrite Hm1 Hd1/=; move => Heq01.
+      rewrite (eqP Heq01) H0 (sdiv0B bs2) to_Z_zeros.
+      case H02: (Z.eqb 0 (to_Z bs2))%Z;
+        [rewrite ->Z.eqb_eq in H02; by rewrite -H02 /Z.quot /=
+        |rewrite ->Z.eqb_neq in H02; by rewrite (Z.quot_0_l _ (Z.neq_sym _ _ H02))].
+    - by rewrite orbT.
+    - move => _.
+      case Hm : (msb bs1 == msb bs2);
+        [by rewrite (to_Z_sdivB_same_msb (ltnW H) H0 (negbT Hd1) Hm)
+        |by rewrite (to_Z_sdivB_diff_msb (ltnW H) H0 (negbT Hd1) (negbT Hm))].
+  Qed.
   
   (*---------------------------------------------------------------------------
     Properties of signed remainder
@@ -6802,7 +6895,7 @@ Admitted.
     rewrite /sremB. rewrite /sdivB.
     case Hall : ((dropmsb bs1 == zeros (size bs1 - 1)) && (dropmsb bs2 == ones (size bs2 - 1)) &&
                                                        (msb bs1 == msb bs2) && msb bs1).
-    by rewrite size_uremB size_absB.
+    by rewrite size_negB size_uremB size_absB.
     case: ((msb bs1 == msb bs2) && ~~ msb bs1) => /=.
     - rewrite size_uremB size_absB. reflexivity.
     - case: ((msb bs1 == msb bs2) && msb bs1) => /=.
@@ -6904,25 +6997,63 @@ Admitted.
     - by rewrite (eqP Heq).
     - exact: (msb_ltB Hsz Hmsb2 Hlt).
   Qed.
+
+  Lemma uremB_le bs1 bs2 : size bs1 = size bs2 -> ~~ (bs2 == zeros (size bs2)) -> uremB bs1 bs2 <=# bs1.
+  Proof.
+    intros. rewrite /uremB (leB_to_Zpos (size_uremB bs1 bs2)) (to_Zpos_uremB' _ H0); last done.
+    apply (Z.mod_le _ _ (@to_Zpos_ge0 bs1)).
+    rewrite -ltB0n -(ltB_zeros_l (size bs2)) in H0; rewrite ->ltB_to_Zpos in H0; rewrite to_Zpos_zeros// in H0.
+  Qed.
+
+  Lemma uremB_lt bs1 bs2 : size bs1 = size bs2 -> ~~ (bs2 == zeros (size bs2))
+                           -> bs2 <=# bs1 -> uremB bs1 bs2 <# bs1.
+  Proof.
+    intros.
+    have Haux : (zeros (size bs1) <=# bs1).
+    { rewrite (leB_to_Zpos (size_zeros _)) to_Zpos_zeros; apply to_Zpos_ge0. }
+    generalize H0; rewrite -ltB0n -(ltB_zeros_l (size bs2)); move => Hltb0.
+    move/iffLR/contra : (uremB_small_iff H Haux Hltb0) => Hsmall. 
+    rewrite leBNlt in H1; last done. move : (Hsmall H1) => Hneq.
+    move : (uremB_le H H0) => Hle. by rewrite (leB_neq_ltB Hle Hneq).
+  Qed.
+
+  Lemma uremB0' : forall bs1 bs2, size bs1 = size bs2 -> bs2 == zeros (size bs2) -> (udivB bs1 bs2).2 = bs1.
+  Proof.
+    move => bs1 bs2 Hsz. move/eqP => Heq; by rewrite Heq udivB0.
+  Qed.
+
+  Lemma absB_zeros n : absB (zeros n) = zeros n.
+  Proof.
+      by rewrite /absB msb_zeros.
+  Qed.
+
+  Lemma msb1_to_Z_lt0 bs : msb bs <-> (to_Z bs < 0)%Z.
+  Proof.
+    rewrite to_Z_to_Zpos. case (msb bs); split; try done.
+    - rewrite Z.mul_1_l Z.lt_sub_0 => _. exact: to_Zpos_bounded.
+    - rewrite Z.mul_0_l Z.sub_0_r => H. apply Z.lt_nge in H. 
+      apply/negP => _. apply H. exact: to_Zpos_ge0. 
+  Qed.
   
   Lemma to_Z_sremB sb1 sb2 :
     0 < size sb1 -> size sb1 = size sb2 -> 
     ~~(dropmsb sb1 == zeros (size sb1 - 1))->
-    ~~(dropmsb sb2 == zeros (size sb2 - 1))->
-    (*(msb sb1 == msb sb2) ->*)
+    (*~~(dropmsb sb2 == zeros (size sb2 - 1))->*)
     to_Z (sdivB sb1 sb2).2 = Z.rem (to_Z sb1) (to_Z sb2).
   Proof.
     intros.
     rewrite /sdivB.
-    (*move : H3.*) have H' : 0 < size sb2 by rewrite -H0.
+    have H' : 0 < size sb2 by rewrite -H0.
     move : (zeros_msb_dropmsb sb1).
-    move : (zeros_msb_dropmsb sb2).
-    rewrite (negbTE H1) (negbTE H2) !andbF; move => Hz2 Hz1.
+    (*move : (zeros_msb_dropmsb sb2).*)
+    rewrite (negbTE H1) (*(negbTE H2)*) !andbF; move => (*Hz2*) Hz1.
+    move : (neq_zeros_to_Z_neq0 (negbT Hz1)) => Hz1z.
+    case Hz2 : (sb2 == zeros (size sb2));
+      first (rewrite (eqP Hz2) msb_zeros absB_zeros -H0 -(size_absB sb1) udivB0 to_Z_zeros /absB eqbF_neg Bool.negb_involutive Bool.andb_diag andbN andNb /Z.rem/Z.quotrem/=; case (msb sb1); [rewrite negB_involutive; by case Htz1: (to_Z sb1)|by case Htz1 : (to_Z sb1)]).
     case Hm1 : (msb sb1); case Hm2 : (msb sb2); move => //= .
-    - case  Hnz1 : (-# sb1 == zeros (size (sb1))).
-      by rewrite (negB_zeros' Hnz1) in Hz1. 
-      case  Hnz2 : (-# sb2 == zeros (size (sb2))).
-      by rewrite (negB_zeros' Hnz2) in Hz2.
+    - move/iffRL/contra : (negB_zeros' sb1); rewrite Hz1; move => Hnz1.
+      (*move : (zeros_msb_dropmsb sb2); rewrite Hm2/=; move => Hz2.*)
+      move/iffRL/contra : (negB_zeros' sb2); rewrite Hz2; move => Hnz2.
       move : (absB_neq0 (negbT Hz1)) => Hanz1. rewrite -{1}(size_absB sb1) in Hanz1.
       move : (absB_neq0 (negbT Hz2)) => Hanz2. rewrite -{1}(size_absB sb2) in Hanz2.
       have Hszabs : size (absB sb1) = size (absB sb2) by rewrite !size_absB H0.
@@ -6932,10 +7063,7 @@ Admitted.
       rewrite /absB Hm1 Hm2.
       have Hm12 : msb sb1 == msb sb2 by rewrite Hm1 Hm2.
       move : (msb_negB H1); rewrite Hm1/=; move => Hmn1; symmetry in Hmn1.
-      move : (msb_negB H2); rewrite Hm2/=; move => Hmn2; symmetry in Hmn2.
-      (*move : (sdivB_negB_negB H H0 Hm12 H1 H2).
-      rewrite /sdivB Hm1  Hm2 Hmn1 Hmn2/=; move => Hsnn. rewrite -Hsnn.
-      rewrite /absB Hmn1 Hmn2 Hm1 Hm2.*)
+      (*move : (msb_negB H2); rewrite Hm2/=; move => Hmn2; symmetry in Hmn2.*)
       rewrite to_Z_to_Zpos.
       case Heq : (-# sb1 == ((udivB (-# sb1) (-# sb2)).1 *# -# sb2)).
       + rewrite {1 3}(eqP Heq) subB_same.
@@ -6948,15 +7076,13 @@ Admitted.
         rewrite to_Zpos_subB; last by rewrite size_mulB size_zeros.
         rewrite -ltB_equiv_borrow_subB; last by rewrite size_mulB size_zeros.
         have Hszu : (0 < size  ((udivB (-# sb1) (-# sb2)).1 *# -# sb2)) by rewrite size_mulB size_udivB size_negB H.
-        rewrite -(size_negB sb1) in Hnz1.
-        rewrite -(size_negB sb2) in Hnz2.
-        rewrite -Heq (neq_zeros_to_Z_gt0 (negbT Hnz1)) Z.mul_1_l size_subB size_zeros minnn.
+        rewrite -Heq (neq_zeros_to_Z_gt0 (Hnz1 isT)) Z.mul_1_l size_subB size_zeros minnn.
         rewrite to_Zpos_zeros Z.add_0_r.
         rewrite -2!Z.sub_add_distr Z.add_comm 2!Z.sub_add_distr Z.sub_diag Z.sub_0_l.
         have Hszn1 : 0 < size (negB sb1) by rewrite size_negB H.
         have Hszn12 : size (negB sb1) = size ( negB sb2) by rewrite !size_negB H0.
         rewrite Heq to_Zpos_mulB; [|by rewrite size_udivB !size_negB H0|exact : (mulB_udivB_Numulo Hszn12)].
-        rewrite -{1}(revK (-#sb1)) (to_Zpos_udivB _ (negbT Hnz2)); last by rewrite size_rev !size_negB -H0.
+        rewrite -{1}(revK (-#sb1)) (to_Zpos_udivB _ (Hnz2 isT)); last by rewrite size_rev !size_negB -H0.
         rewrite revK !to_Z_to_Zpos -!sub0B !(to_Zpos_subB (size_zeros _)) -!(ltB_equiv_borrow_subB (size_zeros _)).
         rewrite Hm1 Hm2 (neq_zeros_to_Z_gt0 (negbT Hz2)) (neq_zeros_to_Z_gt0 (negbT Hz1)).
         rewrite !Z.mul_1_l !to_Zpos_zeros !Z.add_0_r !size_zeros.
@@ -6974,9 +7100,8 @@ Admitted.
         move : (mulB_udivB_leB Hszn12) => Hle.
         move/negbT : Heq; rewrite eq_sym; move => Heq.
         move : (leB_neq_ltB Hle Heq) => Hlt.
-        rewrite (*size_negB size_subB size_mulB size_udivB minnn*) -sub0B.
+        rewrite -sub0B.
         rewrite (to_Zpos_subB (size_zeros _)) -(ltB_equiv_borrow_subB (size_zeros _)).
-        (*rewrite size_subB size_mulB size_udivB minnn.*)
         have Hszaux : size ((udivB (-# sb1) (-# sb2)).1 *# -# sb2)= size (-# sb1).
         by rewrite size_mulB size_udivB !size_negB. 
         move : ((ltB_subB_nonzero Hszaux Hlt)).
@@ -7001,8 +7126,7 @@ Admitted.
                        (to_Zpos (-# sb1) - to_Zpos (udivB (-# sb1) (-# sb2)).1 * to_Zpos (-# sb2)) -
                        2 ^ Z.of_nat (size sb1))%Z
                   = (- (to_Zpos (-# sb1) - to_Zpos (udivB (-# sb1) (-# sb2)).1 * to_Zpos (-# sb2)))%Z. omega.
-        rewrite -(size_negB sb2) in Hnz2.
-        rewrite -{2}(revK (-# sb1)) (to_Zpos_udivB _ (negbT Hnz2)); last by rewrite size_rev !size_negB H0.
+        rewrite -{2}(revK (-# sb1)) (to_Zpos_udivB _ (Hnz2 isT)); last by rewrite size_rev !size_negB H0.
         rewrite revK !to_Z_to_Zpos Hm1 Hm2 !Z.mul_1_l.
         rewrite -sub0B (to_Zpos_subB (size_zeros _)) -(ltB_equiv_borrow_subB (size_zeros _)).
         rewrite (neq_zeros_to_Z_gt0 (negbT Hz1)) Z.mul_1_l to_Zpos_zeros Z.add_0_r.
@@ -7017,12 +7141,10 @@ Admitted.
         rewrite Z.mul_opp_l Z.sub_opp_r Z.quot_div_nonneg ; try omega. 
           by rewrite -Z.opp_sub_distr Z.mul_comm.
     - rewrite /absB Hm1 Hm2.
-      case  Hnz1 : (-# sb1 == zeros (size (sb1))).
-      by rewrite (negB_zeros' Hnz1) in Hz1. 
-      case  Hnz2 : (-# sb2 == zeros (size (sb2))).
-      by rewrite (negB_zeros' Hnz2) in Hz2.
-      rewrite -(size_negB sb1) in Hnz1.
-      rewrite -(size_negB sb2) in Hnz2.
+      move/iffRL/contra : (negB_zeros' sb1); rewrite Hz1; move => Hnz1.
+      (*move/iffRL/contra : (negB_zeros' sb2); rewrite Hz2; move => Hnz2.*)
+      move : (neq_zeros_to_Z_neq0 (negbT Hz1)) => Hneq01.
+      (*case Hz2 : (sb2 == zeros (size sb2)); first (rewrite (eqP Hz2) -{1}H0 -{1}(size_negB) udivB0 negB_involutive to_Z_zeros /Z.rem /Z.quotrem/=; by case (to_Z sb1)).*)
       have Hsz12 : size (-# sb1) = size sb2 by rewrite size_negB.
       have Hsz1 : 0< size (-# sb1) by rewrite size_negB.
       move : (uremB_eq Hsz1 Hsz12 (negbT Hz2)) => Hurem.
@@ -7044,8 +7166,7 @@ Admitted.
         rewrite size_mulB size_udivB size_negB.
         rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)) ; last by rewrite size_udivB Hsz12.
         rewrite (to_Zpos_udivB' _ (negbT Hz2)); last done.
-        (*rewrite (neq_zeros_to_Zpos_negB (negbT Hz1)).*)
-        move : (zeros_msb_dropmsb (-#sb1)); rewrite Hnm1 Hnz1/=; move => Hdnz1; symmetry in Hdnz1.
+        move : (zeros_msb_dropmsb (-#sb1)); rewrite Hnm1 (negbTE (Hnz1 isT))/=; move => Hdnz1; symmetry in Hdnz1.
         rewrite -{4}(negB_involutive sb1) (msb0_to_Z_negB Hnm1 (negbT Hdnz1)).
         move : (neq_zeros_to_Z_neq0 (negbT Hz2)) => Hneq0.
         rewrite high1_0_to_Z; last by rewrite high1_msb Hm2.
@@ -7068,7 +7189,7 @@ Admitted.
         move : (neq_zeros_to_Z_neq0 (negbT Hz2)) => Hneq0z.
         rewrite Hlediv/= (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)); last by rewrite size_udivB Hsz12.
         rewrite (to_Zpos_udivB' _ (negbT Hz2)); last done.
-        move : (zeros_msb_dropmsb (-#sb1)); rewrite Hnm1 Hnz1/=; move => Hdnz1; symmetry in Hdnz1.
+        move : (zeros_msb_dropmsb (-#sb1)); rewrite Hnm1 (negbTE (Hnz1 isT))/=; move => Hdnz1; symmetry in Hdnz1.
         rewrite -{3}(negB_involutive sb1) (msb0_to_Z_negB Hnm1 (negbT Hdnz1)).
         rewrite (Z.rem_eq _ _ Hneq0z) (Z.quot_opp_l _ _ Hneq0z).
         rewrite high1_0_to_Z; last by rewrite high1_msb Hm2.
@@ -7077,15 +7198,10 @@ Admitted.
           [omega |apply to_Zpos_ge0
            |move : (neq_zeros_to_Z_gt0 (negbT Hz2)); by rewrite ltB_to_Zpos to_Zpos_zeros].
     - rewrite /absB Hm1 Hm2.
-      case  Hnz1 : (-# sb1 == zeros (size (sb1))).
-      by rewrite (negB_zeros' Hnz1) in Hz1. 
-      case  Hnz2 : (-# sb2 == zeros (size (sb2))).
-      by rewrite (negB_zeros' Hnz2) in Hz2.
-      rewrite -(size_negB sb1) in Hnz1.
-      rewrite -(size_negB sb2) in Hnz2.
+      move/iffRL/contra : (negB_zeros' sb1); rewrite Hz1; move => Hnz1.
+      move/iffRL/contra : (negB_zeros' sb2); rewrite Hz2; move => Hnz2.
       have Hsz12 : size (sb1) = size (-#sb2) by rewrite size_negB.
-      (*have Hsz1 : 0< size (-# sb1) by rewrite size_negB.*)
-      move : (uremB_eq H Hsz12 (negbT Hnz2)) => Hurem.
+      move : (uremB_eq H Hsz12 (Hnz2 isT)) => Hurem.
       rewrite /uremB in Hurem.
       rewrite Hurem.
       have Hszaux : size ((udivB sb1 (-# sb2)).1 *# -#sb2)= size (sb1).
@@ -7094,43 +7210,31 @@ Admitted.
       move : (msb_negB H1); rewrite Hm1/=; move => Hnm1; symmetry in Hnm1.
       move : (msb_leB Hszaux Hm1 Hlediv) => Hmnu.
       have Hmeq: msb ((udivB (sb1) (-#sb2)).1 *# -#sb2) ==  msb (sb1) by rewrite Hm1 Hmnu.
-      move : (leB_msb_subB Hszaux Hmeq Hlediv) => Hmsu.
+      move : (leB_msb_subB Hszaux Hmeq Hlediv) => Hmsu. 
       case Heq0: (sb1 == (((udivB (sb1) (-#sb2)).1 *# -#sb2))).
       + rewrite {1}(eqP Heq0) subB_same to_Z_zeros.
-        rewrite (Z.rem_eq _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
-        rewrite {1 2}(to_Z_to_Zpos sb1) Hm1 Z.mul_0_l !Z.sub_0_r {1}(eqP Heq0).
-        rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)) ; last by rewrite size_udivB Hsz12.
-        rewrite (to_Zpos_udivB' _ (negbT Hnz2)); last done.
-        move : (dropmsb_negB_nonzeros (H2)) => Hdnz2.
-        rewrite -(size_negB sb2) in Hdnz2.
-        move : (msb_negB  H2); rewrite Hm2/=; move => Hnm2; symmetry in Hnm2.
-        rewrite-{3 4}(negB_involutive sb2) (msb0_to_Z_negB Hnm2 Hdnz2).
-        move : (neq_zeros_to_Z_gt0 (negbT Hnz2)); rewrite ltB_to_Zpos to_Zpos_zeros; move => Hgt0.
-        rewrite (Z.quot_opp_r _ _ (Z.neq_sym _ _ (Z.lt_neq _ _ Hgt0))).
-        rewrite Z.mul_comm Z.mul_opp_opp Z.quot_div_nonneg;
-        [omega |apply to_Zpos_ge0| done].
-      + rewrite eq_sym in Heq0.
-        (*case Heq0' : (((udivB (sb1) (-#sb2)).1 *# -#sb2 == sb1)).
-        by rewrite (eqP Heq0') negB_involutive eq_refl in Heq0.*)
-        move : (leB_neq_ltB Hlediv (negbT Heq0)) => Hltdiv.
-        move : (ltB_subB_nonzero Hszaux Hltdiv) => Hsneq.
-        rewrite Hszaux in Hsneq.
-        rewrite high1_0_to_Z; last by rewrite high1_msb Hmsu.
-        symmetry in Hszaux.
-        rewrite (to_Zpos_subB Hszaux) -(ltB_equiv_borrow_subB Hszaux) (ltBNle Hszaux).
-        move : (neq_zeros_to_Z_neq0 (negbT Hz2)) => Hneq0z.
-        rewrite Hlediv/= (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)); last by rewrite size_udivB Hsz12.
-        rewrite (to_Zpos_udivB' _ (negbT Hnz2)); last done.
-        move : (dropmsb_negB_nonzeros H2) => Hdnz2. rewrite -(size_negB sb2) in Hdnz2.
-        move : (msb_negB H2); rewrite Hm2/=; move => Hnm2; symmetry in Hnm2.
-        rewrite -{3}(negB_involutive sb2) (msb0_to_Z_negB Hnm2 Hdnz2).
-        move : (neq_zeros_to_Z_gt0 (negbT Hnz2)); rewrite ltB_to_Zpos to_Zpos_zeros; move => Hgt0.
-        rewrite Z.rem_opp_r; last omega.
-        rewrite Z.rem_eq; last omega.
+        rewrite (Z.rem_mod _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))) (to_Z_sgn_msb (negbT Hz1)) Hm1 Z.mul_1_l.
         rewrite high1_0_to_Z; last by rewrite high1_msb Hm1.
-        rewrite Z.mul_comm Z.quot_div_nonneg;
-          [omega |apply to_Zpos_ge0
-           |move : (neq_zeros_to_Z_gt0 (negbT Hz2)); by rewrite ltB_to_Zpos to_Zpos_zeros].
+        move/iffRL : (Z.abs_eq_iff (to_Zpos sb1)) => Habs1. move : (Habs1 (@to_Zpos_ge0 sb1)) => {Habs1}Habs1; rewrite Habs1.
+        rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm2.
+        rewrite (Z.mod_eq _ _ (neq_zeros_to_Zpos_neq0 (Hnz2 isT))).
+        rewrite {1}(eqP Heq0) (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)); last by rewrite size_udivB Hsz12.
+        rewrite (to_Zpos_udivB' _ (Hnz2 isT)); last done.
+        by rewrite Z.mul_comm Z.sub_diag.
+      + rewrite eq_sym in Heq0.
+        move : (leB_neq_ltB Hlediv (negbT Heq0)) => Hltdiv.
+        move : (ltB_subB_nonzero Hszaux Hltdiv) => Hsneq; rewrite Hszaux in Hsneq.
+        rewrite high1_0_to_Z; last by rewrite high1_msb Hmsu.
+        symmetry in Hszaux; rewrite (to_Zpos_subB Hszaux) -(ltB_equiv_borrow_subB Hszaux) (ltBNle Hszaux) Hlediv.
+        rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz12)); last by rewrite size_udivB Hsz12.
+        move : (neq_zeros_to_Z_neq0 (negbT Hz2)) => Hneq0z. move : (neq_zeros_to_Zpos_neq0 (Hnz2 isT)) => Hneqnz2.
+        rewrite /=Z.mul_comm (to_Zpos_udivB' _ (Hnz2 isT)); last done.
+        rewrite (Z.rem_eq _ _ Hneq0z) high1_0_to_Z; last by rewrite high1_msb Hm1.
+        move/iffLR : (msb1_to_Z_lt0 sb2); rewrite Hm2; move => Hlt0.
+        rewrite -(Z.abs_sgn (to_Z sb2)) (Z.sgn_neg _ (Hlt0 isT)) -Z.opp_eq_mul_m1 -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm2. 
+        rewrite Z.quot_opp_r; last omega. move : (@to_Zpos_ge0 sb1) => Hge0.
+        rewrite Z.mul_opp_opp Z.quot_div_nonneg; try omega. 
+        move : (neq_zeros_to_Z_gt0 (Hnz2 isT)); by rewrite ltB_to_Zpos to_Zpos_zeros.
     - rewrite /absB Hm1 Hm2.
       rewrite -/(uremB sb1 sb2) (uremB_eq H H0 (negbT Hz2)).
       move : (mulB_udivB_leB H0) => Hle.
@@ -7161,6 +7265,202 @@ Admitted.
       move : (neq_zeros_to_Z_gt0 (negbT Hz2)); rewrite ltB_to_Zpos to_Zpos_zeros; omega.
   Qed.
 
+  Lemma ltB_rcons_ss bs1 bs2 b1 b2 :
+    size bs1 = size bs2 -> 
+    (rcons bs1 b1 <# rcons bs2 b2) = (~~ b1 && b2) || ((bs1 <# bs2) && (b1 == b2)).
+  Proof.
+    move=> Hsz. 
+    rewrite -2!ltB_rev_ltB /ltB_rev /extzip0 !extzip_zip_ss ?size_rcons ?Hsz //=. 
+    by rewrite !rev_zip ?size_rcons ?Hsz //= 2!rev_rcons /= (andbC (_ == _)).
+  Qed.
+  
+  Lemma ltBNeqB bs1 bs2 : bs1 <# bs2 -> bs1 <> bs2.
+  Proof.
+    move=> Hlt Heq. apply ltB_eqF in Hlt. rewrite Heq eqxx in Hlt. discriminate. 
+  Qed.
+
+  Lemma leB_ltB_trans bs1 bs2 bs3 : bs1 <=# bs2 -> bs2 <# bs3 -> bs1 <# bs3.
+  Proof. 
+    rewrite /leB. case/orP; last exact: ltB_trans. by move/eqP=> ->.
+  Qed.
+
+  Lemma ltB_leB_trans bs1 bs2 bs3 : bs1 <# bs2 -> bs2 <=# bs3 -> bs1 <# bs3.
+  Proof. 
+    rewrite /leB => Hlt. case/orP; last exact: ltB_trans. by move/eqP=> <-.
+  Qed.
+
+  Lemma ltB_subB2l ps qs rs : 
+    size ps = size qs -> size qs = size rs -> 
+    ps <# qs -> qs <=# rs -> rs -# qs <# rs -# ps.
+  Proof.
+    move=> Hsz1 Hsz2 Hpq Hqr. move: (eq_trans Hsz1 Hsz2) => Hsz3. 
+    symmetry in Hsz2, Hsz3. 
+    rewrite ltB_to_Zpos (to_Zpos_subB Hsz2) (to_Zpos_subB Hsz3).
+    rewrite -(ltB_equiv_borrow_subB Hsz2) -(ltB_equiv_borrow_subB Hsz3).
+    move: (ltB_leB_trans Hpq Hqr) => Hpr. apply ltB_leB_incl in Hpr. 
+    rewrite (leBNlt (Logic.eq_sym Hsz3)) in Hpr. apply negbTE in Hpr.
+    rewrite (leBNlt (Logic.eq_sym Hsz2)) in Hqr. apply negbTE in Hqr. 
+    rewrite Hpr Hqr Z.mul_0_l Z.add_0_l.
+    apply Z.sub_le_lt_mono; first exact: Z.le_refl. 
+    by rewrite -ltB_to_Zpos.
+  Qed.
+
+  Lemma ltB_subBr bs1 bs2 :
+    size bs1 = size bs2 ->
+    zeros (size bs2) <# bs2 -> bs2 <=# bs1 -> bs1 -# bs2 <# bs1.
+  Proof.
+    move=> Hsz. rewrite -{3}(subB0 bs1) -Hsz. apply ltB_subB2l; last by rewrite Hsz.
+    by rewrite size_zeros.
+  Qed.
+
+  Lemma neq_zeros_gt0 bs : ~~ (bs == zeros (size bs)) = (zeros (size bs) <# bs)%Z.
+  Proof.
+    by rewrite ltB_zeros_l ltB0n.
+  Qed.
+
+  Lemma mulB_udivB_gt0 bs1 bs2 : 
+    size bs1 = size bs2 -> 
+    zeros (size bs1) <# bs1 -> zeros (size bs2) <# bs2 -> 
+    bs2 <=# bs1 -> zeros (size bs1) <# (udivB bs1 bs2).1 *# bs2.
+  Proof. 
+    move=> Hsz Hbs1 Hbs2 Hle. rewrite ltB_to_Zpos to_Zpos_zeros. 
+    rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz)); last by rewrite size_udivB.
+    rewrite to_Zpos_udivB' ?Hsz ?neq_zeros_gt0 //=. 
+    move: Hbs1 Hbs2 Hle. symmetry in Hsz. 
+    rewrite !ltB_to_Zpos !to_Zpos_zeros (leB_to_Zpos Hsz) => Hbs1 Hbs2 Hle.
+    apply Z.mul_pos_pos; last exact: Hbs2. 
+    apply Z.div_str_pos. by split.
+  Qed.
+    
+  Lemma to_Z_sremB_full bs1 bs2 : 1 < size bs1 -> size bs1 = size bs2 ->
+                                  to_Z (sremB bs1 bs2) = Z.rem (to_Z bs1) (to_Z bs2).
+  Proof.
+    intros. generalize H; rewrite H0; move => H'.
+    move : (joinmsb_splitmsb (ltnW H));  move : (joinmsb_splitmsb (ltnW H')).
+    move : (zeros_msb_dropmsb bs1); move : (zeros_msb_dropmsb bs2).
+    rewrite -/(msb bs1) -/(dropmsb bs1) -/(msb bs2) -/(dropmsb bs2).
+    case Hd1 : (dropmsb bs1 == zeros (size bs1 - 1));
+      first (case Hm1 : (msb bs1); case Hm2 : (msb bs2)); rewrite /=; move => Hz2 Hz1.
+    - move => H2 H1; rewrite /sremB /sdivB (eqP Hd1) eq_refl /absB Hm1 Hm2/=.
+      move/iffRL/contra : (negB_zeros' bs2); rewrite Hz2; move => Hnz2.
+      case Hones2 : (dropmsb bs2 == ones (size bs2 - 1)); rewrite (dropmsb_0_negB_id Hd1)/=.
+      + rewrite (eqP Hones2) /joinmsb ones_rcons subn1 (ltn_predK (ltnW H')) in H2.
+        move : (f_equal negB H2); rewrite -(eqP (negB1_ones (size bs2))) negB_involutive; move => Hn2.
+        rewrite -Hn2 -H0 (udivB1 (negbT Hz1)) (eqP (negB_zeros _)) to_Z_zeros -(Z.abs_sgn (to_Z bs2)) Z.sgn_neg;
+          last by (rewrite <-msb1_to_Z_lt0; rewrite Hm2).
+        rewrite -Z.opp_eq_mul_m1 -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm2.
+        move : (f_equal to_Zpos Hn2); rewrite -(from_Zpos_from_nat_1 (ltnW H')) (to_Zpos_from_Zpos_1 (ltnW H')).  
+        move => {Hn2} Hn2.
+        by rewrite (Z.rem_opp_r _ _ (neq_zeros_to_Zpos_neq0 (Hnz2 isT))) -Hn2 Z.rem_1_r. 
+      + have Hszn :  size (dropmsb (-# bs2)) = size (dropmsb bs1) by rewrite !size_dropmsb size_negB H0.
+        have Hsz : size bs1 = size (-# bs2) by rewrite size_negB.
+        move : (uremB_le Hsz (Hnz2 isT)) => Hle.
+        case Hd2 : (dropmsb bs2 == zeros (size bs2 - 1)).
+        * have H12 : bs1 = bs2 .
+          {
+            rewrite -(joinmsb_splitmsb (ltnW H)) -(joinmsb_splitmsb (ltnW H')) -/(dropmsb bs1) -/(dropmsb bs2) (eqP Hd1) (eqP Hd2) -/(msb bs1) -/(msb bs2) Hm1 Hm2 H0//.
+          }
+          rewrite (dropmsb_0_negB_id Hd2) H12 (udivB_same (negbT Hz2)) (eqP (negB_zeros _)) (Z.rem_same _ (neq_zeros_to_Z_neq0 (negbT Hz2))) to_Z_zeros//.
+        * move : (msb_negB (negbT Hd2)); rewrite Hm2/=; move => Hmn2; symmetry in Hmn2; symmetry in Hszn.
+          move : (ltB_rcons_ss (msb bs1) (msb (-#bs2)) Hszn); rewrite {2 3}Hm1 {2 3}Hmn2/= andbF -/joinmsb.
+          rewrite !joinmsb_splitmsb; [|rewrite size_negB (ltnW H')//|rewrite (ltnW H)//]; move => H12.
+          rewrite -/(uremB bs1 (-#bs2)) (uremB_eq (ltnW H) Hsz (Hnz2 isT)).
+          case Hcond : (bs1 == ((udivB bs1 (-# bs2)).1 *# -# bs2)).
+          rewrite -(eqP Hcond) subB_same (eqP (negB_zeros _)) to_Z_zeros (Z.rem_mod _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
+          rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm1.
+          rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm2.
+          move/iffLR : (msb1_to_Z_lt0 bs1) => Haux; move : (Haux Hm1). rewrite -Z.sgn_neg_iff; move => {Haux} Haux.
+          rewrite (dropmsb_0_negB_id Hd1) Haux Z.mul_opp_l Z.mul_1_l (Z.mod_eq _ _ (neq_zeros_to_Zpos_neq0 (Hnz2 isT))).
+          rewrite {1}(eqP Hcond) (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz)); last rewrite size_udivB//.
+          rewrite (to_Zpos_udivB' _ (Hnz2 isT)); last done. 
+          by rewrite Z.mul_comm Z.sub_diag.
+          rewrite eq_sym in Hcond.
+          move : (leB_neq_ltB (mulB_udivB_leB Hsz) (negbT Hcond)) => Hltdiv.
+          have Hszsub : size (bs1 -# ((udivB bs1 (-# bs2)).1 *# -# bs2)) = size bs1.
+          {
+            rewrite size_subB size_mulB size_udivB minnn//.
+          }
+          have Hszmul : size ((udivB bs1 (-# bs2)).1 *# -# bs2) = size bs1 by rewrite size_mulB size_udivB.
+          have Hmsub : msb (bs1 -# ((udivB bs1 (-# bs2)).1 *# -# bs2)) = b0.
+          symmetry in Hszmul.
+          generalize H12; rewrite (ltBNle Hsz). move => H21; apply negbFE in H21. 
+          move : (mulB_udivB_gt0 Hsz (neq_zeros_to_Z_gt0 (negbT Hz1)) (neq_zeros_to_Z_gt0 (Hnz2 isT)) H21); rewrite Hszmul; move => Hmdgt0.
+          move : (ltB_subBr Hszmul Hmdgt0 (ltB_leB_incl Hltdiv)); rewrite -{3}H1 (eqP Hd1).
+          move => Hlt10. move/iffLR : (msb_ltB_aux (bs1 -# ((udivB bs1 (-# bs2)).1 *# -# bs2))).
+          rewrite Hszsub; move => Hmsbsub; exact : (Hmsbsub Hlt10).
+          (*symmetry in Hszmul.*)
+          move : (ltB_subB_nonzero Hszmul Hltdiv).
+          move : (zeros_msb_dropmsb (bs1 -# ((udivB bs1 (-# bs2)).1 *# -# bs2))).
+          rewrite Hszmul; move => Hsubd Hsubz.
+          rewrite Hszsub (negbTE Hsubz) Hmsub /= -Hszsub in Hsubd; symmetry in Hsubd.
+          move : (msb_negB (negbT Hsubd)); rewrite Hmsub/=; move => Hmnsub.
+          rewrite (high1_0_to_Z_negB _ (negbT Hsubd)); last by rewrite high1_msb Hmsub.
+          symmetry in Hszmul.
+          rewrite (to_Zpos_subB Hszmul) -(ltB_equiv_borrow_subB Hszmul) (ltBNle Hszmul) (ltB_leB_incl Hltdiv)/=.
+          rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo Hsz)); last rewrite size_udivB Hsz//.
+          rewrite (to_Zpos_udivB' _ (Hnz2 isT)); last done.
+          rewrite (Z.rem_mod _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
+          rewrite high1_1_to_Zpos_negB; last by rewrite high1_msb Hm2.
+          move/iffLR : (msb1_to_Z_lt0 bs1) => Haux; move : (Haux Hm1) => {Haux}Haux.
+          rewrite (Z.sgn_neg _ Haux); symmetry; rewrite Z.mul_comm -Z.opp_eq_mul_m1.
+          rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm1.
+          move : (neq_zeros_to_Z_neq0 (negbT Hz2)); rewrite -Z.abs_pos; move/Z.lt_neq/Z.neq_sym =>{Haux}Haux. 
+          rewrite (dropmsb_0_negB_id Hd1) (Z.mod_eq _ _ Haux) Z.mul_comm//.
+    - move => H2 H1.
+      rewrite /sremB /sdivB /absB Hd1 Hm1 Hm2 andbF andFb/= (dropmsb_0_negB_id Hd1).
+      case Hd2 : (dropmsb bs2 == zeros (size bs2 - 1)); rewrite Hd2 in Hz2.
+      + rewrite (eqP Hz2) -H0 udivB0 to_Z_zeros dropmsb_0_negB_id /Z.rem /Z.quotrem/=; by case (to_Z bs1).
+      + rewrite -/(uremB bs1 bs2) (uremB_eq (ltnW H) H0 (negbT Hz2)).
+        * case Hcond : (bs1 == ((udivB bs1 bs2).1 *# bs2)).
+          rewrite -(eqP Hcond) subB_same (eqP (negB_zeros _)) to_Z_zeros (Z.rem_mod _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
+          rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm1.
+          move/iffLR : (msb1_to_Z_lt0 bs1) => Haux; move : (Haux Hm1). rewrite -Z.sgn_neg_iff; move => {Haux} Haux.
+          rewrite (dropmsb_0_negB_id Hd1) Haux Z.mul_opp_l Z.mul_1_l high1_0_to_Z; last by rewrite high1_msb Hm2.
+          move : (@to_Zpos_ge0 bs2); rewrite <-Z.abs_eq_iff; move => Habs. 
+          rewrite Habs (Z.mod_eq _ _ (neq_zeros_to_Zpos_neq0 (negbT Hz2))).
+          rewrite {1}(eqP Hcond) (to_Zpos_mulB _ (mulB_udivB_Numulo H0)); last rewrite size_udivB//.
+          rewrite (to_Zpos_udivB' _ (negbT Hz2)); last done. 
+          by rewrite Z.mul_comm Z.sub_diag.
+        * rewrite eq_sym in Hcond. 
+          move : (leB_neq_ltB (mulB_udivB_leB H0) (negbT Hcond)) => Hltdiv.
+          have Hszsub : size (bs1 -# ((udivB bs1 bs2).1 *# bs2)) = size bs1.
+          {
+            rewrite size_subB size_mulB size_udivB minnn//.
+          }
+          have Hszmul : size ((udivB bs1 bs2).1 *# bs2) = size bs1 by rewrite size_mulB size_udivB.
+          have Hmsub : msb (bs1 -# ((udivB bs1 bs2).1 *# bs2)) = b0.
+          generalize Hm2; move => Hm2'. rewrite <-(msb_ltB_aux) in Hm2'. rewrite -H0 -(eqP Hd1) H1 in Hm2'.
+          move : (mulB_udivB_gt0 H0 (neq_zeros_to_Z_gt0 (negbT Hz1)) (neq_zeros_to_Z_gt0 (negbT Hz2)) (ltB_leB_incl Hm2')); rewrite -Hszmul; move => Hmdgt0.
+          symmetry in  Hszmul.
+          move : (ltB_subBr Hszmul Hmdgt0 (ltB_leB_incl Hltdiv)); rewrite -{3}H1 (eqP Hd1).
+          move => Hlt10. move/iffLR : (msb_ltB_aux (bs1 -# ((udivB bs1 (bs2)).1 *# bs2))).
+          rewrite Hszsub; move => Hmsbsub; exact : (Hmsbsub Hlt10).
+          move : (ltB_subB_nonzero Hszmul Hltdiv).
+          move : (zeros_msb_dropmsb (bs1 -# ((udivB bs1 bs2).1 *# bs2))).
+          rewrite Hszmul; move => Hsubd Hsubz.
+          rewrite Hszsub (negbTE Hsubz) Hmsub /= -Hszsub in Hsubd; symmetry in Hsubd.
+          move : (msb_negB (negbT Hsubd)); rewrite Hmsub/=; move => Hmnsub.
+          rewrite (high1_0_to_Z_negB _ (negbT Hsubd)); last by rewrite high1_msb Hmsub.
+          symmetry in Hszmul.
+          rewrite (to_Zpos_subB Hszmul) -(ltB_equiv_borrow_subB Hszmul) (ltBNle Hszmul) (ltB_leB_incl Hltdiv)/=.
+          rewrite (to_Zpos_mulB _ (mulB_udivB_Numulo H0)); last rewrite size_udivB H0//.
+          rewrite (to_Zpos_udivB' _ (negbT Hz2)); last done.
+          rewrite (Z.rem_mod _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
+          rewrite -high1_1_to_Zpos_negB; last by rewrite high1_msb Hm1.
+          move/iffLR : (msb1_to_Z_lt0 bs1) => Haux; move : (Haux Hm1) => {Haux}Haux.
+          rewrite (Z.sgn_neg _ Haux); symmetry; rewrite Z.mul_comm -Z.opp_eq_mul_m1.
+          rewrite (dropmsb_0_negB_id Hd1) high1_0_to_Z; last by rewrite high1_msb Hm2.
+          move/iffRL : (Z.abs_eq_iff (to_Zpos bs2)) => {Haux}Haux; rewrite (Haux (@to_Zpos_ge0 bs2)). 
+          rewrite (Z.mod_eq _ _ (neq_zeros_to_Zpos_neq0 (negbT Hz2))) Z.mul_comm//.
+    - move => H2 H1. rewrite (eqP Hz1) /sremB /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
+      rewrite {1}H0 -{1}(size_absB bs2) udiv0B; last done.
+      rewrite !to_Z_zeros (Z.rem_0_l _ (neq_zeros_to_Z_neq0 (negbT Hz2)))//.
+    - move => H2 H1. rewrite (eqP Hz1) /sremB /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
+      rewrite {1}H0 -{1}(size_absB bs2) udiv0B; last done.
+      rewrite !to_Z_zeros /Z.rem//. 
+    - move => _ _. rewrite /sremB (to_Z_sremB (ltnW H) H0 (negbT Hd1))//.
+  Qed.
+  
   (*---------------------------------------------------------------------------
     Properties of signed modulo
   ---------------------------------------------------------------------------*)
@@ -7202,34 +7502,7 @@ Admitted.
     - rewrite size_sremB Hs minnn. reflexivity.
   Qed.
 
-  (*Z.quot_exact:
-  forall a b : Z, b <> 0%Z -> a = (b * (a ÷ b))%Z <-> Z.rem a b = 0%Z*)
-
-  Lemma to_Z_sremB_exact bs1 bs2:
-    1 < size bs1 ->
-    size bs1 = size bs2 ->
-    ~~ (dropmsb bs1 == zeros (size bs1 - 1)) ->
-    ~~ (dropmsb bs2 == zeros (size bs2 - 1)) ->
-    mulB (udivB bs1 bs2).1 bs2 = bs1 ->
-    sremB bs1 bs2 = zeros (size bs1).
-  Proof.
-    intros.
-    apply to_Z_inj_ss; first by rewrite size_sremB size_zeros.
-    move : (zeros_msb_dropmsb bs2); rewrite (negbTE H2)andbF/=; move => Hz2.
-    rewrite (to_Z_sremB (ltnW H) H0 H1 H2) to_Z_zeros -(Z.quot_exact _ _ (neq_zeros_to_Z_neq0 (negbT Hz2))).
-    move : (msb_negB H1)=> Hnm1; symmetry in Hnm1.
-    case Hm1 : (msb bs1).
-    rewrite Hm1/= in Hnm1.
-    move : (dropmsb_negB_nonzeros H1) => Hnz1.
-    rewrite -(size_negB bs1) in Hnz1.
-    rewrite -{1}(negB_involutive bs1) (msb0_to_Z_negB Hnm1 Hnz1).
-    move : (zeros_msb_dropmsb bs1); rewrite Hm1/=; move => Hz1.
-    rewrite (neq_zeros_to_Zpos_negB (negbT Hz1)).
-    rewrite -{2}H3 (to_Zpos_mulB _ (mulB_udivB_Numulo H0)); last by rewrite size_udivB.
-    rewrite to_Zpos_udivB'; [|done|by rewrite Hz2].
-    Admitted.
-      
-  
+    
   (*---------------------------------------------------------------------------
     Others
   ---------------------------------------------------------------------------*)  
