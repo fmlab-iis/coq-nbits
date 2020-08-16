@@ -6888,6 +6888,20 @@ Admitted.
     Properties of signed remainder
   ---------------------------------------------------------------------------*)
 
+  Definition sremB' bs1' bs2' : bits :=
+    let bs1 := absB bs1' in
+    let bs2 := absB bs2' in
+    if (msb bs1')
+    then negB (udivB bs1 bs2).2
+    else (udivB bs1 bs2).2.
+
+  Lemma size_sremB' : forall bs1 bs2, size (sremB' bs1 bs2) = size bs1.
+  Proof.
+    intros. rewrite /sremB' /absB.
+    case (msb bs1); case (msb bs2); try rewrite size_negB size_uremB size_negB//;
+                                        try rewrite size_uremB//.
+  Qed.
+
   Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
 
   Lemma size_sremB bs1 bs2 : size (sremB bs1 bs2) = size bs1.
