@@ -6904,6 +6904,11 @@ Admitted.
 
   Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
 
+  Lemma sremB_is_sremB' bs1 bs2 :
+    sremB bs1 bs2 = sremB' bs1 bs2.
+  Proof.
+  Admitted.
+
   Lemma size_sremB bs1 bs2 : size (sremB bs1 bs2) = size bs1.
   Proof.
     rewrite /sremB. rewrite /sdivB.
@@ -7486,6 +7491,17 @@ Admitted.
   then
     r_sdiv
   else addB r_sdiv bs2.
+
+  Definition smodB' bs1 bs2 : bits :=
+    let r_sdiv := sremB' bs1 bs2 in 
+    if (msb bs1 == msb bs2) || (r_sdiv == (zeros (size r_sdiv))) then
+      r_sdiv
+    else addB r_sdiv bs2.
+
+  Lemma smodB_is_smodB' bs1 bs2 :
+    smodB bs1 bs2 = smodB' bs1 bs2.
+  Proof. Admitted.
+
 
   Lemma size_smodB bs1 bs2 :
     size (smodB bs1 bs2) =
