@@ -6995,34 +6995,34 @@ Admitted.
     Properties of signed remainder
   ---------------------------------------------------------------------------*)
 
-  Definition sremB' bs1' bs2' : bits :=
+  Definition sremB bs1' bs2' : bits :=
     let bs1 := absB bs1' in
     let bs2 := absB bs2' in
     if (msb bs1')
     then negB (udivB bs1 bs2).2
     else (udivB bs1 bs2).2.
 
-  Lemma size_sremB' : forall bs1 bs2, size (sremB' bs1 bs2) = size bs1.
+  Lemma size_sremB : forall bs1 bs2, size (sremB bs1 bs2) = size bs1.
   Proof.
-    intros. rewrite /sremB' /absB.
+    intros. rewrite /sremB /absB.
     case (msb bs1); case (msb bs2); try rewrite size_negB size_uremB size_negB//;
                                         try rewrite size_uremB//.
   Qed.
 
-  Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
+  Definition sremB' bs1 bs2 := (sdivB bs1 bs2).2.
 
   Lemma sremB_is_sremB' bs1 bs2 :
     sremB bs1 bs2 = sremB' bs1 bs2.
   Proof.
-    rewrite /sremB /sdivB /sremB'.
+    rewrite /sremB' /sdivB /sremB.
       by (case Hdz1 : (dropmsb bs1 == zeros (size bs1 - 1));
           case Hdz2 : (dropmsb bs2 == ones (size bs2 - 1)) ;
           case Hm12 : (msb bs1 == msb bs2); case Hm1 : (msb bs1)).
   Qed.
 
-  Lemma size_sremB bs1 bs2 : size (sremB bs1 bs2) = size bs1.
+  Lemma size_sremB' bs1 bs2 : size (sremB' bs1 bs2) = size bs1.
   Proof.
-    rewrite /sremB. rewrite /sdivB.
+    rewrite /sremB' /sdivB.
     case Hall : ((dropmsb bs1 == zeros (size bs1 - 1)) && (dropmsb bs2 == ones (size bs2 - 1)) &&
                                                        (msb bs1 == msb bs2) && msb bs1).
     by rewrite size_negB size_uremB size_absB.
@@ -7453,7 +7453,7 @@ Admitted.
   Qed.
     
   Lemma to_Z_sremB_full bs1 bs2 : 1 < size bs1 -> size bs1 = size bs2 ->
-                                  to_Z (sremB bs1 bs2) = Z.rem (to_Z bs1) (to_Z bs2).
+                                  to_Z (sremB' bs1 bs2) = Z.rem (to_Z bs1) (to_Z bs2).
   Proof.
     intros. generalize H; rewrite H0; move => H'.
     move : (joinmsb_splitmsb (ltnW H));  move : (joinmsb_splitmsb (ltnW H')).
@@ -7461,7 +7461,7 @@ Admitted.
     rewrite -/(msb bs1) -/(dropmsb bs1) -/(msb bs2) -/(dropmsb bs2).
     case Hd1 : (dropmsb bs1 == zeros (size bs1 - 1));
       first (case Hm1 : (msb bs1); case Hm2 : (msb bs2)); rewrite /=; move => Hz2 Hz1.
-    - move => H2 H1; rewrite /sremB /sdivB (eqP Hd1) eq_refl /absB Hm1 Hm2/=.
+    - move => H2 H1; rewrite /sremB' /sdivB (eqP Hd1) eq_refl /absB Hm1 Hm2/=.
       move/iffRL/contra : (negB_zeros' bs2); rewrite Hz2; move => Hnz2.
       case Hones2 : (dropmsb bs2 == ones (size bs2 - 1)); rewrite (dropmsb_0_negB_id Hd1)/=.
       + rewrite (eqP Hones2) /joinmsb ones_rcons subn1 (ltn_predK (ltnW H')) in H2.
@@ -7527,7 +7527,7 @@ Admitted.
           move : (neq_zeros_to_Z_neq0 (negbT Hz2)); rewrite -Z.abs_pos; move/Z.lt_neq/Z.neq_sym =>{Haux}Haux. 
           rewrite (dropmsb_0_negB_id Hd1) (Z.mod_eq _ _ Haux) Z.mul_comm//.
     - move => H2 H1.
-      rewrite /sremB /sdivB /absB Hd1 Hm1 Hm2 andbF andFb/= (dropmsb_0_negB_id Hd1).
+      rewrite /sremB' /sdivB /absB Hd1 Hm1 Hm2 andbF andFb/= (dropmsb_0_negB_id Hd1).
       case Hd2 : (dropmsb bs2 == zeros (size bs2 - 1)); rewrite Hd2 in Hz2.
       + rewrite (eqP Hz2) -H0 udivB0 to_Z_zeros dropmsb_0_negB_id /Z.rem /Z.quotrem/=; by case (to_Z bs1).
       + rewrite -/(uremB bs1 bs2) (uremB_eq (ltnW H) H0 (negbT Hz2)).
@@ -7572,21 +7572,21 @@ Admitted.
           rewrite (dropmsb_0_negB_id Hd1) high1_0_to_Z; last by rewrite high1_msb Hm2.
           move/iffRL : (Z.abs_eq_iff (to_Zpos bs2)) => {Haux}Haux; rewrite (Haux (@to_Zpos_ge0 bs2)). 
           rewrite (Z.mod_eq _ _ (neq_zeros_to_Zpos_neq0 (negbT Hz2))) Z.mul_comm//.
-    - move => H2 H1. rewrite (eqP Hz1) /sremB /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
+    - move => H2 H1. rewrite (eqP Hz1) /sremB' /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
       rewrite {1}H0 -{1}(size_absB bs2) udiv0B; last done.
       rewrite !to_Z_zeros (Z.rem_0_l _ (neq_zeros_to_Z_neq0 (negbT Hz2)))//.
-    - move => H2 H1. rewrite (eqP Hz1) /sremB /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
+    - move => H2 H1. rewrite (eqP Hz1) /sremB' /sdivB msb_zeros Hm2 !andbF absB_zeros/=.
       rewrite {1}H0 -{1}(size_absB bs2) udiv0B; last done.
       rewrite !to_Z_zeros /Z.rem//. 
-    - move => _ _. rewrite /sremB (to_Z_sremB (ltnW H) H0 (negbT Hd1))//.
+    - move => _ _. rewrite /sremB' (to_Z_sremB (ltnW H) H0 (negbT Hd1))//.
   Qed.
   
   (*---------------------------------------------------------------------------
     Properties of signed modulo
   ---------------------------------------------------------------------------*)
-
+  
   Definition smodB bs1 bs2 : bits :=
-  let (q_sdiv, r_sdiv) := eta_expand (sdivB bs1 bs2) in
+  let r_sdiv := sremB bs1 bs2 in
   if (msb bs1 == msb bs2) || (r_sdiv == (zeros (size r_sdiv)))
      (*|| (bs1 <# bs2)*)
   then
@@ -7604,24 +7604,24 @@ Admitted.
   Lemma smodB_is_smodB' bs1 bs2 :
     smodB bs1 bs2 = smodB' bs1 bs2.
   Proof.
-    rewrite /smodB /smodB' . rewrite -/(sremB _ _) sremB_sremB'_same//.
+    rewrite /smodB /smodB' . rewrite sremB_is_sremB'//.
   Qed.
 
   Lemma size_smodB bs1 bs2 :
     size (smodB bs1 bs2) =
-    if (msb bs1 == msb bs2) || is_zero (eta_expand (sdivB bs1 bs2)).2
+    if (msb bs1 == msb bs2) || is_zero (sremB bs1 bs2)
     then size bs1
-    else minn (size (eta_expand (sdivB bs1 bs2)).2) (size bs2).
+    else minn (size (sremB bs1 bs2)) (size bs2).
   Proof.
     rewrite /smodB.
     case H: ((msb bs1 == msb bs2) ||
-             ((sdivB bs1 bs2).2 == zeros (size (sdivB bs1 bs2).2))).
+             ((sremB bs1 bs2) == zeros (size (sremB bs1 bs2)))).
     - case/orP: H => H.
       + rewrite H /=. rewrite size_sremB. reflexivity.
       + rewrite (eqP H) /=. rewrite zeros_is_zero orbT /=.
         rewrite size_zeros size_sremB. reflexivity.
     - move/Bool.orb_false_iff: H => [H1 H2]. rewrite H1 /=.
-      have ->: is_zero (sdivB bs1 bs2).2 = false.
+      have ->: is_zero (sremB bs1 bs2) = false.
       { apply/negP=> H3. move/negP: H2. apply. rewrite {1}(is_zero_zeros H3).
         exact: eqxx. }
       rewrite size_addB. reflexivity.
@@ -7631,7 +7631,7 @@ Admitted.
     size bs1 = size bs2 -> size (smodB bs1 bs2) = size bs1.
   Proof.
     move=> Hs. rewrite size_smodB.
-    case: ((msb bs1 == msb bs2) || is_zero (eta_expand (sdivB bs1 bs2)).2).
+    case: ((msb bs1 == msb bs2) || is_zero (sremB bs1 bs2)).
     - reflexivity.
     - rewrite size_sremB Hs minnn. reflexivity.
   Qed.
