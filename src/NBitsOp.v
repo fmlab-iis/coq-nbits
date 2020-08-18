@@ -6995,20 +6995,29 @@ Admitted.
     Properties of signed remainder
   ---------------------------------------------------------------------------*)
 
+  Definition sremB' bs1' bs2' : bits :=
+    let bs1 := absB bs1' in
+    let bs2 := absB bs2' in
+    if (msb bs1')
+    then negB (udivB bs1 bs2).2
+    else (udivB bs1 bs2).2.
+
+  Lemma size_sremB' : forall bs1 bs2, size (sremB' bs1 bs2) = size bs1.
+  Proof.
+    intros. rewrite /sremB' /absB.
+    case (msb bs1); case (msb bs2); try rewrite size_negB size_uremB size_negB//;
+                                        try rewrite size_uremB//.
+  Qed.
+
   Definition sremB bs1 bs2 := (sdivB bs1 bs2).2.
 
-  Definition sremB' bs1' bs2' : bits :=
-  let bs1 := absB bs1' in
-  let bs2 := absB bs2' in
-  if (msb bs1')
-  then negB (udivB bs1 bs2).2
-  else (udivB bs1 bs2).2.
-
-  Lemma sremB_sremB'_same bs1 bs2 : sremB bs1 bs2 = sremB' bs1 bs2.
+  Lemma sremB_is_sremB' bs1 bs2 :
+    sremB bs1 bs2 = sremB' bs1 bs2.
   Proof.
     rewrite /sremB /sdivB /sremB'.
-    case Hdz1 : (dropmsb bs1 == zeros (size bs1 - 1)); case Hdz2 : (dropmsb bs2 == ones (size bs2 - 1)) ; case Hm12 : (msb bs1 == msb bs2); case Hm1 : (msb bs1);
-      rewrite //.
+      by (case Hdz1 : (dropmsb bs1 == zeros (size bs1 - 1));
+          case Hdz2 : (dropmsb bs2 == ones (size bs2 - 1)) ;
+          case Hm12 : (msb bs1 == msb bs2); case Hm1 : (msb bs1)).
   Qed.
 
   Lemma size_sremB bs1 bs2 : size (sremB bs1 bs2) = size bs1.
@@ -7025,7 +7034,7 @@ Admitted.
         * rewrite size_uremB size_absB. reflexivity.
         * rewrite size_negB size_uremB size_absB. reflexivity.
   Qed.
-
+  
   Lemma mulB_udivB_Numulo bs1 bs2 : 
     size bs1 = size bs2 -> ~~ Umulo (udivB bs1 bs2).1 bs2 .
   Proof.
@@ -7592,11 +7601,12 @@ Admitted.
     r_sdiv
   else addB r_sdiv bs2.
 
-  Lemma smodB_smodB_same bs1 bs2 : smodB bs1 bs2 = smodB' bs1 bs2.
+  Lemma smodB_is_smodB' bs1 bs2 :
+    smodB bs1 bs2 = smodB' bs1 bs2.
   Proof.
     rewrite /smodB /smodB' . rewrite -/(sremB _ _) sremB_sremB'_same//.
   Qed.
-    
+
   Lemma size_smodB bs1 bs2 :
     size (smodB bs1 bs2) =
     if (msb bs1 == msb bs2) || is_zero (eta_expand (sdivB bs1 bs2)).2
@@ -7626,7 +7636,6 @@ Admitted.
     - rewrite size_sremB Hs minnn. reflexivity.
   Qed.
 
-    
   (*---------------------------------------------------------------------------
     Others
   ---------------------------------------------------------------------------*)  
