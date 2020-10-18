@@ -4318,8 +4318,6 @@ Section Lemmas.
   (*     have Hsggt02 : 0 < sig_bits bs2 by rewrite -Hsg02n addn1. *)
   (*     rewrite Haux1 Haux2 -(leq_add2r 1) (subnK Hgt01) addn1 -addSn subn1 (ltn_predK Hsggt01) in Hle. *)
   (*     Check andb_orb_all_sig_bits2. *)
-      Eval compute in (andb_orb_all [::b1;b1;b0] [::b1;b0;b0]).
-      Eval compute in (to_Zpos(mulB [::b1;b1;b1;b0;b0] [::b1;b1;b0;b0;b0])).
 
   (* Lemma andb_orb_all_false : forall bs1 bs2, size bs1 = size bs2 -> *)
   (*                                            ~~ (andb_orb_all bs1 bs2) -> ~~ (orb_all (andB bs1 bs2)). *)
@@ -6092,7 +6090,7 @@ Section Lemmas.
     move : ((Z.mul_neg_neg _ _ Hm1' Hm2')) => Hmulgt0.
     rewrite -(Z.abs_eq _ (Z.lt_le_incl _ _ Hmulgt0)) Z.abs_mul in Hr; move : Hr.
     rewrite -high1_1_to_Zpos_negB; last rewrite high1_msb Hm1//.
-    rewrite -high1_1_to_Zpos_negB; last rewrite high1_msb Hm2//. SearchAbout negB.
+    rewrite -high1_1_to_Zpos_negB; last rewrite high1_msb Hm2//. 
     rewrite (neq_zeros_to_Zpos_negB H1) (neq_zeros_to_Zpos_negB H2).
     have Hbd1 : ((2 ^ Z.of_nat (size bs1) - to_Zpos bs1) <= 2 ^ Z.of_nat (size bs1 - 1))%Z.
     {
@@ -8792,7 +8790,6 @@ Admitted.
   Qed.
 
 
-  SearchAbout negB.
   (*---------------------------------------------------------------------------
     Properties of signed modulo
   ---------------------------------------------------------------------------*)
