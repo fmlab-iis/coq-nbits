@@ -431,7 +431,26 @@ Section Lemmas.
 
   Local Open Scope bits_scope.
 
-  (* size after operations *)
+  (*---------------------------------------------------------------------------
+    Aux Properties
+    ---------------------------------------------------------------------------*)
+  
+  Lemma zip_nil S T (p:seq T) : @zip S T [::] p = [::].
+  Proof.
+    case p; done. Qed.
+
+  Lemma zip_nil_r S T (p:seq S) : @zip S T p [::] = [::].
+  Proof.
+    case p; done. Qed.
+
+  Lemma pow2_nat2z_gt0 n : (0 < (2 ^ Z.of_nat n))%Z.
+  Proof.
+    apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
+  Qed.
+
+  (*---------------------------------------------------------------------------
+    Size after operations
+    ---------------------------------------------------------------------------*)
 
   Lemma size_succB bs : size (succB bs) = size bs.
   Proof.
@@ -459,6 +478,16 @@ Section Lemmas.
 
   Lemma size_xorB bs1 bs2 : size (xorB bs1 bs2) = maxn (size bs1) (size bs2).
   Proof. rewrite /xorB. rewrite size_lift. reflexivity. Qed.
+ 
+  Lemma size_full_adder : forall p q c, size (full_adder c p q).2 = minn (size p) (size q).
+  Proof.
+    elim => [|phd ptl IH] q c.
+      by rewrite min0n /full_adder zip_nil/=. 
+        by rewrite size_full_adder_zip /=. 
+  Qed.
+
+  Lemma size_adcB : forall p q c, size (adcB c p q).2 = minn (size p) (size q).
+  Proof. rewrite /adcB. exact : size_full_adder. Qed.
 
   Lemma size_addB bs0 bs1 : size (addB bs0 bs1) = minn (size bs0) (size bs1).
   Proof. exact: size_full_adder_zip. Qed.
@@ -513,6 +542,13 @@ Section Lemmas.
     rewrite /shlB1. rewrite size_dropmsb size_joinlsb. rewrite addn1 subn1.
     exact: PeanoNat.Nat.pred_succ.
   Qed.
+  
+  Lemma size_iter_shlB1 i ps :
+    size (iter i shlB1 ps) = size ps .
+  Proof .
+    elim : i => [ | i IH ]; first done .
+    by rewrite /= size_shlB1 IH .
+  Qed .
 
   Lemma size_shlB n bs : size (shlB n bs) = size bs.
   Proof. elim: n bs => [| n IH] bs //=. by rewrite size_shlB1 IH. Qed.
@@ -558,9 +594,20 @@ Section Lemmas.
         rewrite leqNgt Hlt // .
   Qed .
 
-  (******************** Free Region Begin ********************)
+  Lemma size_joinlsb T b (bs : seq T) :
+    size (joinlsb b bs) = (size bs) + 1 .
+  Proof .
+      by rewrite /= addn1 .
+  Qed .
 
-  (* Lemma about comparison operations *)
+  Lemma size_unzip (bsp: seq (bool*bool)) : size (unzip1 bsp) = size (unzip2 bsp).
+  Proof.
+    elim bsp; first done. intros. by rewrite/=H.
+  Qed.
+  
+  (*---------------------------------------------------------------------------
+    Lemmas about comparison operations 
+    ---------------------------------------------------------------------------*)
 
   Lemma ltB_cons (hd1 : bool) (tl1 : bits) (hd2 : bool) (tl2 : bits) :
     (ltB (hd1::tl1) (hd2::tl2)) = ((zext (size tl2 - size tl1) tl1 ==
@@ -751,6 +798,20 @@ Section Lemmas.
   Lemma ltB_zext n m bs1 bs2 : ltB (zext n bs1) (zext m bs2) = ltB bs1 bs2.
   Proof. rewrite ltB_zext_l ltB_zext_r. reflexivity. Qed.
 
+  Lemma ltB_rev_zext bs1 bs2 :
+    ltB_rev (zext (size bs2 - size bs1) bs1) (zext (size bs1 - size bs2) bs2) 
+    = ltB_rev bs1 bs2.
+  Proof.
+    rewrite /ltB_rev /extzip0 2!extzip_zip /zext /zeros. 
+    rewrite !size_cat -2!catA -2!copy_addn 2!size_nseq.
+    rewrite -!maxnE !(maxnC (size bs1) (size bs2)) subnn !addn0. reflexivity.
+  Qed.
+
+  Lemma ltn_gtF : forall m n : nat, m < n -> (n < m) = false.
+  Proof. move=> m n Hlt; by rewrite ltnNge (ltnW Hlt). Qed.
+
+  (* ltB semantics *)
+  
   Lemma ltB_to_nat_ss (bs1 bs2 : bits) :
     size bs1 = size bs2 ->
     ltB bs1 bs2 = (to_nat bs1 < to_nat bs2).
@@ -780,32 +841,8 @@ Section Lemmas.
     - apply Z.ltb_lt, ltB_to_Zpos in Hltb. by rewrite -HltB -Hltb.
   Qed.
 
-  (* TODO: Fix it if ltB_msb is needed *)
-  (*
-  Lemma ltB_msb_to_nat (bs1 bs2 : bits) : ltB_msb bs1 bs2 = (to_nat bs1 < to_nat bs2).
-  Admitted.
-
-  Lemma ltB_msb_ltB (bs1 bs2: bits): ltB_msb bs1 bs2 = ltB bs1 bs2.
-  Proof.
-    rewrite ltB_msb_to_nat ltB_to_nat. reflexivity.
-  Qed.
-
-  Lemma ltB_rev_ltB_msb (bs1 bs2 : bits) : ltB_rev bs1 bs2 = ltB_msb bs1 bs2.
-  Admitted.
-   *)
-
-  Lemma ltB_rev_zext bs1 bs2 :
-    ltB_rev (zext (size bs2 - size bs1) bs1) (zext (size bs1 - size bs2) bs2) 
-    = ltB_rev bs1 bs2.
-  Proof.
-    rewrite /ltB_rev /extzip0 2!extzip_zip /zext /zeros. 
-    rewrite !size_cat -2!catA -2!copy_addn 2!size_nseq.
-    rewrite -!maxnE !(maxnC (size bs1) (size bs2)) subnn !addn0. reflexivity.
-  Qed.
-
-  Lemma ltn_gtF : forall m n : nat, m < n -> (n < m) = false.
-  Proof. move=> m n Hlt; by rewrite ltnNge (ltnW Hlt). Qed.
-
+  (* ltB_rev semantics *)
+  
   Lemma ltB_rev_to_nat_ss (bs1 bs2 : bits) :
     size bs1 = size bs2 ->
     ltB_rev bs1 bs2 = (to_nat bs1 < to_nat bs2).
@@ -877,6 +914,8 @@ Section Lemmas.
     by rewrite Bool.negb_involutive.
   Qed.
 
+  (* leB semantics *)
+  
   Lemma leB_to_nat (bs1 bs2 : bits) :
     size bs1 = size bs2 -> leB bs1 bs2 = (to_nat bs1 <= to_nat bs2).
   Proof.
@@ -899,6 +938,8 @@ Section Lemmas.
     - apply Z.leb_le, (leB_to_Zpos Hsz) in Hleb. by rewrite -HleB -Hleb.
   Qed.
 
+  (* gtB semantics *)
+  
   Lemma gtB_to_nat_ss (bs1 bs2 : bits) :
     size bs1 = size bs2 -> gtB bs1 bs2 = (to_nat bs1 > to_nat bs2).
   Proof.
@@ -919,6 +960,8 @@ Section Lemmas.
     by rewrite /gtB ltB_to_Zpos_eqn Z.gtb_ltb. 
   Qed.
 
+  (* geB semantics *)
+  
   Lemma geB_to_nat (bs1 bs2 : bits) :
     size bs1 = size bs2 -> geB bs1 bs2 = (to_nat bs1 >= to_nat bs2).
   Proof.
@@ -1068,14 +1111,7 @@ Section Lemmas.
     Properties of signed comparison
     ---------------------------------------------------------------------------*)
 
-  (* the size-not-eq case is incorrect, try
-     Eval cbv in sltB (false :: false :: true :: true :: nil) 
-                      (false :: true :: nil)
-                 ==
-                 (to_Z (false :: false :: true :: true :: nil) 
-                  <? to_Z (false :: true :: nil))%Z.
-   *)
-  Lemma sltB_to_Z (bs1 bs2 : bits) : 
+   Lemma sltB_to_Z (bs1 bs2 : bits) : 
     size bs1 = size bs2 -> sltB bs1 bs2 <-> (to_Z bs1 < to_Z bs2)%Z.
   Proof.
     case (lastP bs1); case (lastP bs2) => {bs1 bs2}.
@@ -1162,18 +1198,6 @@ Section Lemmas.
 
 
   (*---------------------------------------------------------------------------
-    Aux Properties
-    ---------------------------------------------------------------------------*)
-  
-  Lemma zip_nil S T (p:seq T) : @zip S T [::] p = [::].
-  Proof.
-    case p; done. Qed.
-
-  Lemma zip_nil_r S T (p:seq S) : @zip S T p [::] = [::].
-  Proof.
-    case p; done. Qed.
-
-  (*---------------------------------------------------------------------------
     Properties of arithmetic shift right
     ---------------------------------------------------------------------------*)
   
@@ -1182,26 +1206,6 @@ Section Lemmas.
   Proof .
       by rewrite /sarB iter_add .
   Qed .
-
-  (* duplicated with size_sarB1 and size_sarB *)
-  (*
-  Lemma sarB1_size bs :
-    size (sarB1 bs) = size bs .
-  Proof .
-    elim : bs => [| b bs Hbs] .
-    - done .
-    - by rewrite /sarB1 size_joinmsb /= addn1 .
-  Qed .
-
-  Lemma sarB_size n bs :
-    size (sarB n bs) = size bs .
-  Proof .
-    rewrite /sarB /iter .
-    elim: n; first done .
-    move => n IH .
-      by rewrite sarB1_size .
-  Qed .
-   *)  
 
   Lemma msb_sarB1 bs : msb (sarB1 bs) = msb bs.
   Proof.
@@ -1277,8 +1281,49 @@ Section Lemmas.
   Proof.
     rewrite !sarB1_is_sarB. rewrite !sarB_add. rewrite addnC. reflexivity.
   Qed.
+  
+  (* to be moved *)
+  (* Lemma to_Zpos_droplsb bs : to_Zpos (droplsb bs) = (to_Zpos bs / 2)%Z. *)
+  (* Proof. *)
+  (*   elim bs => [|bshd bstl _]; first (rewrite /= Z.div_0_l; omega). *)
+  (*   rewrite -/joinlsb droplsb_joinlsb /= Z.mul_comm Z.add_b2z_double_div2//. *)
+  (* Qed. *)
 
+  (* sarB1 semantics *)
+  
+  Lemma sarB1_to_Z bs : 1 < size bs -> to_Z (sarB1 bs) = (Z.div (to_Z bs) 2)%Z.
+  Proof.
+    intros.
+    rewrite /sarB1 (droplsb_joinmsb (msb bs) (ltnW H)).
+    have Haux : [::msb bs] == [::(msb (droplsb bs))] by rewrite -!high1_msb (high_droplsb H). 
+    rewrite eqseq_cons eq_refl andbT in Haux. rewrite (eqP Haux).
+    rewrite /joinmsb -cats1 -{1}(sext0 (droplsb bs)) -sext_Sn to_Z_sext.
+    rewrite 2!to_Z_to_Zpos -(eqP Haux) size_droplsb to_Zpos_droplsb Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
+    rewrite Z.pow_sub_r;
+      [rewrite Z.pow_1_r|omega|split; [apply Nat2Z.is_nonneg|rewrite -Nat2Z.inj_le; apply/leP; rewrite (ltnW H)//]].
+    case (msb bs); last rewrite !Z.mul_0_l !Z.sub_0_r//.
+    rewrite !Z.mul_1_l.
+    have -> : (2 ^ Z.of_nat (size bs) = 2 ^ Z.of_nat (size bs - 1) * 2)%Z.
+    {
+      rewrite -{3}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
+      rewrite Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
+      rewrite Z.sub_simpl_r//.
+    }
+    rewrite -!Z.add_opp_r -Z.mul_opp_l Z_div_plus// Z_div_mult//. 
+  Qed.
 
+  (* sarB semantics *)
+  Lemma sarB_to_Z n bs : 1 < size bs -> to_Z (sarB n bs) = (Z.div (to_Z bs) (2 ^ Z.of_nat n))%Z.
+  Proof.
+    rewrite /sarB. move : n bs. elim => [|ns IH] bs Hsz.
+    - rewrite Z.pow_0_r Z.div_1_r //. 
+    - move : (IH bs Hsz) => IHm.
+      rewrite (lock Z.of_nat)/= -lock sarB1_to_Z; last rewrite -/(sarB ns bs) size_sarB//.
+      rewrite IHm -addn1 Z.div_div//; last (exact : (Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 ns)))).
+      rewrite -{2}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
+      rewrite Nat2Z.inj_add//.
+  Qed.
+      
   (*---------------------------------------------------------------------------
     Properties of logic shift right
     ---------------------------------------------------------------------------*)
@@ -1288,26 +1333,6 @@ Section Lemmas.
   Proof .
       by rewrite /shrB iter_add .
   Qed .
-  
-  (* duplicated with size_shrB1 and size_shrB *)
-  (*
-  Lemma shrB1_size bs :
-    size (shrB1 bs) = size bs .
-  Proof .
-    elim : bs => [| b bs Hbs] .
-    - done .
-    - by rewrite /shrB1 size_joinmsb /= addn1 .
-  Qed .
-  
-  Lemma shrB_size n bs :
-    size (shrB n bs) = size bs .
-  Proof .
-    rewrite /shrB /iter .
-    elim: n; first done .
-    move => n IH .
-      by rewrite shrB1_size .
-  Qed .
-   *)
 
   Lemma to_nat_shrB1 : forall bs, to_nat (shrB1 bs) = div.divn (to_nat bs) 2.
   Proof.
@@ -1406,12 +1431,6 @@ Section Lemmas.
     shlB i (shlB j bs) = shlB (i + j) bs .
   Proof .
       by rewrite /shlB iter_add .
-  Qed .
-
-  Lemma size_joinlsb T b (bs : seq T) :
-    size (joinlsb b bs) = (size bs) + 1 .
-  Proof .
-      by rewrite /= addn1 .
   Qed .
 
   (* duplicated with size_shlB1 and size_shlB *)
@@ -1675,22 +1694,6 @@ Section Lemmas.
         rewrite full_adder_zip_B0 unzip1_zip; first done .
         by rewrite size_zeros .
   Qed .
- 
-  Lemma size_full_adder : forall p q c, size (full_adder c p q).2 = minn (size p) (size q).
-  Proof.
-    elim => [|phd ptl IH] q c.
-      by rewrite min0n /full_adder zip_nil/=. 
-        by rewrite size_full_adder_zip /=. 
-  Qed.
-
-  Lemma size_adcB : forall p q c, size (adcB c p q).2 = minn (size p) (size q).
-  Proof. rewrite /adcB. exact : size_full_adder. Qed.
-
-  (*
-  Lemma size_addB : forall p q, size (addB p q) = minn (size p) (size q).
-  Proof. intros; rewrite/addB; apply : (size_adcB p q false).
-  Qed.
-   *)
 
   Lemma bool_adderC c : commutative (bool_adder c).
   Proof. by (case ; case).
@@ -3289,11 +3292,6 @@ Section Lemmas.
     by rewrite andb_orb_all_zip_0l_ss .
   Qed .
 
-  Lemma size_unzip (bsp: seq (bool*bool)) : size (unzip1 bsp) = size (unzip2 bsp).
-  Proof.
-    elim bsp; first done. intros. by rewrite/=H.
-  Qed.
-
   Lemma orb_all_rev bsp : orb_all (rev bsp) = orb_all bsp.
   Proof.
     elim bsp => [| bsphd bsptl IH]; first done.
@@ -4040,12 +4038,6 @@ Section Lemmas.
         by rewrite mulB_from_natSn IH .
   Qed .
 
-  Lemma size_iter_shlB1 i ps :
-    size (iter i shlB1 ps) = size ps .
-  Proof .
-    elim : i => [ | i IH ]; first done .
-    by rewrite /= size_shlB1 IH .
-  Qed .
 
   Lemma shlB_mul2exp i (p: bits) : iter i shlB1 p = mulB p (from_nat (size p) (2^i)).
   Proof.
@@ -4177,11 +4169,6 @@ Section Lemmas.
     rewrite /mulB -to_Zpos_mod_pow2 to_Zpos_full_mul. reflexivity.
   Qed.
   
-  Lemma pow2_nat2z_gt0 n : (0 < (2 ^ Z.of_nat n))%Z.
-  Proof.
-    apply Z.pow_pos_nonneg; [done | exact: Nat2Z.is_nonneg].
-  Qed.
-
   Lemma msb0_to_Zpos_bounded bs : 0 < size bs -> ~~ (msb bs) <-> (to_Zpos bs < (2 ^ Z.of_nat (size bs - 1)))%Z.
   Proof.
     split; intros.

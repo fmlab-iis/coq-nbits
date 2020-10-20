@@ -1423,6 +1423,12 @@ Section Lemmas.
       split; [exact: to_Zpos_ge0 | exact: to_Zpos_bounded].
     - apply Z.pow_nonzero; [ done | exact: Nat2Z.is_nonneg ].
   Qed.
+  
+  Lemma to_Zpos_droplsb bs : to_Zpos (droplsb bs) = (to_Zpos bs / 2)%Z.
+  Proof.
+    elim bs => [|bshd bstl _]; first (rewrite /= Z.div_0_l; omega).
+    rewrite -/joinlsb droplsb_joinlsb /= Z.mul_comm Z.add_b2z_double_div2//.
+  Qed.
 
   Lemma to_Zpos_joinlsb b bs : to_Zpos (joinlsb b bs) = ((to_Zpos bs) * 2 + b)%Z.
   Proof.
