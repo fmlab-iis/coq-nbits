@@ -98,6 +98,14 @@ Section Definitions.
   Definition zext (n : nat) (bs : bits) : bits := bs ++ zeros n.
   Definition sext (n : nat) (bs : bits) : bits := bs ++ copy n (msb bs).
 
+  (* Repeat a sequence n times *)
+  
+  Fixpoint repeat {A : Type} (n : nat) (s : seq A) := 
+    match n with 
+    | O => [::]
+    | S m => s ++ (repeat m s)
+    end.
+ 
   (* Bit-wise negation *)
 
   Definition invB (bs : bits) : bits := map (fun b => ~~ b) bs.
@@ -325,6 +333,9 @@ Section Lemmas.
 
   Lemma size_sext n bs : size (sext n bs) = size bs + n.
   Proof. rewrite /sext size_cat size_copy. reflexivity. Qed.
+
+  Lemma size_repeat n (bs : bits) : size (repeat n bs) = n * (size bs).
+  Proof. elim: n => [| n IH] //=. by rewrite size_cat IH. Qed.
 
   Lemma size_invB bs : size (invB bs) = size bs.
   Proof. elim: bs => [| b bs IH] //=. by rewrite IH. Qed.
