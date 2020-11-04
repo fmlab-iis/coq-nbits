@@ -6825,6 +6825,8 @@ Section Lemmas.
     if ((from_nat (size n) (to_nat m)) == zeros (size n)) then (zeros (size n), n')
     else udivB_rec n (from_nat (size n) (to_nat m)) (zeros (size n)) (zeros (size n)).
 
+  Definition udivB' (n m : bits) : bits := (udivB n m).1.
+    
   (* size *)
 
   Lemma size_udivB_rec n m q r : size (udivB_rec n m q r).1 = size q.
@@ -7649,6 +7651,8 @@ Admitted.
                 then ((negB (udivB bs1 bs2).1), (udivB bs1 bs2).2)
                 else (negB (udivB bs1 bs2).1, negB (udivB bs1 bs2).2).
 
+  Definition sdivB' bs1 bs2 : bits := (sdivB bs1 bs2).1.
+  
   (* Size *)
   
   Lemma size_sdivB bs1 bs2 : size (sdivB bs1 bs2).1 = size bs1.
