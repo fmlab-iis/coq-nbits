@@ -377,10 +377,17 @@ Section Ops.
   Definition sgeB (bs1 bs2: bits) := sleB bs2 bs1.
 
   (* Rotate from high to low *)
-  Definition rorB (bs : bits) : bits := rotr 1 bs.
-
+  (* Definition rorB (bs : bits) : bits := rotr 1 bs. *)
   (* Rotate from low to high *)
-  Definition rolB (bs : bits) : bits := rot 1 bs.
+  (* Definition rolB (bs : bits) : bits := rot 1 bs. *)
+
+  (* Rotate to left (to higher bits) *)
+  Definition rolB1 (bs : bits) : bits := dropmsb (joinlsb (msb bs) bs).
+  Definition rolB (n : nat) (bs : bits) : bits := iter n rolB1 bs.
+
+  (* Rotate to right (to lower bits) *)
+  Definition rorB1 (bs : bits) : bits := droplsb (joinmsb bs (lsb bs)).
+  Definition rorB (n : nat) (bs : bits) : bits := iter n rorB1 bs.
 
   Definition shrB1 (bs : bits) : bits := droplsb (joinmsb bs b0).
 
@@ -704,11 +711,28 @@ Section Lemmas.
   Lemma size_mulB bs0 bs1 : size (mulB bs0 bs1) = size bs0.
   Proof. by rewrite /mulB size_low. Qed.
 
-  Lemma size_rorB bs : size (rorB bs) = size bs.
-  Proof. rewrite /rorB. rewrite size_rotr. reflexivity. Qed.
+  (* Lemma size_rorB bs : size (rorB bs) = size bs. *)
+  (* Proof. rewrite /rorB. rewrite size_rotr. reflexivity. Qed. *)
+  (* Lemma size_rolB bs : size (rolB bs) = size bs. *)
+  (* Proof. rewrite /rolB. rewrite size_rot. reflexivity. Qed. *)
 
-  Lemma size_rolB bs : size (rolB bs) = size bs.
-  Proof. rewrite /rolB. rewrite size_rot. reflexivity. Qed.
+  Lemma size_rolB1 bs : size (rolB1 bs) = size bs.
+  Proof.
+    rewrite /rolB1. rewrite size_dropmsb size_joinlsb. rewrite addn1 subn1.
+    exact: Nat.pred_succ.
+  Qed.
+  
+  Lemma size_rolB n (bs : bits) : size (rolB n bs) = size bs.
+  Proof. elim: n => [| n IH] //=. by rewrite size_rolB1 IH. Qed.
+
+  Lemma size_rorB1 bs : size (rorB1 bs) = size bs.
+  Proof.
+    rewrite /rorB1. rewrite size_droplsb size_joinmsb. rewrite addn1 subn1.
+    exact: Nat.pred_succ.
+  Qed.
+
+  Lemma size_rorB n (bs : bits) : size (rorB n bs) = size bs.
+  Proof. elim: n => [| n IH] //=. by rewrite size_rorB1 IH. Qed.
 
   Lemma size_shrB1 bs : size (shrB1 bs) = size bs.
   Proof.
