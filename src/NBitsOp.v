@@ -5131,6 +5131,14 @@ Section Lemmas.
     by rewrite /orB /orb /lift0 /lift; case b => /= -> .
   Qed .
 
+  Lemma orB_copy_case : forall b bs,
+      orB (copy (size bs) b) bs = if b then ones (size bs) else bs.
+  Proof.
+    move => [] bs.
+    - by rewrite or1B.
+    - by rewrite or0B.
+  Qed.
+
   (*---------------------------------------------------------------------------
     Properties of bitwise or
     ---------------------------------------------------------------------------*)
