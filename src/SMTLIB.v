@@ -225,7 +225,7 @@ Proof.
   by rewrite (eqP (subB_equiv_addB_negB Hsz)).
 Qed.
 
-Lemma smtlib_bvsdiv_sdivB' bs1 bs2 : SMTLIB.bvsdiv bs1 bs2 = sdivB' bs1 bs2.
+Lemma smtlib_bvsdiv_sdivB bs1 bs2 : SMTLIB.bvsdiv bs1 bs2 = sdivB bs1 bs2.
 Proof.
 Admitted.
 
