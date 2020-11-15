@@ -225,17 +225,48 @@ Proof.
   by rewrite (eqP (subB_equiv_addB_negB Hsz)).
 Qed.
 
-Lemma smtlib_bvsdiv_sdivB bs1 bs2 : SMTLIB.bvsdiv bs1 bs2 = sdivB bs1 bs2.
+Lemma smtlib_bvsdiv_sdivB bs1 bs2 :
+  size bs1 = size bs2 -> SMTLIB.bvsdiv bs1 bs2 = sdivB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvsdiv /SMTLIB.extract /extract subnn !high1_msb.
+  case : (bs2) => [|bshd2 bstl2].
+  - move => /size0nil -> //.
+  - move => Hsz. have Hsz' : 0 < size bs1 by rewrite Hsz.
+    rewrite subnK// low_size Hsz low_size /sdivB /absB.
+    case (msb bs1); case (msb (bshd2::bstl2)); try done.
+Qed.  
 
-Lemma smtlib_bvsrem_sremB bs1 bs2 : SMTLIB.bvsrem bs1 bs2 = sremB bs1 bs2.
-Proof. 
-Admitted.
-
-Lemma smtlib_bvsmod_smodB bs1 bs2 : SMTLIB.bvsmod bs1 bs2 = smodB bs1 bs2.
+Lemma smtlib_bvsrem_sremB bs1 bs2 :
+  size bs1 = size bs2 -> SMTLIB.bvsrem bs1 bs2 = sremB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvsrem /SMTLIB.extract /extract subnn !high1_msb.
+  case : bs2 => [|bshd2 bstl2].
+  - move => /size0nil -> //.
+    move => Hsz. have Hsz' : 0 < size bs1 by rewrite Hsz.
+    rewrite subnK// low_size Hsz low_size /sremB /absB.
+    case (msb bs1); case (msb (bshd2::bstl2)); try done.
+Qed.  
+
+Lemma smtlib_bvsmod_smodB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvsmod bs1 bs2 = smodB bs1 bs2.
+Proof.
+  rewrite /SMTLIB.bvsmod /SMTLIB.extract /extract subnn !high1_msb.
+  case : bs2 => [|bshd2 bstl2].
+  - move => /size0nil -> //.
+  - move => Hsz. have Hsz' : 0 < size bs1 by rewrite Hsz.
+    rewrite subnK// low_size Hsz low_size /smodB /sremB /absB -/(uremB _ _) !smtlib_bvurem_uremB !smtlib_bvneg_negB.
+    case (msb bs1); case (msb (bshd2::bstl2)); rewrite/=.
+    + case H0 : (uremB (-# bs1)%bits (-# (bshd2 :: bstl2))%bits == b0 :: zeros (size bstl2)); last done.
+      rewrite (eqP H0) zeros_cons (eqP (negB_zeros _))//.
+    + case H0 : (uremB (-# bs1)%bits (bshd2 :: bstl2) == b0 :: zeros (size bstl2)).
+      * rewrite (eqP H0) zeros_cons (eqP (negB_zeros _)) size_zeros eq_refl//.
+      * rewrite smtlib_bvadd_addB.
+        case Hn0: ((-# uremB (-# bs1) (bshd2 :: bstl2))%bits == zeros (size (-# uremB (-# bs1) (bshd2 :: bstl2))%bits)); last done.
+        rewrite <-(negB_zeros' (uremB (-# bs1) (bshd2 :: bstl2))%bits) in Hn0;
+          rewrite (eqP Hn0) size_uremB size_negB zeros_cons Hsz eq_refl// in H0.
+    + rewrite smtlib_bvadd_addB size_uremB zeros_cons Hsz//.
+    + by case H0 : (uremB bs1 (bshd2 :: bstl2) == b0 :: zeros (size bstl2)).
+Qed.
                                                                    
 Lemma smtlib_bvule_leB bs1 bs2 : SMTLIB.bvule bs1 bs2 = leB bs1 bs2.
 Proof. 
