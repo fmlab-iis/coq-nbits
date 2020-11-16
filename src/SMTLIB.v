@@ -1,6 +1,5 @@
-From Coq Require Import ZArith Arith List Decidable.
-From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq div.
-Require Import FunInd Recdef.
+From Coq Require Import ZArith List FunInd Recdef.
+From mathcomp Require Import ssreflect ssrbool ssrnat eqtype seq ssrfun.
 From nbits Require Import NBitsDef NBitsOp AuxLemmas.
 
 Set Implicit Arguments.
@@ -168,6 +167,97 @@ Fixpoint rotate_right (i : nat) (bs : bits) : bits :=
 
 End SMTLIB.
 
+(* Aux Lemmas (should be moved to NBits) *)
+
+Lemma andB_cons b1 bs1 b2 bs2 :
+  andB (b1 :: bs1) (b2 :: bs2) = (andb b1 b2) :: (andB bs1 bs2).
+Proof. by rewrite /andB /lift0 lift_cons. Qed.
+
+Lemma orB_cons b1 bs1 b2 bs2 :
+  orB (b1 :: bs1) (b2 :: bs2) = (orb b1 b2) :: (orB bs1 bs2).
+Proof. by rewrite /orB /lift0 lift_cons. Qed.
+
+Lemma xorB_cons b1 bs1 b2 bs2 :
+  xorB (b1 :: bs1) (b2 :: bs2) = (xorb b1 b2) :: (xorB bs1 bs2).
+Proof. by rewrite /xorB /lift0 lift_cons. Qed.
+
+Lemma extract_msb bs :
+  extract (size bs - 1) (size bs - 1) bs = [:: msb bs].
+Proof.
+  case: (lastP bs) => {bs} [| bs b] //=.
+  rewrite /extract size_rcons subn1 -pred_Sn subnn add0n msb_rcons.
+  have->: size bs + 1 = size (rcons bs b) by rewrite size_rcons addn1. 
+  by rewrite low_size high1_rcons. 
+Qed.
+
+Lemma extract_dropmsb bs :
+  1 < size bs -> extract (size bs - 2) 0 bs = dropmsb bs.
+Proof.
+  case: (lastP bs) => {bs} [| bs b1] //=; case: (lastP bs) => {bs} [| bs b2] //=. 
+  rewrite /extract !size_rcons subn2 -!pred_Sn subn0 => _. 
+  rewrite low_rcons; last by rewrite size_rcons addn1.
+  have->: size bs + 1 = size (rcons bs b2) by rewrite size_rcons addn1.
+  by rewrite low_size high_size /dropmsb splitmsb_rcons.
+Qed.
+
+Lemma extract_lsb bs :
+  extract 0 0 bs = [:: lsb bs].
+Proof.
+  case: bs => [| b bs] //=. by rewrite /extract /lsb subn0 add0n low1_cons /=.
+Qed.
+
+Lemma extract_droplsb bs :
+  1 < size bs -> extract (size bs - 1) 1 bs = droplsb bs.
+Proof.
+  case: bs => [| b1 bs] //=; case: bs => [| b2 bs] //=. 
+  rewrite /extract !subn1 -!pred_Sn => _. 
+  have->: (size bs).+1 + 1 = size [:: b1, b2 & bs] by rewrite addn1.
+  rewrite low_size high_cons; last by rewrite addn1. 
+  have->: size bs + 1 = size (b2 :: bs) by rewrite addn1.
+  by rewrite high_size. 
+Qed.
+
+Lemma cat_repeat {A : Type} n (s : seq A) : s ++ (repeat n s) = (repeat n s) ++ s.
+Proof.
+  elim: n => [| n IH] /=.
+  - by rewrite cats0.
+  - by rewrite {1}IH catA.
+Qed.
+
+Lemma rolB1_concat_extract bs :
+  1 < size bs ->
+  rolB1 bs = extract (size bs - 1) (size bs - 1) bs ++ extract (size bs - 2) 0 bs.
+Proof.
+  move=> Hsz. rewrite /rolB1 extract_msb (extract_dropmsb Hsz) /= /joinlsb. 
+  rewrite dropmsb_joinlsb; last by auto. reflexivity.
+Qed.
+
+Lemma rolB_nil n : rolB n [::] = [::].
+Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+Lemma rolB_singleton n b : rolB n [:: b] = [:: b].
+Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+Lemma rolBSn_rolBn_rolB1 n bs : rolB n.+1 bs = rolB n (rolB1 bs).
+Proof. rewrite /rolB. exact: iterSr. Qed.
+
+Lemma rorB1_concat_extract bs :
+  1 < size bs ->
+  rorB1 bs = extract (size bs - 1) 1 bs ++ extract 0 0 bs.
+Proof.
+  move=> Hsz. rewrite /rorB1 extract_lsb (extract_droplsb Hsz) cats1. 
+  rewrite droplsb_joinmsb; last by auto. reflexivity.
+Qed.
+
+Lemma rorB_nil n : rorB n [::] = [::].
+Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+Lemma rorB_singleton n b : rorB n [:: b] = [:: b].
+Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+Lemma rorBSn_rorBn_rorB1 n bs : rorB n.+1 bs = rorB n (rorB1 bs).
+Proof. rewrite /rorB. exact: iterSr. Qed.
+
 
 (* Equivalence Lemmas *)
 
@@ -210,13 +300,42 @@ Proof. by rewrite /SMTLIB.bvlshr. Qed.
 Lemma smtlib_bvult_ltB bs1 bs2 : SMTLIB.bvult bs1 bs2 = ltB bs1 bs2.
 Proof. by rewrite /SMTLIB.bvult. Qed.
 
-Lemma smtlib_bvxor_xorB bs1 bs2 : SMTLIB.bvxor bs1 bs2 = xorB bs1 bs2.
+Lemma smtlib_bvxor_xorB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvxor bs1 bs2 = xorB bs1 bs2.
 Proof. 
-Admitted.
+  rewrite /SMTLIB.bvxor /SMTLIB.bvand /SMTLIB.bvor /SMTLIB.bvnot. 
+  move: bs2. elim: bs1 => [| b1 bs1 IH] bs2; case: bs2 => [| b2 bs2] //=.
+  move=> /eqP Hsz. rewrite eqSS in Hsz. move: Hsz => /eqP Hsz.
+  rewrite 2!andB_cons xorB_cons orB_cons (IH _ Hsz). by case b1; case b2.
+Qed.  
 
-Lemma smtlib_bvcomp_eqop bs1 bs2 : SMTLIB.bvcomp bs1 bs2 = [:: eq_op bs1 bs2].
+Lemma smtlib_bvxnor_eqop b1 b2 : SMTLIB.bvxnor [:: b1] [:: b2] = [:: b1 == b2].
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvxnor /SMTLIB.bvor /SMTLIB.bvand /SMTLIB.bvnot.
+  by case b1; case b2.
+Qed.
+
+Lemma smtlib_bvcomp_eqop bs1 bs2 : 
+  0 < size bs1 -> size bs1 = size bs2 -> SMTLIB.bvcomp bs1 bs2 = [:: eq_op bs1 bs2].
+Proof.
+  apply SMTLIB.bvcomp_ind => {bs1 bs2} bs1 bs2 /=.
+  - rewrite leq_eqVlt. case/orP.
+    + move/eqP=> Hsz1 _ Hsz2. rewrite Hsz1 in Hsz2. apply Logic.eq_sym in Hsz2. 
+      rewrite (size1_msb Hsz1) (size1_msb Hsz2) smtlib_bvxnor_eqop. 
+      rewrite eqseq_cons andbT. reflexivity.
+    + move=> Hsz1. apply lt1_eq0 in Hsz1. rewrite Hsz1. done. 
+  - case; first done.
+    rewrite /SMTLIB.extract !size_extract subn0 leqNgt => Hsz1 _ IH Hsz0 Hsz.
+    apply negbFE in Hsz1. rewrite IH; [ | by rewrite addn1 ltn0Sn | done].
+    have Hsz2 : 1 < size bs2 by rewrite -Hsz.
+    rewrite extract_msb (extract_dropmsb Hsz1).
+    rewrite Hsz extract_msb (extract_dropmsb Hsz2). 
+    rewrite -[in RHS](joinmsb_splitmsb Hsz0).
+    rewrite Hsz in Hsz0. rewrite -[in RHS](joinmsb_splitmsb Hsz0).
+    rewrite smtlib_bvxnor_eqop /joinmsb eqseq_rcons smtlib_bvand_andB /msb /dropmsb.
+    by case: ((splitmsb bs1).1 == (splitmsb bs2).1); 
+      case: ((splitmsb bs1).2 == (splitmsb bs2).2). 
+Qed.    
 
 Lemma smtlib_bvsub_subB bs1 bs2 : 
   size bs1 = size bs2 -> SMTLIB.bvsub bs1 bs2 = subB bs1 bs2.
@@ -271,7 +390,8 @@ Admitted.
 
 Lemma smtlib_repeat_repeat j bs : SMTLIB.repeat j bs = repeat j bs.
 Proof.
-Admitted.
+  elim: j => [| j IH] //=. rewrite IH smtlib_concat_cat cat_repeat. reflexivity.
+Qed.
 
 Lemma smtlib_zero_extend_zext i bs : SMTLIB.zero_extend i bs = zext i bs.
 Proof.
@@ -283,8 +403,24 @@ Admitted.
 
 Lemma smtlib_rotate_left_rolB i bs : SMTLIB.rotate_left i bs = rolB i bs.
 Proof.
-Admitted.
+  move: bs. elim: i => [| i IH] //= bs. 
+  case Hsz : (size bs <= 1).
+  - rewrite leq_eqVlt in Hsz. case/orP: Hsz.
+    + move/eqP=> Hsz. by rewrite (size1_msb Hsz) rolB_singleton.
+    + move=> Hsz. apply lt1_eq0 in Hsz. by rewrite (eqP (size0 Hsz)) rolB_nil.
+  - rewrite /SMTLIB.concat /SMTLIB.extract.
+    rewrite leqNgt in Hsz. apply negbFE in Hsz. 
+    rewrite -(rolB1_concat_extract Hsz) IH -rolBSn_rolBn_rolB1. reflexivity.
+Qed.
 
 Lemma smtlib_rotate_right_rorB i bs : SMTLIB.rotate_right i bs = rorB i bs.
 Proof.
-Admitted.
+  move: bs. elim: i => [| i IH] //= bs. 
+  case Hsz : (size bs <= 1).
+  - rewrite leq_eqVlt in Hsz. case/orP: Hsz.
+    + move/eqP=> Hsz. by rewrite (size1_lsb Hsz) rorB_singleton.
+    + move=> Hsz. apply lt1_eq0 in Hsz. by rewrite (eqP (size0 Hsz)) rorB_nil.
+  - rewrite /SMTLIB.concat /SMTLIB.extract.
+    rewrite leqNgt in Hsz. apply negbFE in Hsz. 
+    rewrite -(rorB1_concat_extract Hsz) IH -rorBSn_rorBn_rorB1. reflexivity.
+Qed.
