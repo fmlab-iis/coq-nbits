@@ -914,6 +914,45 @@ Section Lemmas.
     - by trivial.
   Qed.
 
+  (* Lemmas about extract *)
+
+  Lemma extract_msb bs :
+    extract (size bs - 1) (size bs - 1) bs = [:: msb bs].
+  Proof.
+    case: (lastP bs) => {bs} [| bs b] //=.
+    rewrite /extract size_rcons subn1 -pred_Sn subnn add0n msb_rcons.
+    have->: size bs + 1 = size (rcons bs b) by rewrite size_rcons addn1. 
+    by rewrite low_size high1_rcons. 
+  Qed.
+  
+  Lemma extract_dropmsb bs :
+    1 < size bs -> extract (size bs - 2) 0 bs = dropmsb bs.
+  Proof.
+    case: (lastP bs) => {bs} [| bs b1] //=; case: (lastP bs) => {bs} [| bs b2] //=. 
+    rewrite /extract !size_rcons subn2 -!pred_Sn subn0 => _. 
+    rewrite low_rcons; last by rewrite size_rcons addn1.
+    have->: size bs + 1 = size (rcons bs b2) by rewrite size_rcons addn1.
+    by rewrite low_size high_size /dropmsb splitmsb_rcons.
+  Qed.
+
+  Lemma extract_lsb bs :
+    extract 0 0 bs = [:: lsb bs].
+  Proof.
+    case: bs => [| b bs] //=. by rewrite /extract /lsb subn0 add0n low1_cons /=.
+  Qed.
+  
+  Lemma extract_droplsb bs :
+    1 < size bs -> extract (size bs - 1) 1 bs = droplsb bs.
+  Proof.
+    case: bs => [| b1 bs] //=; case: bs => [| b2 bs] //=. 
+    rewrite /extract !subn1 -!pred_Sn => _. 
+    have->: (size bs).+1 + 1 = size [:: b1, b2 & bs] by rewrite addn1.
+    rewrite low_size high_cons; last by rewrite addn1. 
+    have->: size bs + 1 = size (b2 :: bs) by rewrite addn1.
+    by rewrite high_size. 
+  Qed.
+
+
   (* to_Zpos and to_Zneg is always non-negative *)
 
   Lemma to_Zpos_ge0 bs : (0 <= to_Zpos bs)%Z.
@@ -1108,6 +1147,19 @@ Section Lemmas.
     - rewrite sext_Sn IHn. rewrite msb_sext. rewrite -addn1.
       rewrite -addnA (addnC 1 m) addnA addn1 sext_Sn. reflexivity.
   Qed.
+
+
+  (* Lemmas about repeat *)
+
+  Lemma cat_repeat {A : Type} n (s : seq A) : s ++ (repeat n s) = (repeat n s) ++ s.
+  Proof.
+    elim: n => [| n IH] /=.
+    - by rewrite cats0.
+    - by rewrite {1}IH catA.
+  Qed.
+
+  Lemma repeat_singleton {A : Type} n (b : A) : repeat n [:: b] = copy n b.
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
 
 
   (* Lemmas about from_nat and to_nat *)
