@@ -258,6 +258,55 @@ Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
 Lemma rorBSn_rorBn_rorB1 n bs : rorB n.+1 bs = rorB n (rorB1 bs).
 Proof. rewrite /rorB. exact: iterSr. Qed.
 
+Lemma msb_diff_eqF bs1 bs2 : ~~ (msb bs1 == msb bs2) -> (bs1 == bs2) = false.
+Proof.
+  case (lastP bs1) => {bs1} [|bs1 b1]; case (lastP bs2) => {bs2} [|bs2 b2] //=.
+  - move=> _. rewrite -Bool.negb_true_iff (eq_sym [::]) rev_cons_nil. reflexivity.
+  - move=> _. rewrite -Bool.negb_true_iff rev_cons_nil. reflexivity.
+  - rewrite !msb_rcons eqseq_rcons. case b1; case b2; by rewrite ?andbF. 
+Qed.
+
+Lemma sarB1_msb0 bs : msb bs = false -> sarB1 bs = shrB1 bs.
+Proof. rewrite /sarB1 /shrB1. by move=> ->. Qed.
+
+Lemma sarB_msb0 n bs : msb bs = false -> sarB n bs = shrB n bs.
+Proof.
+  elim: n => [| n IH] //=.
+  move=> Hmsb. rewrite (IH Hmsb) {IH} sarB1_msb0; first reflexivity.
+  case: n => [| n] //=. exact: msb_shrB1.
+Qed.
+
+Lemma droplsb_invB bs : droplsb (invB bs) = invB (droplsb bs).
+Proof. case: bs => [| b bs] //=. Qed.
+
+Lemma invB_joinmsb bs b : invB (joinmsb bs b) = joinmsb (invB bs) (~~ b).
+Proof. exact: invB_rcons. Qed.
+
+Lemma invB_joinlsb b bs : invB (joinlsb b bs) = joinlsb (~~ b) (invB bs).
+Proof. exact: invB_cons. Qed.
+
+Lemma sarB1_msb1 bs : msb bs = true -> sarB1 bs = invB (shrB1 (invB bs)).
+Proof. 
+  rewrite /sarB1 /shrB1 => Hmsb. 
+  rewrite -droplsb_invB invB_joinmsb invB_involutive Hmsb. reflexivity.
+Qed.
+
+Lemma sarB_msb1 n bs : msb bs = true -> sarB n bs = invB (shrB n (invB bs)).
+Proof.
+  elim: n => [| n IH] /=.
+  - rewrite invB_involutive. reflexivity.
+  - move=> Hmsb. rewrite (IH Hmsb) {IH} sarB1_msb1; first by rewrite invB_involutive.
+    move: Hmsb; case: (lastP bs) => {bs} [| bs b] //=.
+    rewrite msb_rcons => ->. 
+    rewrite -msb_invB; last by rewrite size_shrB size_invB size_rcons.
+    case: n => [| n] /=.
+    + rewrite -msb_invB; last by rewrite size_rcons. 
+      rewrite msb_rcons. reflexivity.
+    + by rewrite msb_shrB1.
+Qed.
+
+Lemma repeat_singleton {A : Type} n (b : A) : repeat n [:: b] = copy n b.
+Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
 
 (* Equivalence Lemmas *)
 
@@ -389,35 +438,66 @@ Qed.
                                                                    
 Lemma smtlib_bvule_leB bs1 bs2 : SMTLIB.bvule bs1 bs2 = leB bs1 bs2.
 Proof. 
-Admitted.
+  rewrite /SMTLIB.bvule /leB smtlib_bvult_ltB orbC. reflexivity.
+Qed.
 
 Lemma smtlib_bvugt_gtB bs1 bs2 : SMTLIB.bvugt bs1 bs2 = gtB bs1 bs2.
 Proof. 
-Admitted.
+  rewrite /SMTLIB.bvugt /gtB smtlib_bvult_ltB. reflexivity.
+Qed.
 
 Lemma smtlib_bvuge_geB bs1 bs2 : SMTLIB.bvuge bs1 bs2 = geB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvuge /geB /leB smtlib_bvult_ltB orbC eq_sym. reflexivity.
+Qed.
 
-Lemma smtlib_bvslt_sltB bs1 bs2 : SMTLIB.bvslt bs1 bs2 = sltB bs1 bs2.
+Lemma smtlib_bvslt_sltB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvslt bs1 bs2 = sltB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvslt /SMTLIB.extract /SMTLIB.bvult => Hsz. 
+  rewrite {3 4 7 8}Hsz !extract_msb. 
+  case Hmsb1 : (msb bs1); case Hmsb2 : (msb bs2) => /=.
+  - rewrite (ltB_sltB_same Hsz); last by rewrite ?Hmsb1 ?Hmsb2. reflexivity.
+  - by rewrite (sltB_diff Hmsb1 Hmsb2).
+  - rewrite /msb in Hmsb1 Hmsb2. by rewrite /sltB Hmsb1 Hmsb2. 
+  - rewrite (ltB_sltB_same Hsz); last by rewrite ?Hmsb1 ?Hmsb2. reflexivity.
+Qed.
 
-Lemma smtlib_bvsle_sleB bs1 bs2 : SMTLIB.bvsle bs1 bs2 = sleB bs1 bs2.
+Lemma smtlib_bvsle_sleB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvsle bs1 bs2 = sleB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvsle /sleB /SMTLIB.extract => Hsz.
+  rewrite {3 4 7 8}Hsz !extract_msb smtlib_bvule_leB /leB. 
+  case Hmsb1 : (msb bs1); case Hmsb2 : (msb bs2) => /=.
+  - rewrite (ltB_sltB_same Hsz); last by rewrite ?Hmsb1 ?Hmsb2. reflexivity.
+  - by rewrite (sltB_diff Hmsb1 Hmsb2) orbT.
+  - rewrite msb_diff_eqF; last by rewrite Hmsb1 Hmsb2.  
+    rewrite /msb in Hmsb1 Hmsb2. by rewrite /sltB Hmsb1 Hmsb2. 
+  - rewrite (ltB_sltB_same Hsz); last by rewrite ?Hmsb1 ?Hmsb2. reflexivity.
+Qed.
 
-Lemma smtlib_bvsgt_sgtB bs1 bs2 : SMTLIB.bvsgt bs1 bs2 = sgtB bs1 bs2.
+Lemma smtlib_bvsgt_sgtB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvsgt bs1 bs2 = sgtB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvsgt /sgtB => Hsz. apply Logic.eq_sym in Hsz. 
+  exact: smtlib_bvslt_sltB.
+Qed.
 
-Lemma smtlib_bvsge_sgeB bs1 bs2 : SMTLIB.bvsge bs1 bs2 = sgeB bs1 bs2.
+Lemma smtlib_bvsge_sgeB bs1 bs2 : 
+  size bs1 = size bs2 -> SMTLIB.bvsge bs1 bs2 = sgeB bs1 bs2.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvsge /sgeB => Hsz. apply Logic.eq_sym in Hsz.
+  exact: smtlib_bvsle_sleB.
+Qed.
 
 Lemma smtlib_bvashr_sarB bs1 bs2 : SMTLIB.bvashr bs1 bs2 = sarB (to_nat bs2) bs1.
 Proof.
-Admitted.
+  rewrite /SMTLIB.bvashr /SMTLIB.extract extract_msb.
+  rewrite !smtlib_bvlshr_shrB !smtlib_bvnot_invB.
+  case Hmsb1 : (msb bs1) => /=.
+  - rewrite (sarB_msb1 (to_nat bs2) Hmsb1). reflexivity.
+  - rewrite (sarB_msb0 (to_nat bs2) Hmsb1). reflexivity.
+Qed.
 
 Lemma smtlib_repeat_repeat j bs : SMTLIB.repeat j bs = repeat j bs.
 Proof.
@@ -426,11 +506,18 @@ Qed.
 
 Lemma smtlib_zero_extend_zext i bs : SMTLIB.zero_extend i bs = zext i bs.
 Proof.
-Admitted.
+  rewrite /SMTLIB.zero_extend /zext. case: i => [| i]. 
+  - by rewrite zeros0 cats0.
+  - rewrite smtlib_concat_cat smtlib_repeat_repeat repeat_singleton. reflexivity.
+Qed.
 
 Lemma smtlib_sign_extend_sext i bs : SMTLIB.sign_extend i bs = sext i bs.
 Proof.
-Admitted.
+  rewrite /SMTLIB.sign_extend /sext. case: i => [| i]. 
+  - by rewrite /= cats0.
+  - rewrite /SMTLIB.extract extract_msb. 
+    rewrite smtlib_concat_cat smtlib_repeat_repeat repeat_singleton. reflexivity.
+Qed.
 
 Lemma smtlib_rotate_left_rolB i bs : SMTLIB.rotate_left i bs = rolB i bs.
 Proof.
