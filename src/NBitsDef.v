@@ -1337,6 +1337,52 @@ Section Lemmas.
          rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0. Qed.
 
 
+  (* Lemmas about from_N and to_N *)
+
+  Lemma from_N_to_N bs : from_N (size bs) (to_N bs) = bs.
+  Proof.
+    elim: bs => [| b bs IH] //=.
+    rewrite N.mul_comm. rewrite N.odd_add_mul_2 N.add_b2n_double_div2 IH. 
+    by case: b.
+  Qed.
+
+  Lemma from_N_wrap n : forall m, from_N n m = from_N n (m + 2 ^ N.of_nat n).
+  Proof. 
+    elim: n => [//= | n IHn m]. rewrite /from_N -/from_N. 
+    rewrite Nnat.Nat2N.inj_succ N.pow_succ_r; last exact: N.le_0_l. 
+    rewrite N.odd_add_mul_2 IHn N.mul_comm N.div_add; last done. reflexivity.
+  Qed.
+
+  Lemma from_N_wrapMany n k m : from_N n m = from_N n (m + k * 2 ^ N.of_nat n).
+  Proof.
+    move: k. apply N.peano_ind.
+    - by rewrite N.mul_0_l N.add_0_r.
+    - move=> k IH. by rewrite N.mul_succ_l N.add_assoc IH from_N_wrap.
+  Qed.
+
+  Lemma to_N_from_N_bounded : forall n m, 
+      (m < 2 ^ N.of_nat n)%num -> to_N (from_N n m) = m.
+  Proof.
+    elim => [/= | n IH] m. 
+    - by rewrite N.lt_1_r.
+    - move=> Hm /=. 
+      rewrite IH; first by rewrite -N.div2_div N.add_comm N.mul_comm -N.div2_odd.
+      rewrite (N.mul_lt_mono_pos_r 2); last done.
+      rewrite Nnat.Nat2N.inj_succ N.pow_succ_r in Hm; last exact: N.le_0_l. 
+      rewrite N.mul_comm in Hm.
+      apply: (N.le_lt_trans _ _ _ _ Hm). rewrite N.mul_comm. by apply N.mul_div_le.
+  Qed.
+
+  Lemma to_N_from_N n m : to_N (from_N n m) = (m mod (2 ^ N.of_nat n))%num.
+  Proof. 
+    rewrite (N.div_mod m (2 ^ N.of_nat n)); last exact: N.pow_nonzero. 
+    rewrite N.add_comm N.mul_comm -from_N_wrapMany. 
+    have Hnz : (2 ^ N.of_nat n)%num <> 0%num by exact: N.pow_nonzero.
+    rewrite (N.mod_add _ _ _ Hnz) (N.mod_mod _ _ Hnz).
+    rewrite to_N_from_N_bounded; first reflexivity.
+    by apply: N.mod_lt. 
+  Qed.
+
   (* Lemmas about to_Zpos *)
 
   Lemma to_Zpos_nil : to_Zpos [::] = 0%Z.

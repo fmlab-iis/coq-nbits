@@ -3160,7 +3160,37 @@ Section Lemmas.
     - move => m IH .
       by rewrite -ones_cons -zeros_cons (eqP (@succB1 _)) (eqP IH) .
   Qed .      
+
+  (* succB semantics *)
   
+  Lemma from_nat_succB bs : succB bs = from_nat (size bs) (to_nat bs).+1.
+  Proof.
+    rewrite from_natSn_from_nat from_nat_to_nat addB1. reflexivity. 
+  Qed.
+
+  Lemma from_Zpos_succB bs : succB bs = from_Zpos (size bs) (to_Zpos bs + 1).
+  Proof.
+    elim: bs => [| b bs IH] //=.
+    rewrite Z.add_comm Z.add_assoc {1}Z.mul_comm. 
+    rewrite Z.odd_add_mul_2 Z.div2_div Z_div_plus; last done.
+    case: b. 
+    - rewrite IH. 
+      have->: (1 + Z.b2z true = 2)%Z by reflexivity.
+      rewrite Z.div_same; last done.
+      by rewrite Z.add_comm. 
+    - have->: (1 + Z.b2z false = 1)%Z by reflexivity.
+      by rewrite /= from_Zpos_to_Zpos.
+  Qed.
+
+  Lemma to_Zpos_succB bs : 
+    to_Zpos (succB bs) = ((to_Zpos bs + 1) mod 2 ^ Z.of_nat (size bs))%Z.
+  Proof.
+    move: (@to_Zpos_ge0 bs) => Hbs.
+    rewrite from_Zpos_succB to_Zpos_from_Zpos; last by omega.
+    reflexivity.
+  Qed.
+
+
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
@@ -9558,55 +9588,6 @@ Admitted.
     Semantics of operations w.r.t. N
   ---------------------------------------------------------------------------*)  
 
-  Lemma nat_Z_N n : Z.to_N (Z.of_nat n) = N.of_nat n.
-  Proof. by rewrite -Z_nat_N Nat2Z.id. Qed.
-
-
-  Lemma from_nat_succB bs : succB bs = from_nat (size bs) (to_nat bs).+1.
-  Proof.
-    rewrite from_natSn_from_nat from_nat_to_nat addB1. reflexivity. 
-  Qed.
-
-  Lemma from_Zpos_succB bs : succB bs = from_Zpos (size bs) (to_Zpos bs + 1).
-  Proof.
-    elim: bs => [| b bs IH] //=.
-    rewrite Z.add_comm Z.add_assoc {1}Z.mul_comm. 
-    rewrite Z.odd_add_mul_2 Z.div2_div Z_div_plus; last done.
-    case: b. 
-    - rewrite IH. 
-      have->: (1 + Z.b2z true = 2)%Z by reflexivity.
-      rewrite Z.div_same; last done.
-      by rewrite Z.add_comm. 
-    - have->: (1 + Z.b2z false = 1)%Z by reflexivity.
-      by rewrite /= from_Zpos_to_Zpos.
-  Qed.
-
-(*
-  Lemma to_nat_succB bs : to_nat (succB bs) = (to_nat bs + 1) mod 2 ^ (size bs).
-  Proof.
-    rewrite from_nat_succB. Search _ from_nat. rewrite to_nat_from_nat.
-    rewrite addn1. Print "_ mod _". Search modn.
-    Search _ to_nat.
-*)
-
-  Lemma to_Zpos_succB bs : 
-    to_Zpos (succB bs) = ((to_Zpos bs + 1) mod 2 ^ Z.of_nat (size bs))%Z.
-  Proof.
-    move: (@to_Zpos_ge0 bs) => Hbs.
-    rewrite from_Zpos_succB to_Zpos_from_Zpos; last by omega.
-    reflexivity.
-  Qed.
-
-(*
-  Lemma to_Zpos_succB bs : 
-    to_Zpos (succB bs) = ((to_Zpos bs + 1) mod 2 ^ Z.of_nat (size bs))%Z.
-  Proof.
-    rewrite to_Zpos_nat to_nat_succB.
-    rewrite mod_Zmod; last by rewrite expn_pow; apply Nat.pow_nonzero. 
-    rewrite Nat2Z.inj_add Nat2Z_inj_expn -to_Zpos_nat. reflexivity.
-  Qed.
-*)
-
   Lemma to_N_succB bs : 
     to_N (succB bs) = ((to_N bs + 1) mod 2 ^ N.of_nat (size bs))%num.
   Proof.  
@@ -9617,50 +9598,6 @@ Admitted.
     rewrite -!to_N_Zpos nat_Z_N. reflexivity.
   Qed.
 
-  Lemma from_N_to_N bs : from_N (size bs) (to_N bs) = bs.
-  Proof.
-    elim: bs => [| b bs IH] //=.
-    rewrite N.mul_comm. rewrite N.odd_add_mul_2 N.add_b2n_double_div2 IH. 
-    by case: b.
-  Qed.
-
-  Lemma from_N_wrap n : forall m, from_N n m = from_N n (m + 2 ^ N.of_nat n).
-  Proof. 
-    elim: n => [//= | n IHn m]. rewrite /from_N -/from_N. 
-    rewrite Nnat.Nat2N.inj_succ N.pow_succ_r; last exact: N.le_0_l. 
-    rewrite N.odd_add_mul_2 IHn N.mul_comm N.div_add; last done. reflexivity.
-  Qed.
-
-  Lemma from_N_wrapMany n k m : from_N n m = from_N n (m + k * 2 ^ N.of_nat n).
-  Proof.
-    move: k. apply N.peano_ind.
-    - by rewrite N.mul_0_l N.add_0_r.
-    - move=> k IH. by rewrite N.mul_succ_l N.add_assoc IH from_N_wrap.
-  Qed.
-
-  Lemma to_N_from_N_bounded : forall n m, 
-      (m < 2 ^ N.of_nat n)%num -> to_N (from_N n m) = m.
-  Proof.
-    elim => [/= | n IH] m. 
-    - by rewrite N.lt_1_r.
-    - move=> Hm /=. 
-      rewrite IH; first by rewrite -N.div2_div N.add_comm N.mul_comm -N.div2_odd.
-      rewrite (N.mul_lt_mono_pos_r 2); last done.
-      rewrite Nnat.Nat2N.inj_succ N.pow_succ_r in Hm; last exact: N.le_0_l. 
-      rewrite N.mul_comm in Hm.
-      apply: (N.le_lt_trans _ _ _ _ Hm). rewrite N.mul_comm. by apply N.mul_div_le.
-  Qed.
-
-  Lemma to_N_from_N n m : to_N (from_N n m) = (m mod (2 ^ N.of_nat n))%num.
-  Proof. 
-    rewrite (N.div_mod m (2 ^ N.of_nat n)); last exact: N.pow_nonzero. 
-    rewrite N.add_comm N.mul_comm -from_N_wrapMany. 
-    have Hnz : (2 ^ N.of_nat n)%num <> 0%num by exact: N.pow_nonzero.
-    rewrite (N.mod_add _ _ _ Hnz) (N.mod_mod _ _ Hnz).
-    rewrite to_N_from_N_bounded; first reflexivity.
-    by apply: N.mod_lt. 
-  Qed.
-    
   Lemma from_N_succB bs : succB bs = from_N (size bs) ((to_N bs) + 1). 
   Proof.  
     move: (to_N_succB bs) => H. apply (f_equal (from_N (size bs))) in H.
@@ -9741,6 +9678,15 @@ Admitted.
   Proof.
     move=> Hsz. 
     rewrite (to_Zpos_leB Hsz) !to_N_Zpos Z2N.inj_le; try done; exact: to_Zpos_ge0.
+  Qed.
+
+  Lemma to_N_leB_eqn bs1 bs2 : 
+    size bs1 = size bs2 -> leB bs1 bs2 = (to_N bs1 <=? to_N bs2)%num.
+  Proof.
+    move=> Hsz.
+    case HleB : (leB bs1 bs2); case Hleb : (to_N bs1 <=? to_N bs2)%num; try done.
+    - apply (to_N_leB Hsz), N.leb_le in HleB. by rewrite -HleB -Hleb.
+    - apply N.leb_le, (to_N_leB Hsz) in Hleb. by rewrite -HleB -Hleb.
   Qed.
 
 End Lemmas.

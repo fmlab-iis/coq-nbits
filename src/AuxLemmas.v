@@ -18,6 +18,8 @@ Proof. by case: b. Qed.
 Lemma nat_of_bool_is_b2n b : nat_of_bool b = Nat.b2n b.
 Proof. reflexivity. Qed.
 
+Lemma nat_Z_N n : Z.to_N (Z.of_nat n) = N.of_nat n.
+Proof. by rewrite -Z_nat_N Nat2Z.id. Qed.
 
 Lemma negb_eq_negb (b1 b2 : bool) : (~~ b1 = ~~ b2) -> (b1 = b2).
 Proof. by case: b1; case: b2. Qed.
