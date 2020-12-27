@@ -3616,6 +3616,18 @@ Section Lemmas.
     rewrite /borrow_subB /subB => Hsz. by rewrite (to_Zpos_sbbB _ Hsz) Z.sub_0_r.
   Qed.
 
+  Lemma to_Zpos_subB' bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_Zpos (bs1 -# bs2) = 
+    ((to_Zpos bs1 - to_Zpos bs2) mod 2 ^ Z.of_nat (size bs1))%Z.
+  Proof.
+    move=> Hsz.
+    rewrite -(low_size (subB _ _)) size_subB -Hsz minnn.
+    rewrite -to_Zpos_mod_pow2 (to_Zpos_subB Hsz).
+    rewrite -Z.add_sub_assoc Z.add_comm Z.mod_add; last exact: pow2_nat2z_nonzero.
+    reflexivity. 
+  Qed.
+
   (* *)
   
   Lemma ltB_msb_subB bs1 bs2 :
@@ -9588,6 +9600,8 @@ Admitted.
     Semantics of operations w.r.t. N
   ---------------------------------------------------------------------------*)  
 
+  (* succB *)
+
   Lemma to_N_succB bs : 
     to_N (succB bs) = ((to_N bs + 1) mod 2 ^ N.of_nat (size bs))%num.
   Proof.  
@@ -9605,14 +9619,31 @@ Admitted.
     rewrite {2}(N.div_mod' (to_N bs + 1) (2 ^ N.of_nat (size bs))).
     rewrite N.mul_comm [in RHS]N.add_comm -from_N_wrapMany. reflexivity.    
   Qed.
-    
-(*
-  Lemma to_N_succB bs : succB bs = from_N (size bs) ((to_N bs) + 1). 
+
+  (* negB *)
+
+  Lemma to_N_negB bs : 
+    to_N (negB bs) = ((2 ^ N.of_nat (size bs) - to_N bs) mod 2 ^ N.of_nat (size bs))%num.
   Proof.
-    rewrite from_N_nat to_nat_succB. 
-    rewrite to_N_nat Nnat.N2Nat.inj_add Nnat.Nat2N.id -addn1. reflexivity.
+    rewrite to_N_Zpos to_Zpos_negB -(Z.mod_add _ 1); last exact: pow2_nat2z_nonzero.
+    rewrite Z.mul_1_l Z.add_comm Z.add_opp_r.
+    move: (to_Zpos_bounded bs) => Hbnd; apply Z.lt_0_sub in Hbnd.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_sub; last exact: to_Zpos_ge0.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite -!to_N_Zpos nat_Z_N. reflexivity.    
   Qed.
-*)
+
+  Lemma from_N_negB bs : 
+    negB bs = from_N (size bs) (2 ^ N.of_nat (size bs) - to_N bs).
+  Proof.
+    move: (to_N_negB bs) => H. apply (f_equal (from_N (size bs))) in H.
+    move: (size_negB bs) => Hsz. rewrite -{1}Hsz from_N_to_N in H. rewrite H. 
+    rewrite {2}(N.div_mod' (2 ^ _ - to_N bs) (2 ^ N.of_nat (size bs))).
+    rewrite N.mul_comm [in RHS]N.add_comm -from_N_wrapMany. reflexivity.    
+  Qed.
+    
+  (* addB *)
 
   Lemma to_N_addB bs1 bs2 : 
     size bs1 = size bs2 -> 
@@ -9626,6 +9657,29 @@ Admitted.
     rewrite -!to_N_Zpos nat_Z_N. reflexivity.
   Qed.
 
+  (* subB *)
+
+  Lemma to_N_subB bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_N (subB bs1 bs2) = 
+    ((2 ^ N.of_nat (size bs1) + to_N bs1 - to_N bs2) mod 2 ^ N.of_nat (size bs1))%num.
+  Proof.
+    move=> Hsz.
+    rewrite to_N_Zpos (to_Zpos_subB' Hsz). 
+    rewrite -(Z.mod_add _ 1); last exact: pow2_nat2z_nonzero. 
+    rewrite Z.mul_1_l -Z.add_sub_swap -Z.add_sub_assoc.
+    move: (@to_Zpos_ge0 bs1) (@to_Zpos_ge0 bs2) (to_Zpos_bounded bs2) => H1 H2 Hbnd.
+    have H : (0 <= 2 ^ Z.of_nat (size bs1) - to_Zpos bs2)%Z by rewrite Hsz; omega.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_add; try done.
+    rewrite Z2N.inj_sub; last exact: H2.
+    rewrite N.add_sub_assoc; last by apply (Z2N.inj_le _ _ H2); rewrite Hsz; omega.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite N.add_comm -!to_N_Zpos nat_Z_N. reflexivity.
+  Qed.
+
+  (* mulB *)
+  
   Lemma to_N_mulB bs1 bs2 :
     to_N (mulB bs1 bs2) = ((to_N bs1 * to_N bs2) mod 2 ^ N.of_nat (size bs1))%num.
   Proof.
@@ -9636,6 +9690,8 @@ Admitted.
     rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
     rewrite -!to_N_Zpos nat_Z_N. reflexivity.
   Qed.    
+
+  (* udivB *)
 
   Lemma to_N_udivB_zero bs n : udivB' bs (zeros n) = ones (size bs).
   Proof. by rewrite /udivB' udivB0. Qed.
@@ -9649,6 +9705,8 @@ Admitted.
     rewrite Z2N.inj_div; try done. by rewrite -!to_N_Zpos.
   Qed.
 
+  (* uremB *)
+
   Lemma to_N_uremB_zero bs n : uremB bs (zeros n) = bs.
   Proof. by rewrite /uremB udivB0. Qed.    
 
@@ -9661,6 +9719,8 @@ Admitted.
     rewrite Z2N.inj_mod; try done. by rewrite -!to_N_Zpos.
   Qed.
 
+  (* ltB *)
+
   Lemma to_N_ltB bs1 bs2 : ltB bs1 bs2 <-> (to_N bs1 < to_N bs2)%num.
   Proof.
     rewrite to_Zpos_ltB !to_N_Zpos Z2N.inj_lt; try done; exact: to_Zpos_ge0.
@@ -9672,6 +9732,8 @@ Admitted.
     - apply to_N_ltB, N.ltb_lt in HltB. by rewrite -HltB -Hltb.
     - apply N.ltb_lt, to_N_ltB in Hltb. by rewrite -HltB -Hltb.
   Qed.
+
+  (* leB *)
 
   Lemma to_N_leB bs1 bs2 : 
     size bs1 = size bs2 -> leB bs1 bs2 <-> (to_N bs1 <= to_N bs2)%num.
