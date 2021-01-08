@@ -656,6 +656,15 @@ Section Lemmas.
       by rewrite -{1}(expn0 2) ltn_exp2l; [rewrite H|done].
   Qed. 
 
+  Lemma msb_diff_eqF bs1 bs2 : ~~ (msb bs1 == msb bs2) -> (bs1 == bs2) = false.
+  Proof.
+    case (lastP bs1) => {bs1} [|bs1 b1]; case (lastP bs2) => {bs2} [|bs2 b2] //=.
+    - move=> _. rewrite -Bool.negb_true_iff (eq_sym [::]) rev_cons_nil. reflexivity.
+    - move=> _. rewrite -Bool.negb_true_iff rev_cons_nil. reflexivity.
+    - rewrite !msb_rcons eqseq_rcons. case b1; case b2; by rewrite ?andbF. 
+  Qed.
+
+
   (*---------------------------------------------------------------------------
     Size after operations
     ---------------------------------------------------------------------------*)
@@ -1351,7 +1360,7 @@ Section Lemmas.
         rewrite Hif; last split; done .
   Qed .
 
-    Lemma leBB bs1 : leB bs1 bs1.
+  Lemma leBB bs1 : leB bs1 bs1.
   Proof. rewrite to_Zpos_leB; last done. omega. Qed.
   
 
@@ -1490,125 +1499,101 @@ Section Lemmas.
   Qed.
 
   (*---------------------------------------------------------------------------
-    Properties of arithmetic shift right
+    Properties of rotation to left and to right
     ---------------------------------------------------------------------------*)
+
+  Lemma rolB1_concat_extract bs :
+    1 < size bs ->
+    rolB1 bs = extract (size bs - 1) (size bs - 1) bs ++ extract (size bs - 2) 0 bs.
+  Proof.
+    move=> Hsz. rewrite /rolB1 extract_msb (extract_dropmsb Hsz) /= /joinlsb. 
+    rewrite dropmsb_joinlsb; last by auto. reflexivity.
+  Qed.
   
-  Lemma sarB_add bs i j :
-    sarB i (sarB j bs) = sarB (i + j) bs .
-  Proof .
-      by rewrite /sarB iter_add .
-  Qed .
-
-  Lemma msb_sarB1 bs : msb (sarB1 bs) = msb bs.
+  Lemma rolB_nil n : rolB n [::] = [::].
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+  
+  Lemma rolB_singleton n b : rolB n [:: b] = [:: b].
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+  
+  Lemma rolBSn_rolBn_rolB1 n bs : rolB n.+1 bs = rolB n (rolB1 bs).
+  Proof. rewrite /rolB. exact: iterSr. Qed.
+  
+  Lemma rorB1_concat_extract bs :
+    1 < size bs ->
+    rorB1 bs = extract (size bs - 1) 1 bs ++ extract 0 0 bs.
   Proof.
-    case: bs => [| b bs] //=.
-    rewrite /sarB1 /= /droplsb /= /msb splitmsb_joinmsb /=. reflexivity.
+    move=> Hsz. rewrite /rorB1 extract_lsb (extract_droplsb Hsz) cats1. 
+    rewrite droplsb_joinmsb; last by auto. reflexivity.
   Qed.
+  
+  Lemma rorB_nil n : rorB n [::] = [::].
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+  
+  Lemma rorB_singleton n b : rorB n [:: b] = [:: b].
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+  
+  Lemma rorBSn_rorBn_rorB1 n bs : rorB n.+1 bs = rorB n (rorB1 bs).
+  Proof. rewrite /rorB. exact: iterSr. Qed.
 
-  Lemma msb_sarB bs n : msb (sarB n bs) = msb bs.
-  Proof.
-    elim: n => [| n IHn] //=. rewrite msb_sarB1 IHn. reflexivity.
-  Qed.
+  (*---------------------------------------------------------------------------
+    Properties of inversion
+  ---------------------------------------------------------------------------*)
 
-  Lemma sarB_nil n : sarB n [::] = [::].
-  Proof.
-    elim: n => [| n IHn] //=. by rewrite IHn.
-  Qed.
-
-  Lemma sarB1_copy n b : sarB1 (copy n b) = copy n b.
-  Proof.
-    case: n => [| n] //=. 
-    rewrite /sarB1 copy_cons -{2}copy_rcons /msb splitmsb_rcons /= /droplsb /=.
-    rewrite /joinmsb copy_rcons. reflexivity.
-  Qed.
-
-  Lemma sarB1_zeros n : sarB1 (zeros n) = zeros n.
-  Proof. exact: sarB1_copy. Qed.
-
-  Lemma sarB1_ones n : sarB1 (ones n) = ones n.
-  Proof. exact: sarB1_copy. Qed.
-
-  Lemma sarB_copy n b m : sarB m (copy n b) = copy n b.
-  Proof. elim: m => [| m IHm] //=. by rewrite IHm sarB1_copy. Qed.
-
-  Lemma sarB_zeros n m : sarB m (zeros n) = zeros n.
-  Proof. exact: sarB_copy. Qed.
-
-  Lemma sarB_ones n m : sarB m (ones n) = ones n.
-  Proof. exact: sarB_copy. Qed.
-
-  Lemma sarB_cat bs n : 
-    n <= size bs -> sarB n bs = high (size bs - n) bs ++ copy n (msb bs).
-  Proof.    
-    elim: n => [| n IHn] Hsz /=.
-    - by rewrite cats0 subn0 high_size. 
-    - rewrite /sarB1 msb_sarB. rewrite IHn; last by apply ltnW. 
-      rewrite /joinmsb rcons_cat copy_rcons copy_cons.
-      rewrite droplsb_cat; last by rewrite size_high subn_gt0.
-      rewrite -(subnSK Hsz) droplsb_high. reflexivity.
-  Qed.
-
-  Lemma sarB_size bs : sarB (size bs) bs = copy (size bs) (msb bs).
+  Lemma invB_low bs n :
+    n <= size bs -> ~~# (low n bs) = low n (~~# bs).
   Proof. 
-    rewrite sarB_cat; last trivial. by rewrite subnn high0. 
+    move=> Hn.
+    move: (@cat_low_high bs n (size bs - n) (subnKC Hn)) => Hcat.
+    apply (f_equal invB) in Hcat. rewrite -size_invB in Hn. rewrite invB_cat in Hcat.
+    rewrite -(@cat_low_high (~~# bs) n (size (~~# bs) - n) (subnKC Hn)) in Hcat.
+    move/eqP: Hcat. 
+    have Hsz : size (~~# low n bs) = size (low n (~~# bs)) 
+      by rewrite size_invB 2!size_low.
+    rewrite (eqseq_cat _ _ Hsz) => /andP [/eqP H _]. exact: H.
   Qed.
 
-  Lemma sarB_oversize bs n : size bs <= n -> sarB n bs = copy (size bs) (msb bs).
+  Lemma dropmsb_invB bs : dropmsb (invB bs) = invB (dropmsb bs).
   Proof.
-    move=> Hsz. rewrite -(subnK Hsz) -sarB_add sarB_size sarB_copy. reflexivity.
+    case (lastP bs) => {bs} [//= | bs b].
+    rewrite invB_rcons !dropmsb_joinmsb. reflexivity.
   Qed.
 
-  Lemma sarB1_is_sarB bs : sarB1 bs = sarB 1 bs.
-  Proof. reflexivity. Qed.
+  Lemma droplsb_invB bs : droplsb (invB bs) = invB (droplsb bs).
+  Proof. case: bs => [| b bs] //=. Qed.
 
-  Lemma sarB1_sarB_succ bs n : sarB1 (sarB n bs) = sarB (n.+1) bs.
-  Proof. reflexivity. Qed.
+  Lemma invB_joinmsb bs b : invB (joinmsb bs b) = joinmsb (invB bs) (~~ b).
+  Proof. exact: invB_rcons. Qed.
 
-  Lemma sarB_sarB1_succ bs n : sarB n (sarB1 bs) = sarB (n.+1) bs.
+  Lemma invB_joinlsb b bs : invB (joinlsb b bs) = joinlsb (~~ b) (invB bs).
+  Proof. exact: invB_cons. Qed.
+
+  (* invB semantics *)
+
+  Lemma to_nat_invB bs :
+    to_nat (~~# bs) = 2 ^ (size bs) - 1 - to_nat bs.
   Proof.
-    rewrite sarB1_is_sarB. rewrite sarB_add. rewrite addn1. reflexivity.
-  Qed.
-
-  Lemma sarB1_sarB_comm bs n : sarB1 (sarB n bs) =  sarB n (sarB1 bs).
-  Proof.
-    rewrite !sarB1_is_sarB. rewrite !sarB_add. rewrite addnC. reflexivity.
-  Qed.
-
-  (* sarB1 semantics *)
-  
-  Lemma to_Z_sarB1 bs : 1 < size bs -> to_Z (sarB1 bs) = (Z.div (to_Z bs) 2)%Z.
-  Proof.
-    intros.
-    rewrite /sarB1 (droplsb_joinmsb (msb bs) (ltnW H)).
-    have Haux : [::msb bs] == [::(msb (droplsb bs))] by rewrite -!high1_msb (high_droplsb H). 
-    rewrite eqseq_cons eq_refl andbT in Haux. rewrite (eqP Haux).
-    rewrite /joinmsb -cats1 -{1}(sext0 (droplsb bs)) -sext_Sn to_Z_sext.
-    rewrite 2!to_Z_to_Zpos -(eqP Haux) size_droplsb to_Zpos_droplsb Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
-    rewrite Z.pow_sub_r;
-      [rewrite Z.pow_1_r|omega|split; [apply Nat2Z.is_nonneg|rewrite -Nat2Z.inj_le; apply/leP; rewrite (ltnW H)//]].
-    case (msb bs); last rewrite !Z.mul_0_l !Z.sub_0_r//.
-    rewrite !Z.mul_1_l.
-    have -> : (2 ^ Z.of_nat (size bs) = 2 ^ Z.of_nat (size bs - 1) * 2)%Z.
+    elim: bs => [// | b bs IH]. rewrite /= IH -!mul2n !mulnBr expnS muln1 subnDA.
+    have Hle :  2 * to_nat bs <= 2 * 2 ^ size bs - 2.
     {
-      rewrite -{3}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
-      rewrite Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
-      rewrite Z.sub_simpl_r//.
+      move: (to_nat_bounded bs). 
+      rewrite -{1}(prednK (exp2n_gt0 (size bs))) ltnS -subn1.
+      move=> H. apply (@leq_mul 2 _ 2 _) in H; last done.
+      rewrite mulnBr muln1 in H. exact: H.
     }
-    rewrite -!Z.add_opp_r -Z.mul_opp_l Z_div_plus// Z_div_mult//. 
+    rewrite (addnBA _ Hle) addnC -(subnDA 1 _ b). case b => /=.
+    - rewrite addn0 addn1. reflexivity.
+    - rewrite addn0 addn1 subnSK; first reflexivity. 
+      rewrite mul2n. apply double_gt1. exact: exp2n_gt0. 
   Qed.
 
-  (* sarB semantics *)
-  Lemma to_Z_sarB n bs : 1 < size bs -> to_Z (sarB n bs) = (Z.div (to_Z bs) (2 ^ Z.of_nat n))%Z.
+  Lemma to_Zpos_invB_full bs :
+    to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
   Proof.
-    rewrite /sarB. move : n bs. elim => [|ns IH] bs Hsz.
-    - rewrite Z.pow_0_r Z.div_1_r //. 
-    - move : (IH bs Hsz) => IHm.
-      rewrite (lock Z.of_nat)/= -lock to_Z_sarB1; last rewrite -/(sarB ns bs) size_sarB//.
-      rewrite IHm -addn1 Z.div_div//; last (exact : (Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 ns)))).
-      rewrite -{2}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
-      rewrite Nat2Z.inj_add//.
+    rewrite to_Zpos_invB. move/Z.add_move_l: (to_Zpos_add_to_Zneg bs) => ->. 
+    reflexivity.
   Qed.
-      
+
   (*---------------------------------------------------------------------------
     Properties of logic shift right
     ---------------------------------------------------------------------------*)
@@ -1739,6 +1724,157 @@ Section Lemmas.
     rewrite (lock Z.of_nat) /= -lock msb_shrB1 Z.mul_0_l shrB1_shrB_succ to_Zpos_shrB Z.sub_0_r//.
   Qed.
 
+  (*---------------------------------------------------------------------------
+    Properties of arithmetic shift right
+    ---------------------------------------------------------------------------*)
+  
+  Lemma sarB_add bs i j :
+    sarB i (sarB j bs) = sarB (i + j) bs .
+  Proof .
+      by rewrite /sarB iter_add .
+  Qed .
+
+  Lemma msb_sarB1 bs : msb (sarB1 bs) = msb bs.
+  Proof.
+    case: bs => [| b bs] //=.
+    rewrite /sarB1 /= /droplsb /= /msb splitmsb_joinmsb /=. reflexivity.
+  Qed.
+
+  Lemma msb_sarB bs n : msb (sarB n bs) = msb bs.
+  Proof.
+    elim: n => [| n IHn] //=. rewrite msb_sarB1 IHn. reflexivity.
+  Qed.
+
+  Lemma sarB_nil n : sarB n [::] = [::].
+  Proof.
+    elim: n => [| n IHn] //=. by rewrite IHn.
+  Qed.
+
+  Lemma sarB1_copy n b : sarB1 (copy n b) = copy n b.
+  Proof.
+    case: n => [| n] //=. 
+    rewrite /sarB1 copy_cons -{2}copy_rcons /msb splitmsb_rcons /= /droplsb /=.
+    rewrite /joinmsb copy_rcons. reflexivity.
+  Qed.
+
+  Lemma sarB1_zeros n : sarB1 (zeros n) = zeros n.
+  Proof. exact: sarB1_copy. Qed.
+
+  Lemma sarB1_ones n : sarB1 (ones n) = ones n.
+  Proof. exact: sarB1_copy. Qed.
+
+  Lemma sarB_copy n b m : sarB m (copy n b) = copy n b.
+  Proof. elim: m => [| m IHm] //=. by rewrite IHm sarB1_copy. Qed.
+
+  Lemma sarB_zeros n m : sarB m (zeros n) = zeros n.
+  Proof. exact: sarB_copy. Qed.
+
+  Lemma sarB_ones n m : sarB m (ones n) = ones n.
+  Proof. exact: sarB_copy. Qed.
+
+  Lemma sarB_cat bs n : 
+    n <= size bs -> sarB n bs = high (size bs - n) bs ++ copy n (msb bs).
+  Proof.    
+    elim: n => [| n IHn] Hsz /=.
+    - by rewrite cats0 subn0 high_size. 
+    - rewrite /sarB1 msb_sarB. rewrite IHn; last by apply ltnW. 
+      rewrite /joinmsb rcons_cat copy_rcons copy_cons.
+      rewrite droplsb_cat; last by rewrite size_high subn_gt0.
+      rewrite -(subnSK Hsz) droplsb_high. reflexivity.
+  Qed.
+
+  Lemma sarB_size bs : sarB (size bs) bs = copy (size bs) (msb bs).
+  Proof. 
+    rewrite sarB_cat; last trivial. by rewrite subnn high0. 
+  Qed.
+
+  Lemma sarB_oversize bs n : size bs <= n -> sarB n bs = copy (size bs) (msb bs).
+  Proof.
+    move=> Hsz. rewrite -(subnK Hsz) -sarB_add sarB_size sarB_copy. reflexivity.
+  Qed.
+
+  Lemma sarB1_is_sarB bs : sarB1 bs = sarB 1 bs.
+  Proof. reflexivity. Qed.
+
+  Lemma sarB1_sarB_succ bs n : sarB1 (sarB n bs) = sarB (n.+1) bs.
+  Proof. reflexivity. Qed.
+
+  Lemma sarB_sarB1_succ bs n : sarB n (sarB1 bs) = sarB (n.+1) bs.
+  Proof.
+    rewrite sarB1_is_sarB. rewrite sarB_add. rewrite addn1. reflexivity.
+  Qed.
+
+  Lemma sarB1_sarB_comm bs n : sarB1 (sarB n bs) =  sarB n (sarB1 bs).
+  Proof.
+    rewrite !sarB1_is_sarB. rewrite !sarB_add. rewrite addnC. reflexivity.
+  Qed.
+
+  Lemma sarB1_msb0 bs : msb bs = false -> sarB1 bs = shrB1 bs.
+  Proof. rewrite /sarB1 /shrB1. by move=> ->. Qed.
+
+  Lemma sarB1_msb1 bs : msb bs = true -> sarB1 bs = invB (shrB1 (invB bs)).
+  Proof. 
+    rewrite /sarB1 /shrB1 => Hmsb. 
+    rewrite -droplsb_invB invB_joinmsb invB_involutive Hmsb. reflexivity.
+  Qed.
+
+  Lemma sarB_msb0 n bs : msb bs = false -> sarB n bs = shrB n bs.
+  Proof.
+    elim: n => [| n IH] //=.
+    move=> Hmsb. rewrite (IH Hmsb) {IH} sarB1_msb0; first reflexivity.
+    case: n => [| n] //=. exact: msb_shrB1.
+  Qed.
+
+  Lemma sarB_msb1 n bs : msb bs = true -> sarB n bs = invB (shrB n (invB bs)).
+  Proof.
+    elim: n => [| n IH] /=.
+    - rewrite invB_involutive. reflexivity.
+    - move=> Hmsb. 
+      rewrite (IH Hmsb) {IH} sarB1_msb1; first by rewrite invB_involutive.
+      move: Hmsb; case: (lastP bs) => {bs} [| bs b] //=.
+      rewrite msb_rcons => ->. 
+      rewrite -msb_invB; last by rewrite size_shrB size_invB size_rcons.
+      case: n => [| n] /=.
+      + rewrite -msb_invB; last by rewrite size_rcons. 
+        rewrite msb_rcons. reflexivity.
+      + by rewrite msb_shrB1.
+  Qed.
+
+  (* sarB1 semantics *)
+  
+  Lemma to_Z_sarB1 bs : 1 < size bs -> to_Z (sarB1 bs) = (Z.div (to_Z bs) 2)%Z.
+  Proof.
+    intros.
+    rewrite /sarB1 (droplsb_joinmsb (msb bs) (ltnW H)).
+    have Haux : [::msb bs] == [::(msb (droplsb bs))] by rewrite -!high1_msb (high_droplsb H). 
+    rewrite eqseq_cons eq_refl andbT in Haux. rewrite (eqP Haux).
+    rewrite /joinmsb -cats1 -{1}(sext0 (droplsb bs)) -sext_Sn to_Z_sext.
+    rewrite 2!to_Z_to_Zpos -(eqP Haux) size_droplsb to_Zpos_droplsb Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
+    rewrite Z.pow_sub_r;
+      [rewrite Z.pow_1_r|omega|split; [apply Nat2Z.is_nonneg|rewrite -Nat2Z.inj_le; apply/leP; rewrite (ltnW H)//]].
+    case (msb bs); last rewrite !Z.mul_0_l !Z.sub_0_r//.
+    rewrite !Z.mul_1_l.
+    have -> : (2 ^ Z.of_nat (size bs) = 2 ^ Z.of_nat (size bs - 1) * 2)%Z.
+    {
+      rewrite -{3}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
+      rewrite Nat2Z.inj_sub; last (apply/leP; rewrite (ltnW H)//).
+      rewrite Z.sub_simpl_r//.
+    }
+    rewrite -!Z.add_opp_r -Z.mul_opp_l Z_div_plus// Z_div_mult//. 
+  Qed.
+
+  (* sarB semantics *)
+  Lemma to_Z_sarB n bs : 1 < size bs -> to_Z (sarB n bs) = (Z.div (to_Z bs) (2 ^ Z.of_nat n))%Z.
+  Proof.
+    rewrite /sarB. move : n bs. elim => [|ns IH] bs Hsz.
+    - rewrite Z.pow_0_r Z.div_1_r //. 
+    - move : (IH bs Hsz) => IHm.
+      rewrite (lock Z.of_nat)/= -lock to_Z_sarB1; last rewrite -/(sarB ns bs) size_sarB//.
+      rewrite IHm -addn1 Z.div_div//; last (exact : (Z.neq_sym _ _ (Z.lt_neq _ _ (pow2_nat2z_gt0 ns)))).
+      rewrite -{2}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
+      rewrite Nat2Z.inj_add//.
+  Qed.
+      
   (*---------------------------------------------------------------------------
     Properties of shift left
     ---------------------------------------------------------------------------*)
@@ -1911,55 +2047,6 @@ Section Lemmas.
     - rewrite (lock Z.of_nat) /= -lock to_Zpos_shlB1 size_shlB IH Zmult_mod_idemp_l -Z.mul_assoc -{2}(Z.pow_1_r 2).
       rewrite -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
       rewrite -addn1 Nat2Z.inj_add//.
-  Qed.
-
-  (*---------------------------------------------------------------------------
-    Properties of inversion
-  ---------------------------------------------------------------------------*)
-
-  Lemma invB_low bs n :
-    n <= size bs -> ~~# (low n bs) = low n (~~# bs).
-  Proof. 
-    move=> Hn.
-    move: (@cat_low_high bs n (size bs - n) (subnKC Hn)) => Hcat.
-    apply (f_equal invB) in Hcat. rewrite -size_invB in Hn. rewrite invB_cat in Hcat.
-    rewrite -(@cat_low_high (~~# bs) n (size (~~# bs) - n) (subnKC Hn)) in Hcat.
-    move/eqP: Hcat. 
-    have Hsz : size (~~# low n bs) = size (low n (~~# bs)) 
-      by rewrite size_invB 2!size_low.
-    rewrite (eqseq_cat _ _ Hsz) => /andP [/eqP H _]. exact: H.
-  Qed.
-
-  Lemma dropmsb_invB bs : dropmsb (invB bs) = invB (dropmsb bs).
-  Proof.
-    case (lastP bs) => {bs} [//= | bs b].
-    rewrite invB_rcons !dropmsb_joinmsb. reflexivity.
-  Qed.
-
-  (* invB semantics *)
-
-  Lemma to_nat_invB bs :
-    to_nat (~~# bs) = 2 ^ (size bs) - 1 - to_nat bs.
-  Proof.
-    elim: bs => [// | b bs IH]. rewrite /= IH -!mul2n !mulnBr expnS muln1 subnDA.
-    have Hle :  2 * to_nat bs <= 2 * 2 ^ size bs - 2.
-    {
-      move: (to_nat_bounded bs). 
-      rewrite -{1}(prednK (exp2n_gt0 (size bs))) ltnS -subn1.
-      move=> H. apply (@leq_mul 2 _ 2 _) in H; last done.
-      rewrite mulnBr muln1 in H. exact: H.
-    }
-    rewrite (addnBA _ Hle) addnC -(subnDA 1 _ b). case b => /=.
-    - rewrite addn0 addn1. reflexivity.
-    - rewrite addn0 addn1 subnSK; first reflexivity. 
-      rewrite mul2n. apply double_gt1. exact: exp2n_gt0. 
-  Qed.
-
-  Lemma to_Zpos_invB_full bs :
-    to_Zpos (~~# bs)%bits = (2 ^ Z.of_nat (size bs) - Z.one - to_Zpos bs)%Z.
-  Proof.
-    rewrite to_Zpos_invB. move/Z.add_move_l: (to_Zpos_add_to_Zneg bs) => ->. 
-    reflexivity.
   Qed.
 
   (*---------------------------------------------------------------------------
@@ -3084,7 +3171,37 @@ Section Lemmas.
     - move => m IH .
       by rewrite -ones_cons -zeros_cons (eqP (@succB1 _)) (eqP IH) .
   Qed .      
+
+  (* succB semantics *)
   
+  Lemma from_nat_succB bs : succB bs = from_nat (size bs) (to_nat bs).+1.
+  Proof.
+    rewrite from_natSn_from_nat from_nat_to_nat addB1. reflexivity. 
+  Qed.
+
+  Lemma from_Zpos_succB bs : succB bs = from_Zpos (size bs) (to_Zpos bs + 1).
+  Proof.
+    elim: bs => [| b bs IH] //=.
+    rewrite Z.add_comm Z.add_assoc {1}Z.mul_comm. 
+    rewrite Z.odd_add_mul_2 Z.div2_div Z_div_plus; last done.
+    case: b. 
+    - rewrite IH. 
+      have->: (1 + Z.b2z true = 2)%Z by reflexivity.
+      rewrite Z.div_same; last done.
+      by rewrite Z.add_comm. 
+    - have->: (1 + Z.b2z false = 1)%Z by reflexivity.
+      by rewrite /= from_Zpos_to_Zpos.
+  Qed.
+
+  Lemma to_Zpos_succB bs : 
+    to_Zpos (succB bs) = ((to_Zpos bs + 1) mod 2 ^ Z.of_nat (size bs))%Z.
+  Proof.
+    move: (@to_Zpos_ge0 bs) => Hbs.
+    rewrite from_Zpos_succB to_Zpos_from_Zpos; last by omega.
+    reflexivity.
+  Qed.
+
+
   (*---------------------------------------------------------------------------
     Properties of subtraction
   ---------------------------------------------------------------------------*)
@@ -3510,7 +3627,18 @@ Section Lemmas.
     rewrite /borrow_subB /subB => Hsz. by rewrite (to_Zpos_sbbB _ Hsz) Z.sub_0_r.
   Qed.
 
-    
+  Lemma to_Zpos_subB' bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_Zpos (bs1 -# bs2) = 
+    ((to_Zpos bs1 - to_Zpos bs2) mod 2 ^ Z.of_nat (size bs1))%Z.
+  Proof.
+    move=> Hsz.
+    rewrite -(low_size (subB _ _)) size_subB -Hsz minnn.
+    rewrite -to_Zpos_mod_pow2 (to_Zpos_subB Hsz).
+    rewrite -Z.add_sub_assoc Z.add_comm Z.mod_add; last exact: pow2_nat2z_nonzero.
+    reflexivity. 
+  Qed.
+
   (* *)
   
   Lemma ltB_msb_subB bs1 bs2 :
@@ -5170,6 +5298,10 @@ Section Lemmas.
     by rewrite /andB /andb /lift0 /lift; case b => /= -> .
   Qed .
 
+  Lemma andB_cons b1 bs1 b2 bs2 :
+    andB (b1 :: bs1) (b2 :: bs2) = (andb b1 b2) :: (andB bs1 bs2).
+  Proof. by rewrite /andB /lift0 lift_cons. Qed.
+
   (* Lemma andBC : commutative (xorB). *)
   (* Admitted. *)
   
@@ -5209,8 +5341,13 @@ Section Lemmas.
     - by rewrite or0B.
   Qed.
 
+  Lemma orB_cons b1 bs1 b2 bs2 :
+    orB (b1 :: bs1) (b2 :: bs2) = (orb b1 b2) :: (orB bs1 bs2).
+  Proof. by rewrite /orB /lift0 lift_cons. Qed.
+
+
   (*---------------------------------------------------------------------------
-    Properties of bitwise or
+    Properties of bitwise xor
     ---------------------------------------------------------------------------*)
 
   Lemma xor0B bs : xorB (zeros (size bs)) bs = bs.
@@ -5237,6 +5374,10 @@ Section Lemmas.
     - by rewrite xor1B.
     - by rewrite xor0B. 
   Qed.
+
+  Lemma xorB_cons b1 bs1 b2 bs2 :
+    xorB (b1 :: bs1) (b2 :: bs2) = (xorb b1 b2) :: (xorB bs1 bs2).
+  Proof. by rewrite /xorB /lift0 lift_cons. Qed.
 
   Lemma xorBC: commutative (xorB).
   Proof.
@@ -9867,6 +10008,161 @@ Lemma to_Zpos_udivB_rec_div :
         rewrite Z.mul_1_l to_Z_ones; last done. 
         rewrite Z.mul_comm -Z.opp_eq_mul_m1 Z.add_opp_diag_l. reflexivity.
       + done.
+  Qed.
+
+  (*---------------------------------------------------------------------------
+    Semantics of operations w.r.t. N
+  ---------------------------------------------------------------------------*)  
+
+  (* succB *)
+
+  Lemma to_N_succB bs : 
+    to_N (succB bs) = ((to_N bs + 1) mod 2 ^ N.of_nat (size bs))%num.
+  Proof.  
+    rewrite to_N_Zpos to_Zpos_succB. move: (@to_Zpos_ge0 bs) => Hbs.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_add; try by omega.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite -!to_N_Zpos nat_Z_N. reflexivity.
+  Qed.
+
+  Lemma from_N_succB bs : succB bs = from_N (size bs) ((to_N bs) + 1). 
+  Proof.  
+    move: (to_N_succB bs) => H. apply (f_equal (from_N (size bs))) in H.
+    move: (size_succB bs) => Hsz. rewrite -{1}Hsz from_N_to_N in H. rewrite H. 
+    rewrite {2}(N.div_mod' (to_N bs + 1) (2 ^ N.of_nat (size bs))).
+    rewrite N.mul_comm [in RHS]N.add_comm -from_N_wrapMany. reflexivity.    
+  Qed.
+
+  (* negB *)
+
+  Lemma to_N_negB bs : 
+    to_N (negB bs) = ((2 ^ N.of_nat (size bs) - to_N bs) mod 2 ^ N.of_nat (size bs))%num.
+  Proof.
+    rewrite to_N_Zpos to_Zpos_negB -(Z.mod_add _ 1); last exact: pow2_nat2z_nonzero.
+    rewrite Z.mul_1_l Z.add_comm Z.add_opp_r.
+    move: (to_Zpos_bounded bs) => Hbnd; apply Z.lt_0_sub in Hbnd.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_sub; last exact: to_Zpos_ge0.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite -!to_N_Zpos nat_Z_N. reflexivity.    
+  Qed.
+
+  Lemma from_N_negB bs : 
+    negB bs = from_N (size bs) (2 ^ N.of_nat (size bs) - to_N bs).
+  Proof.
+    move: (to_N_negB bs) => H. apply (f_equal (from_N (size bs))) in H.
+    move: (size_negB bs) => Hsz. rewrite -{1}Hsz from_N_to_N in H. rewrite H. 
+    rewrite {2}(N.div_mod' (2 ^ _ - to_N bs) (2 ^ N.of_nat (size bs))).
+    rewrite N.mul_comm [in RHS]N.add_comm -from_N_wrapMany. reflexivity.    
+  Qed.
+    
+  (* addB *)
+
+  Lemma to_N_addB bs1 bs2 : 
+    size bs1 = size bs2 -> 
+    to_N (addB bs1 bs2) = ((to_N bs1 + to_N bs2) mod 2 ^ N.of_nat (size bs1))%num.
+  Proof.
+    move=> Hsz. rewrite to_N_Zpos (to_Zpos_addB' Hsz). 
+    move: (@to_Zpos_ge0 bs1) (@to_Zpos_ge0 bs2) => Hbs1 Hbs2.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_add; try by omega.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite -!to_N_Zpos nat_Z_N. reflexivity.
+  Qed.
+
+  (* subB *)
+
+  Lemma to_N_subB bs1 bs2 :
+    size bs1 = size bs2 ->
+    to_N (subB bs1 bs2) = 
+    ((2 ^ N.of_nat (size bs1) + to_N bs1 - to_N bs2) mod 2 ^ N.of_nat (size bs1))%num.
+  Proof.
+    move=> Hsz.
+    rewrite to_N_Zpos (to_Zpos_subB' Hsz). 
+    rewrite -(Z.mod_add _ 1); last exact: pow2_nat2z_nonzero. 
+    rewrite Z.mul_1_l -Z.add_sub_swap -Z.add_sub_assoc.
+    move: (@to_Zpos_ge0 bs1) (@to_Zpos_ge0 bs2) (to_Zpos_bounded bs2) => H1 H2 Hbnd.
+    have H : (0 <= 2 ^ Z.of_nat (size bs1) - to_Zpos bs2)%Z by rewrite Hsz; omega.
+    rewrite Z2N.inj_mod; [ | by omega | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_add; try done.
+    rewrite Z2N.inj_sub; last exact: H2.
+    rewrite N.add_sub_assoc; last by apply (Z2N.inj_le _ _ H2); rewrite Hsz; omega.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite N.add_comm -!to_N_Zpos nat_Z_N. reflexivity.
+  Qed.
+
+  (* mulB *)
+  
+  Lemma to_N_mulB bs1 bs2 :
+    to_N (mulB bs1 bs2) = ((to_N bs1 * to_N bs2) mod 2 ^ N.of_nat (size bs1))%num.
+  Proof.
+    rewrite to_N_Zpos to_Zpos_mulB'. 
+    move: (@to_Zpos_ge0 bs1) (@to_Zpos_ge0 bs2) => Hbs1 Hbs2.
+    rewrite Z2N.inj_mod; [ | by apply Z.mul_nonneg_nonneg | exact: pow2_nat2z_gt0]. 
+    rewrite Z2N.inj_mul; try done.
+    rewrite Z2N.inj_pow; [ | done | exact: Nat2Z.is_nonneg]. 
+    rewrite -!to_N_Zpos nat_Z_N. reflexivity.
+  Qed.    
+
+  (* udivB *)
+
+  Lemma to_N_udivB_zero bs n : udivB' bs (zeros n) = ones (size bs).
+  Proof. by rewrite /udivB' udivB0. Qed.
+
+  Lemma to_N_udivB_nonzero bs1 bs2 :
+    size bs1 = size bs2 -> ~~ (bs2 == zeros (size bs2)) -> 
+    to_N (udivB' bs1 bs2) = ((to_N bs1) / (to_N bs2))%num.
+  Proof.
+    move=> Hsz Hn0. symmetry in Hsz. rewrite to_N_Zpos (to_Zpos_udivB' Hsz Hn0).
+    move: (@to_Zpos_ge0 bs1) (@to_Zpos_ge0 bs2) => Hbs1 Hbs2.
+    rewrite Z2N.inj_div; try done. by rewrite -!to_N_Zpos.
+  Qed.
+
+  (* uremB *)
+
+  Lemma to_N_uremB_zero bs n : uremB bs (zeros n) = bs.
+  Proof. by rewrite /uremB udivB0. Qed.    
+
+  Lemma to_N_uremB_nonzero bs1 bs2 :
+    size bs1 = size bs2 -> ~~ (bs2 == zeros (size bs2)) -> 
+    to_N (uremB bs1 bs2) = ((to_N bs1) mod (to_N bs2))%num.
+  Proof.
+    move=> Hsz Hn0. symmetry in Hsz. rewrite to_N_Zpos (to_Zpos_uremB' Hsz Hn0).
+    move: (@to_Zpos_ge0 bs1) (neq_zeros_to_Zpos_gt0 Hn0) => Hbs1 Hbs2.
+    rewrite Z2N.inj_mod; try done. by rewrite -!to_N_Zpos.
+  Qed.
+
+  (* ltB *)
+
+  Lemma to_N_ltB bs1 bs2 : ltB bs1 bs2 <-> (to_N bs1 < to_N bs2)%num.
+  Proof.
+    rewrite to_Zpos_ltB !to_N_Zpos Z2N.inj_lt; try done; exact: to_Zpos_ge0.
+  Qed.
+
+  Lemma to_N_ltB_eqn bs1 bs2 : ltB bs1 bs2 = (to_N bs1 <? to_N bs2)%num.
+  Proof.
+    case HltB : (ltB bs1 bs2); case Hltb : (to_N bs1 <? to_N bs2)%num; try done.
+    - apply to_N_ltB, N.ltb_lt in HltB. by rewrite -HltB -Hltb.
+    - apply N.ltb_lt, to_N_ltB in Hltb. by rewrite -HltB -Hltb.
+  Qed.
+
+  (* leB *)
+
+  Lemma to_N_leB bs1 bs2 : 
+    size bs1 = size bs2 -> leB bs1 bs2 <-> (to_N bs1 <= to_N bs2)%num.
+  Proof.
+    move=> Hsz. 
+    rewrite (to_Zpos_leB Hsz) !to_N_Zpos Z2N.inj_le; try done; exact: to_Zpos_ge0.
+  Qed.
+
+  Lemma to_N_leB_eqn bs1 bs2 : 
+    size bs1 = size bs2 -> leB bs1 bs2 = (to_N bs1 <=? to_N bs2)%num.
+  Proof.
+    move=> Hsz.
+    case HleB : (leB bs1 bs2); case Hleb : (to_N bs1 <=? to_N bs2)%num; try done.
+    - apply (to_N_leB Hsz), N.leb_le in HleB. by rewrite -HleB -Hleb.
+    - apply N.leb_le, (to_N_leB Hsz) in Hleb. by rewrite -HleB -Hleb.
   Qed.
 
 End Lemmas.

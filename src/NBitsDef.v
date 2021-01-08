@@ -914,6 +914,45 @@ Section Lemmas.
     - by trivial.
   Qed.
 
+  (* Lemmas about extract *)
+
+  Lemma extract_msb bs :
+    extract (size bs - 1) (size bs - 1) bs = [:: msb bs].
+  Proof.
+    case: (lastP bs) => {bs} [| bs b] //=.
+    rewrite /extract size_rcons subn1 -pred_Sn subnn add0n msb_rcons.
+    have->: size bs + 1 = size (rcons bs b) by rewrite size_rcons addn1. 
+    by rewrite low_size high1_rcons. 
+  Qed.
+  
+  Lemma extract_dropmsb bs :
+    1 < size bs -> extract (size bs - 2) 0 bs = dropmsb bs.
+  Proof.
+    case: (lastP bs) => {bs} [| bs b1] //=; case: (lastP bs) => {bs} [| bs b2] //=. 
+    rewrite /extract !size_rcons subn2 -!pred_Sn subn0 => _. 
+    rewrite low_rcons; last by rewrite size_rcons addn1.
+    have->: size bs + 1 = size (rcons bs b2) by rewrite size_rcons addn1.
+    by rewrite low_size high_size /dropmsb splitmsb_rcons.
+  Qed.
+
+  Lemma extract_lsb bs :
+    extract 0 0 bs = [:: lsb bs].
+  Proof.
+    case: bs => [| b bs] //=. by rewrite /extract /lsb subn0 add0n low1_cons /=.
+  Qed.
+  
+  Lemma extract_droplsb bs :
+    1 < size bs -> extract (size bs - 1) 1 bs = droplsb bs.
+  Proof.
+    case: bs => [| b1 bs] //=; case: bs => [| b2 bs] //=. 
+    rewrite /extract !subn1 -!pred_Sn => _. 
+    have->: (size bs).+1 + 1 = size [:: b1, b2 & bs] by rewrite addn1.
+    rewrite low_size high_cons; last by rewrite addn1. 
+    have->: size bs + 1 = size (b2 :: bs) by rewrite addn1.
+    by rewrite high_size. 
+  Qed.
+
+
   (* to_Zpos and to_Zneg is always non-negative *)
 
   Lemma to_Zpos_ge0 bs : (0 <= to_Zpos bs)%Z.
@@ -1110,6 +1149,19 @@ Section Lemmas.
   Qed.
 
 
+  (* Lemmas about repeat *)
+
+  Lemma cat_repeat {A : Type} n (s : seq A) : s ++ (repeat n s) = (repeat n s) ++ s.
+  Proof.
+    elim: n => [| n IH] /=.
+    - by rewrite cats0.
+    - by rewrite {1}IH catA.
+  Qed.
+
+  Lemma repeat_singleton {A : Type} n (b : A) : repeat n [:: b] = copy n b.
+  Proof. elim: n => [| n IH] //=. by rewrite IH. Qed.
+
+
   (* Lemmas about from_nat and to_nat *)
 
   Lemma to_nat_nil : to_nat [::] = 0.
@@ -1284,6 +1336,52 @@ Section Lemmas.
          have HH:= from_nat_wrapMany n (div.divn m (2^n)) (div.modn m (2^n)). rewrite addnC in HH. rewrite -HH.
          rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0. Qed.
 
+
+  (* Lemmas about from_N and to_N *)
+
+  Lemma from_N_to_N bs : from_N (size bs) (to_N bs) = bs.
+  Proof.
+    elim: bs => [| b bs IH] //=.
+    rewrite N.mul_comm. rewrite N.odd_add_mul_2 N.add_b2n_double_div2 IH. 
+    by case: b.
+  Qed.
+
+  Lemma from_N_wrap n : forall m, from_N n m = from_N n (m + 2 ^ N.of_nat n).
+  Proof. 
+    elim: n => [//= | n IHn m]. rewrite /from_N -/from_N. 
+    rewrite Nnat.Nat2N.inj_succ N.pow_succ_r; last exact: N.le_0_l. 
+    rewrite N.odd_add_mul_2 IHn N.mul_comm N.div_add; last done. reflexivity.
+  Qed.
+
+  Lemma from_N_wrapMany n k m : from_N n m = from_N n (m + k * 2 ^ N.of_nat n).
+  Proof.
+    move: k. apply N.peano_ind.
+    - by rewrite N.mul_0_l N.add_0_r.
+    - move=> k IH. by rewrite N.mul_succ_l N.add_assoc IH from_N_wrap.
+  Qed.
+
+  Lemma to_N_from_N_bounded : forall n m, 
+      (m < 2 ^ N.of_nat n)%num -> to_N (from_N n m) = m.
+  Proof.
+    elim => [/= | n IH] m. 
+    - by rewrite N.lt_1_r.
+    - move=> Hm /=. 
+      rewrite IH; first by rewrite -N.div2_div N.add_comm N.mul_comm -N.div2_odd.
+      rewrite (N.mul_lt_mono_pos_r 2); last done.
+      rewrite Nnat.Nat2N.inj_succ N.pow_succ_r in Hm; last exact: N.le_0_l. 
+      rewrite N.mul_comm in Hm.
+      apply: (N.le_lt_trans _ _ _ _ Hm). rewrite N.mul_comm. by apply N.mul_div_le.
+  Qed.
+
+  Lemma to_N_from_N n m : to_N (from_N n m) = (m mod (2 ^ N.of_nat n))%num.
+  Proof. 
+    rewrite (N.div_mod m (2 ^ N.of_nat n)); last exact: N.pow_nonzero. 
+    rewrite N.add_comm N.mul_comm -from_N_wrapMany. 
+    have Hnz : (2 ^ N.of_nat n)%num <> 0%num by exact: N.pow_nonzero.
+    rewrite (N.mod_add _ _ _ Hnz) (N.mod_mod _ _ Hnz).
+    rewrite to_N_from_N_bounded; first reflexivity.
+    by apply: N.mod_lt. 
+  Qed.
 
   (* Lemmas about to_Zpos *)
 
