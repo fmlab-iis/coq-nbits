@@ -7556,7 +7556,14 @@ Section Lemmas.
 
   Lemma from_Zpos_Zdiv2_mul2 n z : (0 <= z)%Z -> (z < 2 ^ Z.of_nat n)%Z -> from_Zpos (n).+1 (2 ^ Z.of_nat (n) + z) = rcons (from_Zpos (n) z) b1.
   Proof.
-  Admitted.
+    intros. apply to_Zpos_inj_ss; first rewrite size_rcons !size_from_Zpos //.
+    rewrite to_Zpos_from_Zpos; last (apply Z.add_nonneg_nonneg; [apply Z.lt_le_incl, pow2_nat2z_gt0| done]).
+    rewrite to_Zpos_rcons Z.mul_1_l size_from_Zpos to_Zpos_from_Zpos_bounded//.
+    rewrite Z.mod_small; first rewrite Z.add_comm//.
+    split; first (apply Z.add_nonneg_nonneg; [apply Z.lt_le_incl, pow2_nat2z_gt0| done]).
+    rewrite -addn1 Nat2Z.inj_add Z.pow_add_r; try omega. rewrite Z.pow_1_r -Zred_factor1.
+    exact : (Zplus_lt_compat_l _ _ (2 ^ Z.of_nat n) H0). 
+  Qed.
 
   Lemma msb1_to_Zpos_bounded bs : 0 < size bs -> msb bs <-> (2 ^ Z.of_nat (size bs - 1) <= to_Zpos bs)%Z.
   Proof.
