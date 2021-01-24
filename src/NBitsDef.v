@@ -431,14 +431,14 @@ Section Lemmas.
   Lemma size1_msb bs : size bs = 1 -> bs = [:: msb bs].
   Proof. by case: bs => [| b [| b' bs]]. Qed.
 
-  Lemma droplsb_joinmsb bs b : 
+  Lemma droplsb_joinmsb bs b :
     0 < size bs -> droplsb (joinmsb bs b) = joinmsb (droplsb bs) b.
   Proof. case: bs => [| a bs] //=. Qed.
 
   Lemma droplsb_dropmsb bs : droplsb (dropmsb bs) = dropmsb (droplsb bs).
   Proof.
     case: bs => [| b bs] //=. case: (lastP bs) => {bs} [| bs b'] //=.
-    by rewrite {2}/droplsb /= -{1}rcons_cons /dropmsb !splitmsb_rcons /droplsb. 
+    by rewrite {2}/droplsb /= -{1}rcons_cons /dropmsb !splitmsb_rcons /droplsb.
   Qed.
 
   Lemma dropmsb_cons n b bs :
@@ -450,18 +450,21 @@ Section Lemmas.
     by rewrite {1}/dropmsb /splitmsb /split_last /= .
   Qed .
 
-  Lemma droplsb_cat bs1 bs2 : 
+  Lemma droplsb_cat bs1 bs2 :
     0 < size bs1 -> droplsb (bs1 ++ bs2) = droplsb bs1 ++ bs2.
   Proof. by case: bs1. Qed.
 
-  Lemma dropmsb_cat bs1 bs2 : 
+  Lemma dropmsb_cat bs1 bs2 :
     0 < size bs2 -> dropmsb (bs1 ++ bs2) = bs1 ++ dropmsb bs2.
-  Proof. 
-    elim: bs1 => [| b bs1 IH] //=. move=> Hsz. 
+  Proof.
+    elim: bs1 => [| b bs1 IH] //=. move=> Hsz.
     have H : size (bs1 ++ bs2) = (size (bs1 ++ bs2)).-1.+1.
     { apply S_pred_pos. apply/ltP. rewrite size_cat. by apply ltn_addl. }
     by rewrite (eqP (dropmsb_cons _ H)) (IH Hsz).
   Qed.
+
+  Lemma dropmsb_rcons bs b : dropmsb (rcons bs b) = bs.
+  Proof. by rewrite /dropmsb splitmsb_rcons. Qed.
 
   (* Lemmas about zeros and ones *)
 
