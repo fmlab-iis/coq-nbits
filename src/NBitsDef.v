@@ -240,17 +240,24 @@ Section Lemmas.
   Local Open Scope bits_scope.
 
   (* generalize type lemmas *)
-  Lemma size_belastd T1 T2 (ls1: seq T1) (ls2:seq T2):
-    size ls1 == size ls2 ->
-    size (belastd ls1) == size (belastd ls2).
+
+  Lemma size_belastd {T : Type} (ls : seq T) :
+    size (belastd ls) = match ls with
+                        | [::] => 0
+                        | hd::tl => (size ls).-1
+                        end.
+  Proof.
+    case: ls => [| hd tl] //=. rewrite size_belast. reflexivity.
+  Qed.
+
+  Lemma size_belastd_eq T1 T2 (ls1: seq T1) (ls2:seq T2):
+    size ls1 = size ls2 ->
+    size (belastd ls1) = size (belastd ls2).
   Proof.
     elim: ls1 ls2 => [| ls_hd ls_tl IH] //=.
-    - move=> ls2 Hsz0.
-      move/eqP: Hsz0 => Hsz0.
-      symmetry in Hsz0.
-        by rewrite (size0nil Hsz0).
-    - case => [| ls2_hd ls2_tl] //=.
-        by rewrite !size_belast.
+    - move=> ls2 Hsz0. symmetry in Hsz0. by rewrite (size0nil Hsz0).
+    - case => [| ls2_hd ls2_tl] //=. rewrite !size_belast; move/eqP=> H.
+      rewrite eqSS in H. exact: (eqP H).
   Qed.
 
   Notation size := (@size bool).
