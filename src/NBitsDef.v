@@ -1299,10 +1299,6 @@ Section Lemmas.
     - by rewrite mul0n addn0 (div.modn_small (to_nat_bounded (rev l))).
   Qed.
 
-  (* Lemma lt1_eq0 : forall (n:nat), n<1 -> n=0. *)
-  (* Proof. intros. induction n; try done. *)
-  (* Qed. *)
-
   Lemma to_nat_from_nat_bounded : forall n m, m < 2^n -> to_nat (from_nat n m) = m.
   Proof.
     elim => [|ns IH] m /=. rewrite expn0. symmetry. exact : lt1_eq0.
