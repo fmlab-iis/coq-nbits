@@ -1,5 +1,7 @@
 .coqdeps.d
 *.glob
 *.vo
+*.vok
+*.vos
 *.aux
 Makefile.conf
