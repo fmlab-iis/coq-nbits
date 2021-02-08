@@ -5068,7 +5068,10 @@ Section Lemmas.
     move : (ltn_mul Hbd1 Hbd2); rewrite -expnD; move => Hbd. generalize Hbd.
     rewrite -(ltn_pmul2l (ltn0Sn 1)) -expnS mulnC in Hbd. move => Hbd'.
     case phd1. 
-    - rewrite/=to_nat_addB size_addB size_joinlsb to_nat_joinlsb (IH p2) size_full_mul size_zext to_nat_zext addn1-addSn addnC minnn addn0 !to_nat_from_nat -!muln2 muln_modl; last done. rewrite addnS expnS.
+    - rewrite/= to_nat_addB size_addB size_joinlsb to_nat_joinlsb (IH p2)
+             size_full_mul size_zext to_nat_zext addn1
+      -addSn addnC minnn addn0 !to_nat_from_nat -!muln2 muln_modl.
+      rewrite addnS expnS.
       have-> :(2 * 2 ^ (size p2 + size ptl1) = (2 ^ (size ptl1 + size p2) * 2)) by rewrite mulnC addnC. rewrite div.modnDml.
       have->:(((1 + to_nat ptl1 * 2) * to_nat p2) = to_nat ptl1 * to_nat p2 * 2 + to_nat p2) by rewrite mulnDl mul1n; ring. done.
     - rewrite size_joinlsb to_nat_joinlsb (IH p2) size_full_mul addn0 add0n-!muln2!to_nat_from_nat_bounded; first ring; try exact. by rewrite addn1 mulnAC.
@@ -7391,12 +7394,12 @@ Section Lemmas.
         have -> : (to_Zpos (dropmsb r) * 2 + mhd = to_Zpos (dropmsb (joinlsb mhd r)))%Z
           by rewrite dropmsb_joinlsb// to_Zpos_joinlsb.
         rewrite -(size_rev mtl). apply div_foo; done.
-  Qed.
-  
+    Qed.
+
   (* Semantics of unsigned division *)
-    
+
   Lemma to_Zpos_udivB : forall m n , size n = size m -> ~~(n == zeros (size n)) ->
-                                     to_Zpos (udivB (rev m) n).1 = (Zdiv (to_Zpos (rev m)) (to_Zpos n)).
+                                     to_Zpos (udivB (rev m) n).1 = (Z.div (to_Zpos (rev m)) (to_Zpos n)).
   Proof.
     intros.  rewrite /udivB revK/=.
     move : (neq_zeros_to_Zpos_neq0 H0) => Hnneq0.
@@ -7433,7 +7436,7 @@ Section Lemmas.
     
   Lemma to_Zpos_udivB' : forall m n , 
       size n = size m -> ~~ (n == zeros (size n)) ->
-      to_Zpos (udivB' m n) = (Zdiv (to_Zpos m) (to_Zpos n)).
+      to_Zpos (udivB' m n) = (Z.div (to_Zpos m) (to_Zpos n)).
   Proof.
     move=> m n Hsz Hn. rewrite -(revK m). rewrite -(size_rev m) in Hsz.
     exact: to_Zpos_udivB.
