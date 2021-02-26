@@ -399,6 +399,27 @@ Section Ops.
 
   Definition sarB (n : nat) (bs : bits) : bits := iter n sarB1 bs.
 
+  (* `sarBB bs ns` is the same as `sarB (to_nat ns) bs` but is more efficient *)
+  Definition sarBB (bs : bits) (ns : bits) : bits :=
+    let szbs := size bs in
+    let szns := size ns in
+    let log2szbs := Nat.log2_up szbs in
+    let msb_bs := msb bs in
+    if szbs <= 1 then
+      if ns == zeros szns
+      then bs
+      else copy szbs msb_bs
+    else if szns <= log2szbs then
+           sarB (to_nat ns) bs
+         else
+           (* size bs > 1 -> log2szbs > 0 *)
+           let zero_hi := zeros (szns - log2szbs) in
+           let ns_hi := high (szns - log2szbs) ns in
+           if ns_hi == zero_hi
+           then let ns_lo := low log2szbs ns in
+                sarB (to_nat ns_lo) bs
+           else copy szbs msb_bs.
+
   Definition shlB1 (bs : bits) := dropmsb (joinlsb false bs).
 
   Definition shlB (n : nat) (bs : bits) : bits := iter n shlB1 bs.
@@ -2042,6 +2063,37 @@ Section Lemmas.
         rewrite (eqP Hzeros). rewrite to_nat_cat. rewrite to_nat_zeros mul0n addn0.
         reflexivity.
       + rewrite from_natn0. rewrite shrB_oversize; first reflexivity.
+        rewrite -(cat_low_high Hs). rewrite to_nat_cat. rewrite size_low. move/idP/negP: Hzeros.
+        replace (size ns - Nat.log2_up (size bs))
+          with (size (high (size ns - Nat.log2_up (size bs)) ns)) at 2;
+          last by rewrite size_high; reflexivity.
+        move=> Hzeros. move: (neq_zeros_to_nat_gt0 Hzeros) => Hgt0.
+        move/idP/negP: Hszbs_le1. rewrite -ltnNge => Hszbs_gt1.
+        have Hszbs_gt0: (0 < size bs) by apply: (ltn_trans _ Hszbs_gt1).
+        move/ltP: Hszbs_gt0 => Hszbs_gt0.
+        move: (Nat.log2_log2_up_spec _ Hszbs_gt0) => [_ /leP H2]. rewrite -expn_pow in H2.
+        rewrite -{1}(add0n (size bs)). apply: leq_add; first done.
+        rewrite -{1}(mul1n (size bs)). exact: (leq_mul Hgt0 H2).
+  Qed.
+
+  Lemma sarBB_sarB bs ns : sarBB bs ns = sarB (to_nat ns) bs.
+  Proof.
+    rewrite /sarBB. case Hszbs_le1: (size bs <= 1);
+                      last case Hszns: (size ns <= Nat.log2_up (size bs)).
+    - case Hns: (ns == zeros (size ns)).
+      + rewrite (eqP Hns). rewrite to_nat_zeros /=. reflexivity.
+      + rewrite sarB_oversize; first reflexivity. rewrite -to_nat_zero in Hns.
+        move/idP/negP: Hns => Hns. rewrite -lt0n in Hns. exact: (leq_trans Hszbs_le1 Hns).
+    - reflexivity.
+    - have Hs: (Nat.log2_up (size bs)) + (size ns - Nat.log2_up (size bs)) = size ns.
+      { move/idP/negP: Hszns. rewrite -ltnNge => Hszns. rewrite (subnKC (ltnW Hszns)).
+        reflexivity. }
+      case Hzeros: (high (size ns - Nat.log2_up (size bs)) ns ==
+                    zeros (size ns - Nat.log2_up (size bs))).
+      + rewrite -(cat_low_high Hs). rewrite low_size_cat; last by rewrite size_low.
+        rewrite (eqP Hzeros). rewrite to_nat_cat. rewrite to_nat_zeros mul0n addn0.
+        reflexivity.
+      + rewrite sarB_oversize; first reflexivity.
         rewrite -(cat_low_high Hs). rewrite to_nat_cat. rewrite size_low. move/idP/negP: Hzeros.
         replace (size ns - Nat.log2_up (size bs))
           with (size (high (size ns - Nat.log2_up (size bs)) ns)) at 2;
