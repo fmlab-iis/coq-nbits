@@ -99,13 +99,13 @@ Section Definitions.
   Definition sext (n : nat) (bs : bits) : bits := bs ++ copy n (msb bs).
 
   (* Repeat a sequence n times *)
-  
-  Fixpoint repeat {A : Type} (n : nat) (s : seq A) := 
-    match n with 
+
+  Fixpoint repeat {A : Type} (n : nat) (s : seq A) :=
+    match n with
     | O => [::]
     | S m => s ++ (repeat m s)
     end.
- 
+
   (* Bit-wise negation *)
 
   Definition invB (bs : bits) : bits := map (fun b => ~~ b) bs.
@@ -905,7 +905,7 @@ Section Lemmas.
       rewrite (take_nth b0 Hn) /dropmsb splitmsb_rcons /=. reflexivity.
     - rewrite dropmsb_cat; last by rewrite size_zeros subn_gt0.
       rewrite subSn; last done. rewrite -zeros_rcons /dropmsb splitmsb_rcons /=.
-      rewrite take_oversize; last exact: ltnW. 
+      rewrite take_oversize; last exact: ltnW.
       rewrite take_oversize; done.
   Qed.
 
@@ -931,15 +931,15 @@ Section Lemmas.
   Proof.
     case: (lastP bs) => {bs} [| bs b] //=.
     rewrite /extract size_rcons subn1 -pred_Sn subnn add0n msb_rcons.
-    have->: size bs + 1 = size (rcons bs b) by rewrite size_rcons addn1. 
-    by rewrite low_size high1_rcons. 
+    have->: size bs + 1 = size (rcons bs b) by rewrite size_rcons addn1.
+    by rewrite low_size high1_rcons.
   Qed.
-  
+
   Lemma extract_dropmsb bs :
     1 < size bs -> extract (size bs - 2) 0 bs = dropmsb bs.
   Proof.
-    case: (lastP bs) => {bs} [| bs b1] //=; case: (lastP bs) => {bs} [| bs b2] //=. 
-    rewrite /extract !size_rcons subn2 -!pred_Sn subn0 => _. 
+    case: (lastP bs) => {bs} [| bs b1] //=; case: (lastP bs) => {bs} [| bs b2] //=.
+    rewrite /extract !size_rcons subn2 -!pred_Sn subn0 => _.
     rewrite low_rcons; last by rewrite size_rcons addn1.
     have->: size bs + 1 = size (rcons bs b2) by rewrite size_rcons addn1.
     by rewrite low_size high_size /dropmsb splitmsb_rcons.
@@ -950,18 +950,35 @@ Section Lemmas.
   Proof.
     case: bs => [| b bs] //=. by rewrite /extract /lsb subn0 add0n low1_cons /=.
   Qed.
-  
+
   Lemma extract_droplsb bs :
     1 < size bs -> extract (size bs - 1) 1 bs = droplsb bs.
   Proof.
-    case: bs => [| b1 bs] //=; case: bs => [| b2 bs] //=. 
-    rewrite /extract !subn1 -!pred_Sn => _. 
+    case: bs => [| b1 bs] //=; case: bs => [| b2 bs] //=.
+    rewrite /extract !subn1 -!pred_Sn => _.
     have->: (size bs).+1 + 1 = size [:: b1, b2 & bs] by rewrite addn1.
-    rewrite low_size high_cons; last by rewrite addn1. 
+    rewrite low_size high_cons; last by rewrite addn1.
     have->: size bs + 1 = size (b2 :: bs) by rewrite addn1.
-    by rewrite high_size. 
+    by rewrite high_size.
   Qed.
 
+  Lemma high_as_extract n bs :
+    0 < n -> n < size bs ->
+    high n bs = extract (size bs).-1 (size bs - n) bs.
+  Proof.
+    rewrite /extract => Hsn Hszbs. move: (ltn_trans Hsn Hszbs) => H0szbs.
+    rewrite (subnBA _ (ltnW Hszbs)). rewrite -subn1. rewrite (subnK H0szbs).
+    rewrite -(addnABC (m:=size bs) H0szbs Hsn). rewrite -(addnBAC _ (leqnn (size bs))).
+    rewrite subnn add0n. rewrite (subnK Hsn). rewrite low_size. reflexivity.
+  Qed.
+
+  Lemma low_as_extract n bs :
+    0 < n -> low n bs = extract n.-1 0 bs.
+  Proof.
+    rewrite /extract => Hsn. rewrite subn0 addn1. rewrite (prednK Hsn).
+    rewrite high_oversize; rewrite size_low; last exact: leqnn.
+    rewrite subnn /=. reflexivity.
+  Qed.
 
   (* to_Zpos and to_Zneg is always non-negative *)
 

@@ -382,6 +382,27 @@ Section Ops.
 
   Definition shlB (n : nat) (bs : bits) : bits := iter n shlB1 bs.
 
+  (* `shlBB bs ns` is the same as `shlB (to_nat ns) bs` but is more efficient *)
+  Definition shlBB (bs : bits) (ns : bits) : bits :=
+    let szbs := size bs in
+    let szns := size ns in
+    let log2szbs := Nat.log2_up szbs in
+    if szbs <= 1 then
+      if ns == zeros szns
+      then bs
+      else zeros szbs
+    else if szns <= log2szbs then
+           shlB (to_nat ns) bs
+         else
+           (* size bs > 1 -> log2szbs > 0 *)
+           let zero_hi := zeros (szns - log2szbs) in
+           let ns_hi := high (szns - log2szbs) ns in
+           if ns_hi == zero_hi
+           then let ns_lo := low log2szbs ns in
+                shlB (to_nat ns_lo) bs
+           else let zero := from_nat szbs 0 in
+                zero.
+
   (* Cast an unsigned bits to an unsigned/signed bits of another size *)
   Definition ucastB (bs : bits) (n : nat) :=
     if n == size bs then bs
@@ -716,7 +737,7 @@ Section Lemmas.
     rewrite /rolB1. rewrite size_dropmsb size_joinlsb. rewrite addn1 subn1.
     exact: Nat.pred_succ.
   Qed.
-  
+
   Lemma size_rolB n (bs : bits) : size (rolB n bs) = size bs.
   Proof. elim: n => [| n IH] //=. by rewrite size_rolB1 IH. Qed.
 
@@ -752,7 +773,7 @@ Section Lemmas.
     rewrite /shlB1. rewrite size_dropmsb size_joinlsb. rewrite addn1 subn1.
     exact: PeanoNat.Nat.pred_succ.
   Qed.
-  
+
   Lemma size_iter_shlB1 i ps :
     size (iter i shlB1 ps) = size ps .
   Proof .
@@ -770,7 +791,7 @@ Section Lemmas.
     - by rewrite IH.
   Qed.
 
-  Lemma size_sbbB b bs0 bs1 : 
+  Lemma size_sbbB b bs0 bs1 :
     size (sbbB b bs0 bs1).2 = minn (size bs0) (size bs1) .
   Proof .
     rewrite /sbbB /adcB /full_adder /= .
@@ -1850,7 +1871,7 @@ Section Lemmas.
       rewrite -{2}(Z.pow_1_r 2) -Z.pow_add_r//; last apply Nat2Z.is_nonneg.
       rewrite Nat2Z.inj_add//.
   Qed.
-      
+
   (*---------------------------------------------------------------------------
     Properties of shift left
     ---------------------------------------------------------------------------*)
@@ -1878,7 +1899,7 @@ Section Lemmas.
 
   Lemma shlB1_zeros n : shlB1 (zeros n) = zeros n.
   Proof.
-    case: n => [| n]; first done. 
+    case: n => [| n]; first done.
     rewrite /shlB1 /joinlsb.
     have->: false :: zeros n.+1 = zeros n.+2 by trivial.
     rewrite dropmsb_zeros. reflexivity.
@@ -1888,21 +1909,21 @@ Section Lemmas.
   Proof.
     elim: m => [| m IHm] //=. by rewrite IHm shlB1_zeros.
   Qed.
-  
-  Lemma shlB_cat bs n : 
+
+  Lemma shlB_cat bs n :
     n <= size bs -> bs <<# n = zeros n ++ low (size bs - n) bs.
-  Proof.    
+  Proof.
     elim: n => [| n IHn] Hsz /=.
-    - by rewrite subn0 low_size. 
-    - rewrite IHn; last by apply ltnW. 
+    - by rewrite subn0 low_size.
+    - rewrite IHn; last by apply ltnW.
       rewrite /shlB1 /joinlsb -cat_cons.
       rewrite dropmsb_cat; last by rewrite size_low subn_gt0.
       rewrite -(subnSK Hsz) dropmsb_low. reflexivity.
   Qed.
 
   Lemma shlB_size bs : bs <<# (size bs) = zeros (size bs).
-  Proof. 
-    rewrite shlB_cat; last trivial. by rewrite subnn low0 cats0. 
+  Proof.
+    rewrite shlB_cat; last trivial. by rewrite subnn low0 cats0.
   Qed.
 
   Lemma shlB_oversize bs n : size bs <= n -> bs <<# n = zeros (size bs).
@@ -1916,8 +1937,8 @@ Section Lemmas.
     - elim: n => [| n IHn] Hn.
       + by rewrite low0.
       + apply (ltn_trans (ltnSn n)) in Hn.
-        rewrite /= /shlB1 low_dropmsb; last by rewrite size_joinlsb size_shlB addn1. 
-        rewrite /joinlsb low_cons (IHn Hn). reflexivity.    
+        rewrite /= /shlB1 low_dropmsb; last by rewrite size_joinlsb size_shlB addn1.
+        rewrite /joinlsb low_cons (IHn Hn). reflexivity.
     - move=> Hsz. rewrite (shlB_oversize Hsz) low_zeros. reflexivity.
   Qed.
 
@@ -1929,11 +1950,11 @@ Section Lemmas.
   Lemma shlB_shrB_cancel bs n : high n bs == zeros n -> bs <<# n >># n = bs.
   Proof.
     move=> Hzeros. case/orP: (leq_total n (size bs)) => Hsz.
-    - rewrite (shlB_cat Hsz) shrB_cat; 
+    - rewrite (shlB_cat Hsz) shrB_cat;
         last by rewrite size_cat size_zeros size_low leq_addr.
       rewrite size_cat size_zeros size_low -(addnBAC _ (leqnn n)) subnn add0n.
       rewrite high_size_cat; last by rewrite size_low.
-      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnK]. 
+      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnK].
     - rewrite (shlB_oversize Hsz) shrB_zeros.
       move/eqP in Hzeros. apply (f_equal (high (size bs))) in Hzeros.
       rewrite (high_high _ Hsz) high_size high_zeros in Hzeros. done.
@@ -1946,7 +1967,7 @@ Section Lemmas.
         last by rewrite size_cat size_zeros size_high leq_addl.
       rewrite size_cat size_zeros size_high addnK.
       rewrite low_size_cat; last by rewrite size_high.
-      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnKC]. 
+      rewrite -(eqP Hzeros) cat_low_high; [reflexivity | by rewrite subnKC].
     - rewrite (shrB_oversize Hsz) shlB_zeros.
       move/eqP in Hzeros. apply (f_equal (low (size bs))) in Hzeros.
       rewrite (low_low _ Hsz) low_size low_zeros in Hzeros. done.
@@ -1982,6 +2003,38 @@ Section Lemmas.
     by rewrite /dropmsb /= .
   Qed .
 
+  Lemma shlBB_shlB bs ns : shlBB bs ns = shlB (to_nat ns) bs.
+  Proof.
+    rewrite /shlBB.
+    case Hszbs_le1: (size bs <= 1);
+      last case Hszns: (size ns <= Nat.log2_up (size bs)).
+    - case Hns: (ns == zeros (size ns)).
+      + rewrite (eqP Hns). rewrite to_nat_zeros /=. reflexivity.
+      + rewrite shlB_oversize; first reflexivity. rewrite -to_nat_zero in Hns.
+        move/idP/negP: Hns => Hns. rewrite -lt0n in Hns. exact: (leq_trans Hszbs_le1 Hns).
+    - reflexivity.
+    - have Hs: (Nat.log2_up (size bs)) + (size ns - Nat.log2_up (size bs)) = size ns.
+      { move/idP/negP: Hszns. rewrite -ltnNge => Hszns. rewrite (subnKC (ltnW Hszns)).
+        reflexivity. }
+      case Hzeros: (high (size ns - Nat.log2_up (size bs)) ns ==
+                    zeros (size ns - Nat.log2_up (size bs))).
+      + rewrite -(cat_low_high Hs). rewrite low_size_cat; last by rewrite size_low.
+        rewrite (eqP Hzeros). rewrite to_nat_cat. rewrite to_nat_zeros mul0n addn0.
+        reflexivity.
+      + rewrite from_natn0. rewrite shlB_oversize; first reflexivity.
+        rewrite -(cat_low_high Hs). rewrite to_nat_cat. rewrite size_low. move/idP/negP: Hzeros.
+        replace (size ns - Nat.log2_up (size bs))
+          with (size (high (size ns - Nat.log2_up (size bs)) ns)) at 2;
+          last by rewrite size_high; reflexivity.
+        move=> Hzeros. move: (neq_zeros_to_nat_gt0 Hzeros) => Hgt0.
+        move/idP/negP: Hszbs_le1. rewrite -ltnNge => Hszbs_gt1.
+        have Hszbs_gt0: (0 < size bs) by apply: (ltn_trans _ Hszbs_gt1).
+        move/ltP: Hszbs_gt0 => Hszbs_gt0.
+        move: (Nat.log2_log2_up_spec _ Hszbs_gt0) => [_ /leP H2]. rewrite -expn_pow in H2.
+        rewrite -{1}(add0n (size bs)). apply: leq_add; first done.
+        rewrite -{1}(mul1n (size bs)). exact: (leq_mul Hgt0 H2).
+  Qed.
+
   (* shlB1 semantics *)
   Lemma to_nat_shlB1 : forall (p: bits), to_nat (shlB1 p) = div.modn ((to_nat p).*2) (2^size p).
   Proof. move => p. by rewrite /shlB1 to_nat_dropmsb to_nat_joinlsb size_joinlsb-subn1 addnK addn0-muln2.
@@ -1990,17 +2043,18 @@ Section Lemmas.
   Lemma to_Zpos_shlB1 bs :
     to_Zpos (shlB1 bs) = ((to_Zpos bs * 2) mod (2 ^ Z.of_nat (size bs)))%Z.
   Proof.
-    rewrite /shlB1 to_Zpos_dropmsb to_Zpos_joinlsb size_joinlsb. 
-    by rewrite Nat2Z.inj_add /= Z.add_simpl_r Z.add_0_r. 
+    rewrite /shlB1 to_Zpos_dropmsb to_Zpos_joinlsb size_joinlsb.
+    by rewrite Nat2Z.inj_add /= Z.add_simpl_r Z.add_0_r.
   Qed.
-  
+
   (* shlB semantics *)
+
   Lemma to_nat_shlBn:
     forall n k, k < n -> to_nat (shlB k (from_nat n 1) ) = 2 ^ k.
   Proof.
     move=> n; elim => [| k IH] /=.
     - move=> Hn. rewrite expn0 to_nat_from_nat_bounded //=.
-      by rewrite -{1}(expn0 2) ltn_exp2l. 
+      by rewrite -{1}(expn0 2) ltn_exp2l.
     - move=> Hlt. rewrite to_nat_shlB1.
       have Hkn : k < n by apply (ltn_trans (ltnSn k)).
       rewrite (IH Hkn) size_shlB size_from_nat -muln2 -expnSr modn_small //=.
@@ -2009,12 +2063,12 @@ Section Lemmas.
 
   Lemma to_nat_shlBnm : forall n m , to_nat (shlB n m) = modn (to_nat m * (2^ n)) (2^ size m).
   Proof.
-    elim => [|ns IH] m. rewrite expn0 muln1 -to_nat_mod//. 
+    elim => [|ns IH] m. rewrite expn0 muln1 -to_nat_mod//.
     rewrite/= to_nat_shlB1.
     rewrite {1}(IH m).
     by rewrite size_shlB -muln2 expnSr mulnA modnMml.
   Qed.
-  
+
   Lemma to_Zpos_shlB : forall n bs,
     to_Zpos (bs <<# n)%bits = ((to_Zpos bs * 2 ^ Z.of_nat n) mod 2 ^ Z.of_nat (size bs))%Z.
   Proof.
@@ -2034,12 +2088,12 @@ Section Lemmas.
     elim => [|phd ptl IH] n. by rewrite zip_nil.
     elim n =>[|ns IH1] /=. done.
     case phd; case Hfadderz :(full_adder_zip false (zip ptl (zeros ns)))=>[c1 tl];
-                                                                            by rewrite -(IH ns) Hfadderz. 
+                                                                            by rewrite -(IH ns) Hfadderz.
   Qed.
 
   Lemma full_adder_B0 : forall p n, (full_adder false p (zeros n)).2 = unzip1 (zip p (zeros n)).
   Proof. rewrite /full_adder. exact : full_adder_zip_B0. Qed.
-  
+
   Lemma addB0 : forall p n, addB p (zeros n) = unzip1 (zip p (zeros n)).
   Proof. rewrite /addB. exact : full_adder_B0. Qed.
 
