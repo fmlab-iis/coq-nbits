@@ -1,0 +1,17 @@
+opam-version: "1.0"
+name: "nBits"
+maintainer: ["fmlab-iis"]
+authors: ["fmlab-iis"]
+synopsis: "A certified bit vector library for OCaml"
+description: "A certified bit vector library for OCaml"
+homepage: "https://github.com/fmlab-iis/coq-qfbv"
+depends: [
+  "ocaml"
+  "dune" {>= "2.0.0"}
+]
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name] {with-test}
+]
+dev-repo: "git+https://github.com/fmlab-iis/coq-qfbv"
