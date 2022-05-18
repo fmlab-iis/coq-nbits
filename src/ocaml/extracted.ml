@@ -1796,3 +1796,13 @@ let sremB bs1' bs2' =
   let bs1 = absB bs1' in
   let bs2 = absB bs2' in
   if msb bs1' then negB (snd (udivB bs1 bs2)) else snd (udivB bs1 bs2)
+
+(** val smodB : bits -> bits -> bits **)
+
+let smodB bs1 bs2 =
+  let r_sdiv = sremB bs1 bs2 in
+  if (||) (eq_op bool_eqType (Obj.magic msb bs1) (Obj.magic msb bs2))
+       (eq_op bitseq_eqType (Obj.magic r_sdiv)
+         (Obj.magic zeros (size0 r_sdiv)))
+  then r_sdiv
+  else addB r_sdiv bs2

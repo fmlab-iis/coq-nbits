@@ -20,7 +20,7 @@ Extraction "extracted"
          rolB rorB shrB shrBB sarB sarBB shlB shlBB
          (* Arithmetic operations *)
          adcB addB carry_addB addB_ovf sbbB subB borrow_subB Saddo Ssubo
-         full_mul mulB Umulo Smulo udivB' uremB sdivB' sdivB sremB
+         full_mul mulB Umulo Smulo udivB' uremB sdivB' sdivB sremB smodB
          (* Comparison operations *)
          ltB leB gtB geB sltB sleB sgtB sgeB
          (* Testing operations *)

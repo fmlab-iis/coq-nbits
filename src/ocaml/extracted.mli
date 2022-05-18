@@ -528,3 +528,5 @@ val sdivB' : bits -> bits -> bits * bits
 val sdivB : bits -> bits -> bits
 
 val sremB : bits -> bits -> bits
+
+val smodB : bits -> bits -> bits
