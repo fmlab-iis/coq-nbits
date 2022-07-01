@@ -3213,6 +3213,7 @@ Section Lemmas.
     apply Z.add_le_mono; [done|apply to_Zpos_ge0].
   Qed.
 
+
   (*---------------------------------------------------------------------------
     Properties of successor
   ---------------------------------------------------------------------------*)
@@ -9287,6 +9288,32 @@ Section Lemmas.
     exact: bv2z_adc_signed.
   Qed.
 
+  Lemma to_Z_adcB_ex bs1 bs2 (c : bool) :
+    size bs1 = size bs2 ->
+    exists d,
+      (c + to_Z bs1 + to_Z bs2)%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (adcB c bs1 bs2).2)%Z.
+  Proof.
+    move=> Hs12. rewrite !to_Z_to_Zpos. rewrite size_adcB Hs12 minnn.
+    replace (c + (to_Zpos bs1 - msb bs1 * 2 ^ Z.of_nat (size bs2)) +
+               (to_Zpos bs2 - msb bs2 * 2 ^ Z.of_nat (size bs2)))%Z
+      with (c + to_Zpos bs1 + to_Zpos bs2 -
+              msb bs1 * 2 ^ Z.of_nat (size bs2) - msb bs2 * 2 ^ Z.of_nat (size bs2))%Z by ring.
+    rewrite -(to_Zpos_adcB _ Hs12). rewrite Hs12.
+    exists ((adcB c bs1 bs2).1 - msb bs1 - msb bs2 + msb (adcB c bs1 bs2).2)%Z. ring.
+  Qed.
+
+  Lemma to_Z_addB_ex bs1 bs2 :
+    size bs1 = size bs2 ->
+    exists d,
+      (to_Z bs1 + to_Z bs2)%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (addB bs1 bs2))%Z.
+  Proof.
+    move=> Hs12. rewrite /addB. move: (to_Z_adcB_ex false Hs12) => [d H].
+    exists d. rewrite -H. replace (Z.b2z false)%Z with 0%Z by reflexivity.
+    rewrite Z.add_0_l. reflexivity.
+  Qed.
+
   Lemma bv2z_sub_unsigned bs1 bs2 :
     size bs1 = size bs2 -> ~~ borrow_subB bs1 bs2 ->
     to_Zpos (bs1 -# bs2)%bits = (to_Zpos bs1 - to_Zpos bs2)%Z.
@@ -9459,6 +9486,57 @@ Section Lemmas.
   Proof.
     exact: bv2z_sbb_signed.
   Qed.
+
+  Lemma to_Z_sbc_ex bs1 bs2 (c : bool) :
+    0 < size bs1 ->
+    size bs1 = size bs2 ->
+    exists d,
+      (to_Z bs1 - to_Z bs2 - (1 - c))%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (adcB c bs1 (~~# bs2)%bits).2)%Z.
+  Proof.
+    move=> Hs1 Hs12. have Hs: (size bs1 = size (~~# bs2)) by rewrite size_invB.
+    move: (to_Z_adcB_ex c Hs) => [d H].
+    rewrite (Z.add_comm (d * 2 ^ Z.of_nat (size bs1))) in H. move/Z.sub_move_r: H.
+    move=> <-. rewrite bv2z_not_signed; last by (rewrite -Hs12; auto with zarith).
+    exists d. replace (Z.b2z true)%Z with 1%Z by reflexivity.
+    replace Z.one with 1%Z by reflexivity. ring.
+  Qed.
+
+  Lemma to_Z_subc_ex bs1 bs2 :
+    0 < size bs1 ->
+    size bs1 = size bs2 ->
+    exists d,
+      (to_Z bs1 - to_Z bs2)%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (adcB true bs1 (~~# bs2)).2)%Z.
+  Proof.
+    move=> Hs1 Hs12. move: (to_Z_sbc_ex true Hs1 Hs12) => [d H].
+    exists d. rewrite -H. replace (Z.b2z true)%Z with 1%Z by reflexivity.
+    ring.
+  Qed.
+
+  Lemma to_Z_sbb_ex bs1 bs2 (b : bool) :
+    size bs1 = size bs2 ->
+    exists d,
+      (to_Z bs1 - to_Z bs2 - b)%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (sbbB b bs1 bs2).2)%Z.
+  Proof.
+    move=> Hs12. rewrite !to_Z_to_Zpos. rewrite (to_Zpos_sbbB b Hs12).
+    rewrite size_sbbB Hs12 minnn.
+    exists (- msb bs1 + msb bs2 - (sbbB b bs1 bs2).1 + msb (sbbB b bs1 bs2).2)%Z.
+    ring.
+  Qed.
+
+  Lemma to_Z_subB_ex bs1 bs2 :
+    size bs1 = size bs2 ->
+    exists d,
+      (to_Z bs1 - to_Z bs2)%Z =
+        (d * Z.pow 2 (Z.of_nat (size bs1)) + to_Z (subB bs1 bs2))%Z.
+  Proof.
+    move=> Hs12. rewrite /subB. move: (to_Z_sbb_ex false Hs12) => [d H].
+    exists d. rewrite -H. replace (Z.b2z false)%Z with 0%Z by reflexivity.
+    rewrite Z.sub_0_r. reflexivity.
+  Qed.
+
 
 
   Lemma Z_mul_to_Z_msb_same bs1 bs2 :
