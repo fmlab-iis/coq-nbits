@@ -2588,6 +2588,24 @@ Section Lemmas.
             apply /andP; done .
   Qed .
 
+  Lemma full_adderA1 x y z b c :
+    ((full_adder b x (full_adder c y z).2).2 =
+       (full_adder b (full_adder c x y).2 z).2).
+  Proof. move: (full_adderA x y z b c) => /andP [H _]. exact: (eqP H). Qed.
+
+  Lemma full_adderA2 x y z b c :
+    ((full_adder b x (full_adder c y z).2).2 =
+       (full_adder c (full_adder b x y).2 z).2).
+  Proof. move: (full_adderA x y z b c) => /andP [_ H]. exact: (eqP H). Qed.
+
+  Lemma adcBA1 b c x y z : (adcB b (adcB c x y).2 z).2 =
+                            (adcB b x (adcB c y z).2).2.
+  Proof. rewrite /adcB. rewrite full_adderA1. reflexivity. Qed.
+
+  Lemma adcBA2 b c x y z : (adcB b (adcB c x y).2 z).2 =
+                            (adcB c x (adcB b y z).2).2.
+  Proof. rewrite /adcB. rewrite full_adderA2. reflexivity. Qed.
+
   Lemma addBA : associative (@addB).
   Proof.
     rewrite /associative /addB /adcB => x y z .
@@ -3732,6 +3750,59 @@ Section Lemmas.
     rewrite (addnC 1 (2 ^ size bs2).-1) addn1 (ltn_predK (exp2n_gt0 _)).
     rewrite (to_nat_from_nat  (size bs2) (2 ^ size bs2)) modnn addn0 -H0.
     by rewrite to_nat_from_nat to_nat_mod modn_mod.
+  Qed.
+
+  Lemma bool_adder_gate c a b :
+    bool_adder c a b = (a && b || b && c || a && c, xorb (xorb a b) c).
+  Proof. by case: c; case: a; case: b. Qed.
+
+  Lemma adcB_cons c x0 x y0 y :
+    adcB c (x0::x) (y0::y) = let (c, hd) := bool_adder c x0 y0 in
+                             let (c, tl) := adcB c x y in
+                             (c, hd::tl).
+  Proof. reflexivity. Qed.
+
+  Lemma addB_cons x0 x y0 y :
+    addB (x0::x) (y0::y) = (xorb x0 y0::(adcB (andb x0 y0) x y).2).
+  Proof.
+    rewrite /addB /adcB /full_adder /=. case: x0 => //=; case: y0 => //=.
+    - by case: (full_adder_zip true (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
+  Qed.
+
+  Lemma sbbB_cons b x0 x y0 y :
+    sbbB b (x0::x) (y0::y) = let (c, hd) := bool_adder (~~ b) x0 (~~ y0) in
+                             let (c, tl) := sbbB (~~c) x y in
+                             (c, hd::tl).
+  Proof.
+    rewrite /sbbB /=. rewrite adcB_cons.
+    case H1: (bool_adder (~~ b) x0 (~~ y0)) => [c0 hd].
+    rewrite Bool.negb_involutive. case H2: (adcB c0 x (invB y)) => [c1 tl].
+    reflexivity.
+  Qed.
+
+  Lemma subB_cons x0 x y0 y :
+    subB (x0::x) (y0::y) = (xorb x0 y0::(sbbB (~~ x0 && y0) x y).2).
+  Proof.
+    rewrite /subB /sbbB /=. rewrite adcB_cons.
+    case H0: (bool_adder true x0 (~~ y0)) => [c0 hd].
+    rewrite bool_adder_gate in H0. case: H0 => ? ?; subst. rewrite andbT.
+    have ->: (x0 && ~~ y0 || ~~ y0 || x0 && true = ~~ (~~ x0 && y0))
+      by case: x0; case: y0.
+    case: (adcB (~~ (~~ x0 && y0)) x (invB y)) => [c1 tl] /=.
+    by case: x0; case: y0.
+  Qed.
+
+  Lemma addBBAC a b c : size a = size b -> size b = size c ->
+                        addB (subB a b) c = subB (addB a c) b.
+  Proof.
+    move=> /eqP Hs1 Hs2. rewrite (eqP (@subB_equiv_addB_negB _ _ Hs1)).
+    have Hs: size (a +# c) == size b.
+    { rewrite size_addB. rewrite (eqP Hs1) Hs2. rewrite minnn. exact: eqxx. }
+    rewrite (eqP (@subB_equiv_addB_negB _ _ Hs)). rewrite -addBA.
+    rewrite (addBC (-# b) c). rewrite addBA. reflexivity.
   Qed.
 
   (* sbbB semantics *)
