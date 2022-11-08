@@ -718,7 +718,7 @@ let eq_op t =
 
 let eqP t =
   let _evar_0_ = fun _ a -> a in
-  let { Equality.op = x; Equality.mixin_of__1 = x0 } = t in _evar_0_ x x0
+  let { Equality.op = op0; Equality.mixin_of__1 = a } = t in _evar_0_ op0 a
 
 (** val eqb : bool -> bool -> bool **)
 
@@ -970,7 +970,7 @@ let eqseqP t _top_assumption_ =
     let _evar_0_0 = fun _ _ -> ReflectF in
     (match __top_assumption_ with
      | [] -> _evar_0_
-     | x :: x0 -> _evar_0_0 x x0)
+     | a :: l -> _evar_0_0 a l)
   in
   let _evar_0_0 = fun x1 s1 iHs __top_assumption_ ->
     let _evar_0_0 = ReflectF in
@@ -984,7 +984,7 @@ let eqseqP t _top_assumption_ =
     in
     (match __top_assumption_ with
      | [] -> _evar_0_0
-     | x :: x0 -> _evar_0_1 x x0)
+     | a :: l -> _evar_0_1 a l)
   in
   let rec f = function
   | [] -> _evar_0_
@@ -1458,9 +1458,9 @@ let addB bs1 bs2 =
 let carry_addB bs1 bs2 =
   fst (adcB false bs1 bs2)
 
-(** val addB_ovf : bits -> bits -> bool **)
+(** val uaddo : bits -> bits -> bool **)
 
-let addB_ovf =
+let uaddo =
   carry_addB
 
 (** val sbbB : bool -> bits -> bits -> bool * bits **)
@@ -1477,6 +1477,11 @@ let subB bs1 bs2 =
 
 let borrow_subB bs1 bs2 =
   fst (sbbB false bs1 bs2)
+
+(** val usubo : bits -> bits -> bool **)
+
+let usubo =
+  borrow_subB
 
 (** val saddo : bits -> bits -> bool **)
 

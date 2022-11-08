@@ -19,7 +19,7 @@ Extraction "extracted"
          invB succB predB andB orB xorB negB
          rolB rorB shrB shrBB sarB sarBB shlB shlBB
          (* Arithmetic operations *)
-         adcB addB carry_addB addB_ovf sbbB subB borrow_subB Saddo Ssubo
+         adcB addB carry_addB sbbB subB borrow_subB Uaddo Saddo Usubo Ssubo
          full_mul mulB Umulo Smulo udivB' uremB sdivB' sdivB sremB smodB
          (* Comparison operations *)
          ltB leB gtB geB sltB sleB sgtB sgeB

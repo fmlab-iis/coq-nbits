@@ -258,7 +258,7 @@ Section Ops.
 
   Definition carry_addB (bs1 bs2 : bits) : bool := (adcB false bs1 bs2).1.
 
-  Definition addB_ovf (bs1 bs2 : bits) : bool := carry_addB bs1 bs2.
+  Definition Uaddo (bs1 bs2 : bits) : bool := carry_addB bs1 bs2.
 
   Definition sbbB b (bs1 bs2 : bits) : bool * bits :=
     let (c, res) := (adcB (~~b) bs1 (invB bs2)) in
@@ -267,6 +267,8 @@ Section Ops.
   Definition subB (bs1 bs2 : bits) : bits := (sbbB false bs1 bs2).2.
 
   Definition borrow_subB (bs1 bs2 : bits) : bool := (sbbB false bs1 bs2).1.
+
+  Definition Usubo := borrow_subB.
 
   Definition Saddo (bs1 bs2: bits) :=
     let (tbs1, sign1) := eta_expand (splitmsb bs1) in
@@ -1204,6 +1206,14 @@ Section Lemmas.
   Lemma neq_zeros_gt0 bs : ~~ (bs == zeros (size bs)) = (zeros (size bs) <# bs)%Z.
   Proof.
     by rewrite ltB_zeros_l ltB0n.
+  Qed.
+
+  Lemma leBn0 n : leB n [::] = (n == [::]).
+  Proof. rewrite /leB. rewrite ltBn0 orbF. reflexivity. Qed.
+
+  Lemma leB0n n : leB [::] n = ((n == [::]) || (n != zeros (size n))).
+  Proof.
+    rewrite /leB. rewrite ltB0n. rewrite eq_sym. by case H: (n == [::]).
   Qed.
 
   (* leB semantics *)
@@ -2186,19 +2196,110 @@ Section Lemmas.
     Properties of addition
     ---------------------------------------------------------------------------*)
 
-  Lemma full_adder_zip_B0 : forall p n, (full_adder_zip false (zip p (zeros n))).2 = unzip1 (zip p (zeros n)).
+  Lemma bool_adder_gate c a b :
+    bool_adder c a b = (a && b || b && c || a && c, xorb (xorb a b) c).
+  Proof. by case: c; case: a; case: b. Qed.
+
+  Lemma adcB_cons c x0 x y0 y :
+    adcB c (x0::x) (y0::y) = let (c, hd) := bool_adder c x0 y0 in
+                             let (c, tl) := adcB c x y in
+                             (c, hd::tl).
+  Proof. reflexivity. Qed.
+
+  Lemma addB_cons x0 x y0 y :
+    addB (x0::x) (y0::y) = (xorb x0 y0::(adcB (andb x0 y0) x y).2).
   Proof.
-    elim => [|phd ptl IH] n. by rewrite zip_nil.
-    elim n =>[|ns IH1] /=. done.
-    case phd; case Hfadderz :(full_adder_zip false (zip ptl (zeros ns)))=>[c1 tl];
-                                                                            by rewrite -(IH ns) Hfadderz.
+    rewrite /addB /adcB /full_adder /=. case: x0 => //=; case: y0 => //=.
+    - by case: (full_adder_zip true (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
+    - by case: (full_adder_zip false (zip x y)).
   Qed.
 
-  Lemma full_adder_B0 : forall p n, (full_adder false p (zeros n)).2 = unzip1 (zip p (zeros n)).
+  Lemma bool_adderC c : commutative (bool_adder c).
+  Proof. by (case ; case). Qed.
+
+  Lemma full_adderC c : commutative (full_adder c).
+  Proof.
+    intro. generalize dependent c.
+    elim x => [|xhd xtl IH]/=.
+    - intros. rewrite/full_adder zip_nil; case y; done.
+    - intros; rewrite/full_adder/=; case y; try done.
+      intros; rewrite/= bool_adderC. case (bool_adder c b xhd)=>[c0 hd].
+      move : (IH c0 l); rewrite/full_adder; move => IH1. by rewrite IH1.
+  Qed.
+
+  Lemma adcBC c : commutative (adcB c).
+  Proof. exact :full_adderC.
+  Qed.
+
+  Lemma addBC : commutative (addB).
+  Proof.
+    rewrite /commutative /addB .
+    move => x y; by rewrite (adcBC false x y) .
+  Qed .
+
+  Lemma full_adder_zip_B0 p n :
+    (full_adder_zip false (zip p (zeros n))) = (false, unzip1 (zip p (zeros n))).
+  Proof.
+    elim: p n => [| phd ptl IH] n; first by rewrite zip_nil.
+    elim: n =>[| ns _] //=. by case: phd => //=; rewrite IH.
+  Qed.
+
+  Lemma full_adder_B0 p n :
+    (full_adder false p (zeros n)) = (false, unzip1 (zip p (zeros n))).
   Proof. rewrite /full_adder. exact : full_adder_zip_B0. Qed.
 
-  Lemma addB0 : forall p n, addB p (zeros n) = unzip1 (zip p (zeros n)).
-  Proof. rewrite /addB. exact : full_adder_B0. Qed.
+  Lemma full_adder_is_zero_r m n :
+    is_zero n -> size m <= size n ->
+    full_adder false m n = (false, m).
+  Proof.
+    move=> Hz Hs. rewrite is_zero_eq_zeros in Hz. move/eqP: Hz => Hz.
+    rewrite Hz in Hs *. rewrite full_adder_B0.
+    rewrite (unzip1_zip Hs). reflexivity.
+  Qed.
+
+  Lemma full_adder_is_zero_l m n :
+    is_zero m -> size n <= size m ->
+    full_adder false m n = (false, n).
+  Proof.
+    move=> Hz Hs. rewrite full_adderC. exact: full_adder_is_zero_r.
+  Qed.
+
+  Lemma adcB_B0 p n :
+    (adcB false p (zeros n)) = (false, unzip1 (zip p (zeros n))).
+  Proof. exact: full_adder_B0. Qed.
+
+  Lemma adcB_is_zero_r m n :
+    is_zero n -> size m <= size n ->
+    adcB false m n = (false, m).
+  Proof. exact: full_adder_is_zero_r. Qed.
+
+  Lemma adcB_is_zero_l m n :
+    is_zero m -> size n <= size m ->
+    adcB false m n = (false, n).
+  Proof. exact: full_adder_is_zero_l. Qed.
+
+  Lemma addB0 p n : addB p (zeros n) = unzip1 (zip p (zeros n)).
+  Proof. rewrite /addB. by rewrite adcB_B0 /=. Qed.
+
+  Lemma addBn0 p n : size p <= n -> addB p (zeros n) = p.
+  Proof.
+    move=> Hs. rewrite /addB. rewrite (adcB_is_zero_r (zeros_is_zero n)); first reflexivity.
+    by rewrite size_zeros.
+  Qed.
+
+  Lemma addB_is_zero_r m n :
+    is_zero n -> size m <= size n -> addB m n = m.
+  Proof.
+    move=> Hz Hs. rewrite /addB. by rewrite (adcB_is_zero_r Hz Hs).
+  Qed.
+
+  Lemma addB_is_zero_l m n :
+    is_zero m -> size n <= size m -> addB m n = n.
+  Proof.
+    move=> Hz Hs. rewrite /addB. by rewrite (adcB_is_zero_l Hz Hs).
+  Qed.
 
   Lemma full_adder_zip_B1 : forall p n,
       (full_adder_zip true (zip p (zeros n))).2 =
@@ -2238,30 +2339,6 @@ Section Lemmas.
         rewrite -[(c1, true::tl1).2]/(true::(c1, tl1).2) - Hadder1 .
         rewrite full_adder_zip_B0 unzip1_zip; first done .
         by rewrite size_zeros .
-  Qed .
-
-  Lemma bool_adderC c : commutative (bool_adder c).
-  Proof. by (case ; case).
-  Qed.
-
-  Lemma full_adderC c : commutative (full_adder c).
-  Proof.
-    intro. generalize dependent c.
-    elim x => [|xhd xtl IH]/=.
-    - intros. rewrite/full_adder zip_nil; case y; done.
-    - intros; rewrite/full_adder/=; case y; try done.
-      intros; rewrite/= bool_adderC. case (bool_adder c b xhd)=>[c0 hd].
-      move : (IH c0 l); rewrite/full_adder; move => IH1. by rewrite IH1.
-  Qed.
-
-  Lemma adcBC c : commutative (adcB c).
-  Proof. exact :full_adderC.
-  Qed.
-
-  Lemma addBC : commutative (addB).
-  Proof.
-    rewrite /commutative /addB .
-    move => x y; by rewrite (adcBC false x y) .
   Qed .
 
   Ltac dcase_full_adder_zip c xs ys :=
@@ -2928,10 +3005,8 @@ Section Lemmas.
 
   Lemma adcB0 bs : adcB false bs (zeros (size bs)) = (false, bs).
   Proof.
-    elim: bs => [//= | b bs IH]. rewrite /adcB /full_adder /=. case b.
-    all : have->: full_adder_zip false (zip bs (zeros (size bs))) =
-                  adcB false bs (zeros (size bs)) by reflexivity.
-    all : by rewrite IH.
+    rewrite adcB_B0. rewrite unzip1_zip; first reflexivity.
+    by rewrite size_zeros.
   Qed.
 
   Lemma joinlsb0_addB1_nocarry bs :
@@ -3134,6 +3209,137 @@ Section Lemmas.
     have->: Z.of_nat (adcB c bs1 bs2).1 = (adcB c bs1 bs2).1
       by case (adcB c bs1 bs2).1.
     done.
+  Qed.
+
+  Lemma UaddoC m n : Uaddo m n = Uaddo n m.
+  Proof. rewrite /Uaddo /carry_addB. rewrite adcBC. reflexivity. Qed.
+
+  Lemma Uaddo_is_zero_r m n : is_zero n -> size m <= size n -> ~~ Uaddo m n.
+  Proof.
+    rewrite /Uaddo /carry_addB. move=> Hz Hs.
+    by rewrite (adcB_is_zero_r Hz Hs).
+  Qed.
+
+  Lemma Uaddo_is_zero_l m n : is_zero m -> size n <= size m -> ~~ Uaddo m n.
+  Proof. rewrite UaddoC. exact: Uaddo_is_zero_r. Qed.
+
+  Lemma SaddoC m n : Saddo m n = Saddo n m.
+  Proof.
+    rewrite /Saddo. rewrite addBC. rewrite (andbC (splitmsb m).2).
+    rewrite (andbC (~~ (splitmsb m).2)). reflexivity.
+  Qed.
+
+  Lemma Saddo_is_zero_r m n : is_zero n -> size m <= size n -> ~~ Saddo m n.
+  Proof.
+    rewrite /Saddo => Hz Hs. rewrite (addB_is_zero_r Hz Hs).
+    by case: ((splitmsb m).2); rewrite ?andbF /=.
+  Qed.
+
+  Lemma Saddo_is_zero_l m n : is_zero m -> size n <= size m -> ~~ Saddo m n.
+  Proof. rewrite SaddoC. exact: Saddo_is_zero_r. Qed.
+
+  Lemma adcB0n c n : adcB c [::] n = (c, [::]).
+  Proof. rewrite /adcB /full_adder. rewrite zip_nil /=. reflexivity. Qed.
+
+  Lemma adcBn0 c n : adcB c n [::] = (c, [::]).
+  Proof. rewrite /adcB /full_adder. rewrite zip_nil_r /=. reflexivity. Qed.
+
+  Lemma adcB_carry01 m n : (adcB false m n).1 -> (adcB true m n).1.
+  Proof.
+    elim: m n => [| m0 m IH] [| n0 n] //=.
+    rewrite !adcB_cons. case: m0; case: n0 => //=.
+    - by case: (adcB true m n) => [c r].
+    - case H1: (adcB false m n) => [c1 r1]; case H2: (adcB true m n) => [c2 r2] /= Hc1.
+      have ->: c2 = (adcB true m n).1 by rewrite H2. apply: IH. by rewrite H1 Hc1.
+    - case H1: (adcB false m n) => [c1 r1]; case H2: (adcB true m n) => [c2 r2] /= Hc1.
+      have ->: c2 = (adcB true m n).1 by rewrite H2. apply: IH. by rewrite H1 Hc1.
+    - by case H: (adcB false m n) => [c1 r1].
+  Qed.
+
+  Lemma adcB_carry0c c m n : (adcB false m n).1 -> (adcB c m n).1.
+  Proof. case: c => //=. exact: adcB_carry01. Qed.
+
+  Lemma carry_addB0n n : carry_addB [::] n = false.
+  Proof. rewrite /carry_addB adcB0n /=. reflexivity. Qed.
+
+  Lemma carry_addBn0 n : carry_addB n [::] = false.
+  Proof. rewrite /carry_addB adcBn0 /=. reflexivity. Qed.
+
+  Lemma Uaddo0n n : Uaddo [::] n = false.
+  Proof. by rewrite /Uaddo carry_addB0n. Qed.
+
+  Lemma Uaddon0 n : Uaddo n [::] = false.
+  Proof. by rewrite /Uaddo carry_addBn0. Qed.
+
+  Lemma Uaddo_cons m0 m n0 n :
+    Uaddo (m0::m) (n0::n) = (adcB (m0 && n0) m n).1.
+  Proof.
+    rewrite /Uaddo /carry_addB. rewrite adcB_cons. rewrite /bool_adder.
+    case: m0; case: n0 => //=.
+    - by case H: (adcB true m n) => [c r].
+    - by case H: (adcB false m n) => [c r].
+    - by case H: (adcB false m n) => [c r].
+    - by case H: (adcB false m n) => [c r].
+  Qed.
+
+  Lemma full_adder_zip_ltB_r_carry m n p c1 c2 :
+    size m = size n -> size m = size p ->
+    ltB n p -> (adcB c1 m n).1 -> (adcB c2 m p).1.
+  Proof.
+    elim: m n p c1 c2 => [| m0 m IH] n p c1 c2 //=.
+    - move => Hn Hp. symmetry in Hn. symmetry in Hp.
+      rewrite (size0nil Hn) (size0nil Hp). discriminate.
+    - case: n => [| n0 n]; case: p => [| p0 p] //=.
+      move => /eq_add_S Hmn /eq_add_S Hmp. rewrite ltB_cons. case/orP.
+      + move/andP => [/andP [H1 H2] H3]. rewrite {p0}H3. move/negPf: H2 => {n0}->.
+        rewrite -Hmn -Hmp subnn !zext0 in H1. move/eqP: H1 => ?; subst.
+        rewrite !adcB_cons.
+        case H1: (bool_adder c1 m0 false) => [cc1 r1] /=.
+        case H2: (bool_adder c2 m0 true) => [cc2 r2] /=.
+        case H3: (adcB cc1 m p) => [cc3 r3] /=.
+        case H4: (adcB cc2 m p) => [cc4 r4] /=.
+        have ->: cc3 = (adcB cc1 m p).1 by rewrite H3 => {H3}.
+        have ->: cc4 = (adcB cc2 m p).1 by rewrite H4 => {H4}.
+        move: H1 H2; case: c1; case: c2; (case: m0 => //=); (move=> [] ? ? [] ? ?); subst;
+          by apply || by exact: adcB_carry0c.
+      + move=> Hlt. rewrite !adcB_cons.
+        case H1: (bool_adder c1 m0 n0) => [cc1 r1].
+        case H2: (bool_adder c2 m0 p0) => [cc2 r2].
+        case H3: (adcB cc1 m n) => [cc3 r3]; case H4: (adcB cc2 m p) => [cc4 r4] /=.
+        have ->: cc3 = (adcB cc1 m n).1 by rewrite H3.
+        have ->: cc4 = (adcB cc2 m p).1 by rewrite H4.
+        exact: (IH _ _ _ _ Hmn Hmp Hlt).
+  Qed.
+
+  Lemma Uaddo_ltB_r m n p :
+    size m = size n -> size m = size p -> ltB n p ->
+    Uaddo m n -> Uaddo m p.
+  Proof. exact: full_adder_zip_ltB_r_carry. Qed.
+
+  Lemma Uaddo_leB_r m n p :
+    size m = size n -> size m = size p -> leB n p ->
+    Uaddo m n -> Uaddo m p.
+  Proof.
+    move=> Hmn Hmp. case/orP.
+    - move=> /eqP ->. by apply.
+    - exact: Uaddo_ltB_r.
+  Qed.
+
+  Lemma Uaddo_ltB_l m n p :
+    size m = size n -> size m = size p -> ltB m p ->
+    Uaddo m n -> Uaddo p n.
+  Proof.
+    rewrite (UaddoC m) (UaddoC p) => Hmn Hmp Hlt.
+    apply: (Uaddo_ltB_r (Logic.eq_sym Hmn) _ Hlt). by rewrite -Hmn -Hmp.
+  Qed.
+
+  Lemma Uaddo_leB_l m n p :
+    size m = size n -> size m = size p -> leB m p ->
+    Uaddo m n -> Uaddo p n.
+  Proof.
+    move=> Hmn Hmp. case/orP.
+    - move=> /eqP ->. by apply.
+    - exact: Uaddo_ltB_l.
   Qed.
 
   (* addB semantics *)
@@ -3750,26 +3956,6 @@ Section Lemmas.
     rewrite (addnC 1 (2 ^ size bs2).-1) addn1 (ltn_predK (exp2n_gt0 _)).
     rewrite (to_nat_from_nat  (size bs2) (2 ^ size bs2)) modnn addn0 -H0.
     by rewrite to_nat_from_nat to_nat_mod modn_mod.
-  Qed.
-
-  Lemma bool_adder_gate c a b :
-    bool_adder c a b = (a && b || b && c || a && c, xorb (xorb a b) c).
-  Proof. by case: c; case: a; case: b. Qed.
-
-  Lemma adcB_cons c x0 x y0 y :
-    adcB c (x0::x) (y0::y) = let (c, hd) := bool_adder c x0 y0 in
-                             let (c, tl) := adcB c x y in
-                             (c, hd::tl).
-  Proof. reflexivity. Qed.
-
-  Lemma addB_cons x0 x y0 y :
-    addB (x0::x) (y0::y) = (xorb x0 y0::(adcB (andb x0 y0) x y).2).
-  Proof.
-    rewrite /addB /adcB /full_adder /=. case: x0 => //=; case: y0 => //=.
-    - by case: (full_adder_zip true (zip x y)).
-    - by case: (full_adder_zip false (zip x y)).
-    - by case: (full_adder_zip false (zip x y)).
-    - by case: (full_adder_zip false (zip x y)).
   Qed.
 
   Lemma sbbB_cons b x0 x y0 y :
