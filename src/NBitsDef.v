@@ -133,6 +133,15 @@ Section Definitions.
   Definition to_bool (bs : bits) : bool := ~~ is_zero bs.
   Definition to_N (bs : bits) : N :=
     foldr (fun b res => (N_of_bool b + res * 2)%num) 0%num bs.
+  Fixpoint from_pos (n : nat) (x : positive) : bits :=
+    match n with
+    | O => [::]
+    | S m => match x with
+             | xI y => b1::from_pos m y
+             | xO y => b0::from_pos m y
+             | xH => b1::zeros m
+             end
+    end.
   Fixpoint from_N (n : nat) (x : N) : bits :=
     match n with
     | O => [::]
@@ -448,30 +457,38 @@ Section Lemmas.
     by rewrite {2}/droplsb /= -{1}rcons_cons /dropmsb !splitmsb_rcons /droplsb.
   Qed.
 
-  Lemma dropmsb_cons n b bs :
-    size bs = n.+1 ->
-    dropmsb (b::bs) == b::(dropmsb bs) .
-  Proof .
-    case bs; first done .
-    move => c cs Hsz .
-    by rewrite {1}/dropmsb /splitmsb /split_last /= .
-  Qed .
-
   Lemma droplsb_cat bs1 bs2 :
     0 < size bs1 -> droplsb (bs1 ++ bs2) = droplsb bs1 ++ bs2.
   Proof. by case: bs1. Qed.
 
-  Lemma dropmsb_cat bs1 bs2 :
-    0 < size bs2 -> dropmsb (bs1 ++ bs2) = bs1 ++ dropmsb bs2.
-  Proof.
-    elim: bs1 => [| b bs1 IH] //=. move=> Hsz.
-    have H : size (bs1 ++ bs2) = (size (bs1 ++ bs2)).-1.+1.
-    { apply S_pred_pos. apply/ltP. rewrite size_cat. by apply ltn_addl. }
-    by rewrite (eqP (dropmsb_cons _ H)) (IH Hsz).
-  Qed.
+  Lemma dropmsb_cons b bs :
+    0 < size bs ->
+    dropmsb (b::bs) = b::(dropmsb bs).
+  Proof. by case: bs => [| c cs] //=. Qed.
 
   Lemma dropmsb_rcons bs b : dropmsb (rcons bs b) = bs.
   Proof. by rewrite /dropmsb splitmsb_rcons. Qed.
+
+  Lemma dropmsb_cat bs1 bs2 :
+    0 < size bs2 -> dropmsb (bs1 ++ bs2) = bs1 ++ dropmsb bs2.
+  Proof.
+    elim: bs1 => [| b bs1 IH] //=. move=> Hsz. rewrite dropmsb_cons.
+    - rewrite (IH Hsz). reflexivity.
+    - rewrite size_cat. apply: ltn_addl. assumption.
+  Qed.
+
+  Lemma msb_singleton b : msb [:: b] = b.
+  Proof. reflexivity. Qed.
+
+  Lemma lsb_singleton b : lsb [:: b] = b.
+  Proof. reflexivity. Qed.
+
+  Lemma msb_copy_msb bs n : msb (bs ++ copy n (msb bs)) = msb bs.
+  Proof.
+    elim: n bs => [| n IHn] bs /=.
+    - rewrite cats0. reflexivity.
+    - rewrite -cat_rcons. move: (IHn (rcons bs (msb bs))). rewrite msb_rcons. by apply.
+  Qed.
 
   (* Lemmas about zeros and ones *)
 
@@ -924,6 +941,36 @@ Section Lemmas.
     - by trivial.
   Qed.
 
+  Lemma high_cat_zeros n m bs : high n (zeros m ++ bs) = high n bs.
+  Proof.
+    move: bs n m. apply: last_ind => [| bs b IH] n m /=.
+    - rewrite cats0 high_nil high_zeros. reflexivity.
+    - case: n => [| n].
+      + rewrite !high0. reflexivity.
+      + rewrite -rcons_cat. rewrite !high_rcons. rewrite IH. reflexivity.
+  Qed.
+
+  Lemma low_cat_zeros n m bs : low n (bs ++ zeros m) = low n bs.
+  Proof.
+    elim: bs n m => [| b bs IH] n m /=.
+    - rewrite low_nil low_zeros. reflexivity.
+    - case: n => [| n].
+      + rewrite !low0. reflexivity.
+      + rewrite !low_cons. rewrite IH. reflexivity.
+  Qed.
+
+  Lemma high_high_cat_cat n m bs1 bs2 :
+    n <= m ->
+    high n (high m bs1 ++ bs2) = high n (bs1 ++ bs2).
+  Proof.
+    move: bs2 bs1 n m. apply: last_ind => [| b bs2 IH] bs1 n m Hnm /=.
+    - by rewrite !cats0 high_high.
+    - case: n Hnm => [| n] Hnm.
+      + rewrite !high0. reflexivity.
+      + rewrite -!rcons_cat. rewrite high_rcons.
+        rewrite (IH _ _ _ (ltnW Hnm)). rewrite high_rcons. reflexivity.
+  Qed.
+
   (* Lemmas about extract *)
 
   Lemma extract_msb bs :
@@ -1031,6 +1078,23 @@ Section Lemmas.
 
   Lemma to_Zpos_nat bs : to_Zpos bs = Z.of_nat (to_nat bs).
   Proof. by rewrite to_Zpos_N to_N_nat nat_N_Z. Qed.
+
+
+  (* Relate from_nat, from_N, and ... *)
+
+  Lemma from_N_nat n m : from_N n (N.of_nat m) = from_nat n m.
+  Proof.
+    elim: n m => [| n IH] m //=. rewrite /joinlsb. rewrite -IH.
+    rewrite ssrodd_odd ssrdiv2_div2 Nat.div2_div. rewrite N_of_nat_odd.
+    rewrite Nnat.Nat2N.inj_div /=. reflexivity.
+  Qed.
+
+  Lemma from_nat_N n m : from_nat n (N.to_nat m) = from_N n m.
+  Proof.
+    elim: n m => [| n IH] m //=. rewrite -IH.
+    rewrite ssrodd_odd ssrdiv2_div2 Nat.div2_div. rewrite N_to_nat_odd.
+    rewrite Nnat.N2Nat.inj_div /=. reflexivity.
+  Qed.
 
 
   (* Lemmas about is_zero *)
@@ -1351,13 +1415,27 @@ Section Lemmas.
            by rewrite -addnA (addnC (2^n)) addnA.
   Qed.
 
-  Lemma to_nat_mod p: to_nat p = div.modn (to_nat p) (2^(size p)).
+  Lemma to_nat_mod p: to_nat p = (to_nat p) %% (2^(size p)).
   Proof. rewrite div.modn_small => //. apply to_nat_bounded. Qed.
 
-  Lemma to_nat_from_nat n m : to_nat (from_nat n m) = div.modn m (2^n).
-  Proof. have H:= div.divn_eq m (2^n). rewrite {1}H.
-         have HH:= from_nat_wrapMany n (div.divn m (2^n)) (div.modn m (2^n)). rewrite addnC in HH. rewrite -HH.
-         rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0. Qed.
+  Lemma to_nat_from_nat n m : to_nat (from_nat n m) = m %% (2^n).
+  Proof.
+    have H:= div.divn_eq m (2^n). rewrite {1}H.
+    have HH:= from_nat_wrapMany n (div.divn m (2^n)) (div.modn m (2^n)).
+    rewrite addnC in HH. rewrite -HH.
+    rewrite to_nat_from_nat_bounded. done. apply div.ltn_pmod. apply expn_gt0.
+  Qed.
+
+  Lemma from_nat_eqmod (n m p : nat) :
+    m %% (2 ^ n) = p %% (2 ^ n) -> from_nat n m = from_nat n p.
+  Proof.
+    move=> H. rewrite -(from_nat_to_nat (from_nat n m)) -(from_nat_to_nat (from_nat n p)).
+    rewrite !to_nat_from_nat. rewrite H. rewrite !size_from_nat. reflexivity.
+  Qed.
+
+  Lemma from_nat_mod_pow2n (n m : nat) :
+    from_nat n (m %% (2 ^ n)) = from_nat n m.
+  Proof. apply: from_nat_eqmod. rewrite modn_mod. reflexivity. Qed.
 
 
   (* Lemmas about from_N and to_N *)
@@ -1404,6 +1482,61 @@ Section Lemmas.
     rewrite (N.mod_add _ _ _ Hnz) (N.mod_mod _ _ Hnz).
     rewrite to_N_from_N_bounded; first reflexivity.
     by apply: N.mod_lt.
+  Qed.
+
+  Lemma from_N_mod_pow2n n m :
+    from_N n (m mod (2 ^ N.of_nat n))%num = from_N n m.
+  Proof.
+    rewrite -!from_nat_N. rewrite Nnat.N2Nat.inj_mod.
+    rewrite Nnat.N2Nat.inj_pow. rewrite Nnat.Nat2N.id.
+    replace (N.to_nat 2) with 2 by reflexivity.
+    rewrite -expn_pow. rewrite -modn_modulo; first exact: from_nat_mod_pow2n.
+    apply/eqP => H. move: (expn2_gt0 n). by rewrite H.
+  Qed.
+
+  Lemma to_N_zeros n : to_N (zeros n) = 0%num.
+  Proof. by rewrite to_N_nat to_nat_zeros. Qed.
+
+  Lemma to_N_ones n : to_N (ones n) = (2^N.of_nat n - 1)%num.
+  Proof.
+    rewrite to_N_nat to_nat_ones. rewrite Nnat.Nat2N.inj_sub.
+    rewrite expn_pow Nnat.Nat2N.inj_pow. reflexivity.
+  Qed.
+
+  Lemma from_N_Zpos n m : from_N n (N.pos m) = from_Zpos n (Zpos m).
+  Proof.
+    elim: n m => [| n IH] //. case => //=.
+    - move=> m. rewrite /N.odd Npos_xI_div2 IH /=. reflexivity.
+    - move=> m. rewrite /N.odd Npos_xO_div2 IH /=. reflexivity.
+    - rewrite /N.odd /=. rewrite N.div_small //.
+      rewrite -zeros_from_N -zeros_from_Zpos. reflexivity.
+  Qed.
+
+  (* Lemmas about from_pos *)
+
+  Lemma from_pos_N n m : from_pos n m = from_N n (N.pos m).
+  Proof.
+    elim: m n => //=.
+    - move=> m IHm n. case: n => [| n] //=.
+      rewrite /N.odd /=. rewrite Npos_xI_div2. rewrite -IHm. reflexivity.
+    - move=> m IHm n. case: n => [| n] //=.
+      rewrite /N.odd /=. rewrite Npos_xO_div2. rewrite -IHm. reflexivity.
+    - move=> n. elim: n => [| n IH] //=. rewrite /N.odd /=.
+      rewrite N.div_small => //. rewrite -zeros_from_N. reflexivity.
+  Qed.
+
+  Lemma from_pos_nat n m : from_pos n m = from_nat n (Pos.to_nat m).
+  Proof. rewrite from_pos_N -from_N_nat positive_nat_N. reflexivity. Qed.
+
+  Lemma size_from_pos n m : size (from_pos n m) = n.
+  Proof. by rewrite from_pos_N size_from_N. Qed.
+
+  Lemma from_pos_Zpos n m : from_pos n m = from_Zpos n (Zpos m).
+  Proof.
+    elim: n m => [| n IH] m //. case: m => //=.
+    - move=> m. by rewrite IH.
+    - move=> m. by rewrite IH.
+    - rewrite -zeros_from_Zpos. reflexivity.
   Qed.
 
   (* Lemmas about to_Zpos *)

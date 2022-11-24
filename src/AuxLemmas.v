@@ -217,7 +217,7 @@ Proof.
 Qed.
 
 Lemma lt1_eq0 : forall (n : nat), n < 1 -> n = 0.
-Proof. 
+Proof.
   intros. induction n; try done.
 Qed.
 
@@ -225,7 +225,7 @@ Lemma rev_cons_nil : forall (hd : bool) tl, ~~ (rcons tl hd == [::]).
 Proof.
   intros. move : hd. elim tl;  done.
 Qed.
-    
+
 Lemma rev_nil : forall (hd : bool) tl, ~~ (rev (hd :: tl) == [::]).
 Proof.
   move => hd tl. rewrite rev_cons. exact : rev_cons_nil.
@@ -237,6 +237,178 @@ Proof.
   rewrite -(ltn_mod m) in H.
   move : (ltn_leq_trans H H0) => Hgt.
   rewrite ltn_neqAle in Hgt. move/andP : Hgt => [Hne Hle]. exact.
+Qed.
+
+Lemma ssrodd_odd n : odd n = Nat.odd n.
+Proof.
+  elim: n => /=.
+  - reflexivity.
+  - move=> n IH. rewrite {}IH Nat.odd_succ Nat.negb_odd. reflexivity.
+Qed.
+
+Lemma div2_succ n : Nat.div2 (S n) = Nat.odd n + Nat.div2 n.
+Proof.
+  case H: (Nat.odd n).
+  - move: (proj1 (Nat.odd_spec n) H) => {H} [m H].
+    rewrite {n}H.
+    have: (((2 * m) + 1).+1 = 2 * (1 + m)) by ring.
+    move=> ->. rewrite Nat.div2_double (plus_comm (2 * m) 1)
+                 Nat.div2_succ_double.
+    reflexivity.
+  - move/negPn: H => H. move: (proj1 (Nat.even_spec n) H) => {H} [m H].
+    rewrite {n}H Nat.div2_double Nat.div2_succ_double.
+    reflexivity.
+Qed.
+
+Lemma ssrdiv2_succ n : (n.+1)./2 = odd n + n./2.
+Proof. rewrite /half -/uphalf -/half uphalf_half. reflexivity. Qed.
+
+Lemma ssrdiv2_div2 n : n./2 = Nat.div2 n.
+Proof.
+  elim: n => [| n IH] //. rewrite div2_succ ssrdiv2_succ ssrodd_odd IH.
+  reflexivity.
+Qed.
+
+Lemma pos_to_nat_odd n : Nat.odd (Pos.to_nat n) = N.odd (N.pos n).
+Proof.
+  case: n => [n | n |].
+  - rewrite Pos2Nat.inj_xI Nat.odd_succ Nat.even_mul Nat.even_2 /=. reflexivity.
+  - rewrite Pos2Nat.inj_xO Nat.odd_mul Nat.odd_2 /=. reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma pos_to_nat_even n : Nat.even (Pos.to_nat n) = N.even (N.pos n).
+Proof.
+  case: n => [n | n |].
+  - rewrite Pos2Nat.inj_xI Nat.even_succ Nat.odd_mul Nat.odd_2 /=. reflexivity.
+  - rewrite Pos2Nat.inj_xO Nat.even_mul Nat.even_2 /=. reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma N_of_nat_odd n : N.odd (N.of_nat n) = Nat.odd n
+with N_of_nat_even n : N.even (N.of_nat n) = Nat.even n.
+Proof.
+  (* N_of_nat_odd *)
+  - case: n => [| n]; [reflexivity | simpl]. rewrite Nat.odd_succ.
+    rewrite -N_of_nat_even. rewrite -N.odd_succ.
+    clear N_of_nat_odd N_of_nat_even. by elim: n => [| n IH] //=.
+  (* N_of_nat_even *)
+  - case: n => [| n]; first reflexivity. rewrite Nat.even_succ.
+    rewrite -N_of_nat_odd. rewrite -N.even_succ.
+    clear N_of_nat_odd N_of_nat_even. by elim: n => [| n IH] //=.
+Qed.
+
+Lemma N_to_nat_odd n : Nat.odd (N.to_nat n) = N.odd n.
+Proof. case: n => [| n]; [reflexivity | exact: pos_to_nat_odd]. Qed.
+
+Lemma N_to_nat_even n : Nat.even (N.to_nat n) = N.even n.
+Proof. case: n => [| n]; [reflexivity | exact: pos_to_nat_even]. Qed.
+
+Lemma leq_le_iff n m : n <= m <-> (n <= m)%coq_nat.
+Proof.
+  elim: m n => /=.
+  - move=> n; split => H.
+    + rewrite /leq subn0 in H. rewrite (eqP H). done.
+    + inversion_clear H. done.
+  - move=> m IH n; split => H.
+    + apply: (proj1 (Nat.le_pred_le_succ n m)). apply: (proj1 (IH (n.-1))).
+      rewrite -subn1 leq_subLR addnC addn1. exact: H.
+    + rewrite -addn1 addnC -leq_subLR subn1. apply: (proj2 (IH (n.-1))).
+      apply: (proj2 (Nat.le_pred_le_succ n m)). exact: H.
+Qed.
+
+Lemma leq_le n m : n <= m -> (n <= m)%coq_nat.
+Proof.
+  exact: (proj1 (leq_le_iff n m)).
+Qed.
+
+Lemma le_leq n m : (n <= m)%coq_nat -> n <= m.
+Proof.
+  exact: (proj2 (leq_le_iff n m)).
+Qed.
+
+Lemma ltn_lt_iff n m : n < m <-> (n < m)%coq_nat.
+Proof.
+  split => H.
+  - apply: (proj1 (Nat.le_succ_l n m)). apply: leq_le. exact: H.
+  - apply: le_leq. apply: (proj2 (Nat.le_succ_l n m)). exact: H.
+Qed.
+
+Lemma ltn_lt n m : n < m -> (n < m)%coq_nat.
+Proof.
+  exact: (proj1 (ltn_lt_iff n m)).
+Qed.
+
+Lemma lt_ltn n m : (n < m)%coq_nat -> n < m.
+Proof.
+  exact: (proj2 (ltn_lt_iff n m)).
+Qed.
+
+Theorem nat_strong_ind (P : nat -> Prop) :
+  (forall n : nat, (forall k : nat, k < n -> P k) -> P n) ->
+  forall n : nat, P n.
+Proof.
+  move=> IH. have H0: P 0.
+  { apply: IH. move=> k H; by inversion H. }
+  have H: forall n m, m <= n -> P m.
+  { move=> n; elim: n.
+    - move=> m Hm. rewrite leqn0 in Hm. rewrite (eqP Hm); exact: H0.
+    - move=> n H m Hmn. apply: IH. move=> k Hkm.
+      apply: H. exact: (leq_trans Hkm Hmn). }
+  move=> n. apply: IH. move=> k Hkn. exact: (H _ _ (ltnW Hkn)).
+Qed.
+
+Lemma modn_subn n m : m <= n -> n %% m = (n - m) %% m.
+Proof.
+  move=> H. apply/eqP. rewrite -(eqn_modDl m).
+  rewrite addnC modnDr. rewrite addnC (subnK H). exact: eqxx.
+Qed.
+
+Lemma mod_sub n m :
+  (m <> 0)%coq_nat ->
+  (m <= n)%coq_nat -> ((n mod m) = (n - m) mod m)%coq_nat.
+Proof.
+  move=> Hm Hmn. rewrite -(Nat.mod_add (n - m) 1 _ Hm).
+  rewrite Nat.mul_1_l (Nat.sub_add _ _ Hmn).
+  reflexivity.
+Qed.
+
+Lemma modn_modulo (n m : nat) : m != 0 -> n %% m = Nat.modulo n m.
+Proof.
+  move=> Hm0. case H: (n < m)%N.
+  - rewrite (modn_small H) Nat.mod_small; first reflexivity.
+    exact: (ltn_lt H).
+  - move/negP/idP: H; rewrite -leqNgt => H.
+    move: m H Hm0. induction n using nat_strong_ind.
+    move=> m Hmn Hm0. have Hne: m <> 0 by move/eqP: Hm0; apply.
+    rewrite (modn_subn Hmn) (mod_sub Hne (leq_le Hmn)).
+    case Hsub: ((n - m) < m)%N.
+    + rewrite (modn_small Hsub) (Nat.mod_small _ _ (ltn_lt Hsub)).
+      reflexivity.
+    + move/negP/idP: Hsub; rewrite -leqNgt => Hsub.
+      apply: H.
+      * rewrite -lt0n in Hm0. rewrite -{2}(subn0 n). apply: ltn_sub2l.
+        -- exact: (ltn_leq_trans Hm0 Hmn).
+        -- exact: Hm0.
+      * exact: Hsub.
+      * exact: Hm0.
+Qed.
+
+Lemma expn2_gt0 n : 0 < 2^n.
+Proof.
+  by rewrite expn_gt0.
+Qed.
+
+Lemma Npos_xI_div2 n : (N.pos (n~1) / 2 = N.pos n)%num.
+Proof.
+  rewrite -Z2N.inj_pos. rewrite Pos2Z.inj_xI. rewrite Z2N.inj_add => //.
+  rewrite Z2N.inj_mul => //. rewrite N.mul_comm. by rewrite N.div_add_l.
+Qed.
+
+Lemma Npos_xO_div2 n : (N.pos (n~0) / 2 = N.pos n)%num.
+Proof.
+  rewrite -Z2N.inj_pos. rewrite Pos2Z.inj_xO. rewrite Z2N.inj_mul => //.
+  rewrite N.mul_comm. by rewrite N.div_mul.
 Qed.
 
 
