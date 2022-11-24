@@ -6,8 +6,6 @@ let size = List.length
 
 let ltB = ltB_lsb
 
-let uaddo = addB_ovf
-
 let usubo = borrow_subB
 
 let to_nat = to_nat0
