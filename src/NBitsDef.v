@@ -1,7 +1,7 @@
 
 From Coq Require Import ZArith Arith List Ascii String List Lia.
 From mathcomp Require Import ssreflect eqtype ssrbool ssrnat ssrfun seq div.
-From nbits Require Import AuxLemmas.
+From nbits Require Import AuxLemmas Compatibility.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
@@ -234,6 +234,7 @@ Section Definitions.
 
 End Definitions.
 
+Declare Scope bits_scope.
 Delimit Scope bits_scope with bits.
 
 Notation copy := nseq.
@@ -336,7 +337,7 @@ Section Lemmas.
   Proof.
     rewrite /low size_cat size_take size_zeros.
     case/orP: (ltn_geq_total n (size bs)) => H.
-    - rewrite H. move: (ltnW H) => {H} H. rewrite -subn_eq0 in H.
+    - rewrite H. move: (ltnW H) => {} H. rewrite -subn_eq0 in H.
       by rewrite (eqP H) addn0.
     - rewrite (leq_gtF H). by rewrite (subnKC H).
   Qed.
@@ -512,7 +513,7 @@ Section Lemmas.
 
   Lemma copy_addn A n1 n2 (x : A) :
     copy (n1 + n2) x = copy n1 x ++ copy n2 x.
-  Proof. by rewrite cat_nseq /nseq /ncons iter_add. Qed.
+  Proof. by rewrite cat_nseq /nseq /ncons iterD. Qed.
 
   Lemma zeros_addn n m : zeros (n + m) = zeros n ++ zeros m.
   Proof. rewrite /zeros. exact: copy_addn. Qed.
@@ -1086,14 +1087,14 @@ Section Lemmas.
   Proof.
     elim: n m => [| n IH] m //=. rewrite /joinlsb. rewrite -IH.
     rewrite ssrodd_odd ssrdiv2_div2 Nat.div2_div. rewrite N_of_nat_odd.
-    rewrite Nnat.Nat2N.inj_div /=. reflexivity.
+    rewrite Nat2N_inj_div /=. reflexivity.
   Qed.
 
   Lemma from_nat_N n m : from_nat n (N.to_nat m) = from_N n m.
   Proof.
     elim: n m => [| n IH] m //=. rewrite -IH.
     rewrite ssrodd_odd ssrdiv2_div2 Nat.div2_div. rewrite N_to_nat_odd.
-    rewrite Nnat.N2Nat.inj_div /=. reflexivity.
+    rewrite N2Nat_inj_div /=. reflexivity.
   Qed.
 
 
@@ -1263,7 +1264,7 @@ Section Lemmas.
     elim: bs => /=.
     - reflexivity.
     - move=> hd tl IH. rewrite /from_nat -/from_nat. rewrite half_bit_double.
-      rewrite IH. rewrite odd_add odd_double. by case hd.
+      rewrite IH. rewrite oddD odd_double. by case hd.
   Qed.
 
   Lemma from_natn0 n : from_nat n 0  = zeros n.
@@ -1404,8 +1405,8 @@ Section Lemmas.
   Proof. induction n => //.
          rewrite expnS.
          move => m.
-         case ODD: (odd m); rewrite /from_nat-/from_nat /=ODD odd_add odd_mul/=ODD/= halfD ODD/=.
-         specialize (IHn m./2). by rewrite odd_mul/= add0n mul2n doubleK IHn.
+         case ODD: (odd m); rewrite /from_nat-/from_nat /=ODD oddD oddM/=ODD/= halfD ODD/=.
+         specialize (IHn m./2). by rewrite oddM/= add0n mul2n doubleK IHn.
          specialize (IHn m./2). by rewrite add0n mul2n doubleK IHn.
   Qed.
 
@@ -1487,8 +1488,8 @@ Section Lemmas.
   Lemma from_N_mod_pow2n n m :
     from_N n (m mod (2 ^ N.of_nat n))%num = from_N n m.
   Proof.
-    rewrite -!from_nat_N. rewrite Nnat.N2Nat.inj_mod.
-    rewrite Nnat.N2Nat.inj_pow. rewrite Nnat.Nat2N.id.
+    rewrite -!from_nat_N. rewrite N2Nat_inj_mod; last by apply: N.pow_nonzero.
+    rewrite N2Nat_inj_pow. rewrite Nnat.Nat2N.id.
     replace (N.to_nat 2) with 2 by reflexivity.
     rewrite -expn_pow. rewrite -modn_modulo; first exact: from_nat_mod_pow2n.
     apply/eqP => H. move: (expn2_gt0 n). by rewrite H.
@@ -1500,7 +1501,7 @@ Section Lemmas.
   Lemma to_N_ones n : to_N (ones n) = (2^N.of_nat n - 1)%num.
   Proof.
     rewrite to_N_nat to_nat_ones. rewrite Nnat.Nat2N.inj_sub.
-    rewrite expn_pow Nnat.Nat2N.inj_pow. reflexivity.
+    rewrite expn_pow Nat2N_inj_pow. reflexivity.
   Qed.
 
   Lemma from_N_Zpos n m : from_N n (N.pos m) = from_Zpos n (Zpos m).
@@ -1555,7 +1556,7 @@ Section Lemmas.
   Lemma to_Zpos_inj_ss bs1 bs2 :
     size bs1 = size bs2 -> to_Zpos bs1 = to_Zpos bs2 -> bs1 = bs2.
   Proof.
-    rewrite 2!to_Zpos_nat. move=> Hs Hn. move: (Nat2Z.inj _ _ Hn) => {Hn} Hn.
+    rewrite 2!to_Zpos_nat. move=> Hs Hn. move: (Nat2Z.inj _ _ Hn) => {} Hn.
     apply/eqP. rewrite -(to_nat_inj_ss Hs). apply/eqP. assumption.
   Qed.
 
@@ -1633,7 +1634,7 @@ Section Lemmas.
   Proof.
     case/orP: (AuxLemmas.ltn_geq_total n (size bs)) => Hs.
     - move: (@cat_low_high bs n (size bs - n)). rewrite (subnKC (ltnW Hs)) => H.
-      move: (H (Logic.eq_refl (size bs))) => {H} H. rewrite -{5}H.
+      move: (H (Logic.eq_refl (size bs))) => {} H. rewrite -{5}H.
       move=> ->.  rewrite to_Zpos_cat to_Zpos_zeros Z.mul_0_l Z.add_0_r.
       reflexivity.
     - move=> _. rewrite (low_oversize Hs). rewrite to_Zpos_cat.
@@ -1738,7 +1739,7 @@ Section Lemmas.
       rewrite (Z.div_small _ _ Hbnd). apply ltnW in Hsz. rewrite -subn_eq0 in Hsz.
       rewrite (eqP Hsz) high0. reflexivity.
     - move: (@to_Zpos_low_high bs n (size bs - n)).
-      rewrite (subnKC Hsz) => H. move: (H (eqP (eqxx (size bs)))) => {H} H.
+      rewrite (subnKC Hsz) => H. move: (H (eqP (eqxx (size bs)))) => {} H.
       rewrite Z.add_comm Z.mul_comm in H. apply Logic.eq_sym.
       apply: (Z.div_unique_pos _ _ _ _ _ H). split.
       + exact: to_Zpos_ge0.
@@ -1817,7 +1818,7 @@ Section Lemmas.
     size bs1 = size bs2 -> to_Zneg bs1 = to_Zneg bs2 -> bs1 = bs2.
   Proof.
     elim: bs1 bs2 => [| b1 bs1 IH] [| b2 bs2] //=. move=> Hs Hn.
-    move: (Nat.succ_inj _ _ Hs) => {Hs} Hs. move: (b2z_cons Hn) => [H1 H2].
+    move: (Nat.succ_inj _ _ Hs) => {} Hs. move: (b2z_cons Hn) => [H1 H2].
     move: (IH _ Hs H2) => ->. move: {Hn Hs H2} H1. by case: b1; case: b2.
   Qed.
 
@@ -1836,10 +1837,10 @@ Section Lemmas.
     bs2 = bs1 ++ copy (size bs2 - size bs1) b1.
   Proof.
     elim: bs1 bs2 => [| b1 bs1 IH1] bs2 /=.
-    - move=> _ H. move: (Logic.eq_sym H) => {H} H. rewrite subn0.
+    - move=> _ H. move: (Logic.eq_sym H) => {} H. rewrite subn0.
       rewrite {1}(to_Zneg0 H). reflexivity.
     - case: bs2 => [| b2 bs2] //=. move=> Hs Hz. rewrite ltnS in Hs.
-      move: (b2z_cons Hz) => {Hz} [Hz1 Hz2]. move: (negb_eq_negb Hz1) => {Hz1} Hz1.
+      move: (b2z_cons Hz) => {Hz} [Hz1 Hz2]. move: (negb_eq_negb Hz1) => {} Hz1.
       rewrite -(addn1 (size bs2)) -(addn1 (size bs1)) subnDr.
       rewrite -(IH1 _ Hs Hz2). rewrite Hz1; reflexivity.
   Qed.
@@ -1851,8 +1852,8 @@ Section Lemmas.
     case Hs: (size bs1 <= size bs2) => Hz.
     - rewrite -(to_Zneg_inj_rl Hs Hz). rewrite -subn_eq0 in Hs.
       rewrite (eqP Hs) /=. rewrite cats0. reflexivity.
-    - move/idP/negP: Hs. rewrite -ltnNge => Hs. move: (ltnW Hs) => {Hs} Hs.
-      move: (Logic.eq_sym Hz) => {Hz} Hz. rewrite -(to_Zneg_inj_rl Hs Hz).
+    - move/idP/negP: Hs. rewrite -ltnNge => Hs. move: (ltnW Hs) => {} Hs.
+      move: (Logic.eq_sym Hz) => {} Hz. rewrite -(to_Zneg_inj_rl Hs Hz).
       rewrite -subn_eq0 in Hs. rewrite (eqP Hs) /=. rewrite cats0. reflexivity.
   Qed.
 
@@ -1885,7 +1886,7 @@ Section Lemmas.
   Proof.
     move=> Hsz.
     move: (@cat_low_high bs n (size bs - n)). rewrite (subnKC Hsz) => H.
-    move: (H (Logic.eq_refl (size bs))) => {H} H. rewrite -{5}H.
+    move: (H (Logic.eq_refl (size bs))) => {} H. rewrite -{5}H.
     move=> ->.  rewrite to_Zneg_cat to_Zneg_ones Z.mul_0_l Z.add_0_r.
     reflexivity.
   Qed.
@@ -2022,10 +2023,10 @@ Section Lemmas.
     - move=> ? ?; rewrite size_rcons. discriminate.
     - move=> ? ?; rewrite size_rcons. discriminate.
     - move=> bs2 lb2 bs1 lb1. rewrite !size_rcons => Hs.
-      move: (eq_add_S _ _ Hs) => {Hs} Hs. rewrite !to_Z_rcons.
+      move: (eq_add_S _ _ Hs) => {} Hs. rewrite !to_Z_rcons.
       case: lb1; case: lb2 => /=.
-      + move=> Hz. move: (Z.opp_inj _ _ Hz) => {Hz} Hz.
-        move: (Z.succ_inj _ _ Hz) => {Hz} Hz.
+      + move=> Hz. move: (Z.opp_inj _ _ Hz) => {} Hz.
+        move: (Z.succ_inj _ _ Hz) => {} Hz.
         by rewrite (to_Zneg_inj_ss Hs Hz).
       + move: (@to_Zpos_ge0 bs2) => {Hs} H. move=> Hz. rewrite -Hz in H.
         move/Z.opp_nonneg_nonpos: H => H. move/Z.le_succ_l: H => H.
@@ -2042,7 +2043,7 @@ Section Lemmas.
   Proof.
     case: (lastP bs1); case: (lastP bs2) => {bs1 bs2} //=.
     - move=> bs2 lb2. rewrite to_Z_nil. rewrite subn0 sub0n sext_nil sext0.
-      move=> H. move: (Logic.eq_sym H) => {H} H. rewrite (to_Z0 H).
+      move=> H. move: (Logic.eq_sym H) => {} H. rewrite (to_Z0 H).
       rewrite size_zeros. reflexivity.
     - move=> bs1 lb1. rewrite to_Z_nil. rewrite subn0 sub0n sext_nil sext0.
       move=> H. rewrite (to_Z0 H). rewrite size_zeros. reflexivity.
@@ -2050,13 +2051,13 @@ Section Lemmas.
       rewrite -!(addn1 (size bs1)) -!(addn1 (size bs2)) !subnDr.
       rewrite /sext !msb_joinmsb.
       rewrite !to_Z_rcons. case: lb1; case: lb2 => /=.
-      + move=> H. move: (Z.opp_inj _ _ H) => {H} H. move: (Z.succ_inj _ _ H) => {H} H.
+      + move=> H. move: (Z.opp_inj _ _ H) => {} H. move: (Z.succ_inj _ _ H) => {} H.
         rewrite !cat_rcons. rewrite !copy_cons. rewrite -!copy_rcons.
         rewrite -!rcons_cat. rewrite (to_Zneg_inj H). reflexivity.
-      + move=> H. move: (@to_Zpos_ge0 bs2). rewrite -H => {H} H.
+      + move=> H. move: (@to_Zpos_ge0 bs2). rewrite -H => {} H.
         move/Z.opp_nonneg_nonpos: H => H. move/Z.le_succ_l: H => H1.
         move: (@to_Zneg_ge0 bs1) => H2. move: (Z.le_lt_trans _ _ _ H2 H1). done.
-      + move=> H. move: (@to_Zpos_ge0 bs1). rewrite H => {H} H.
+      + move=> H. move: (@to_Zpos_ge0 bs1). rewrite H => {} H.
         move/Z.opp_nonneg_nonpos: H => H. move/Z.le_succ_l: H => H1.
         move: (@to_Zneg_ge0 bs2) => H2. move: (Z.le_lt_trans _ _ _ H2 H1). done.
       + move=> H. rewrite !cat_rcons. rewrite !copy_cons. rewrite -!copy_rcons.
@@ -2147,7 +2148,7 @@ Section Lemmas.
         have H1: (high 1 (low n bs) = zeros 1).
         { rewrite (high_low H0n (ltnW Hn)). rewrite Hz low_zeros. reflexivity. }
         rewrite (high1_0_to_Z H1).
-        move: (subnKC (ltnW Hn)) => {H1} H1. rewrite -{2}(cat_low_high H1) => {H1}.
+        move: (subnKC (ltnW Hn)) => {} H1. rewrite -{2}(cat_low_high H1) => {H1}.
         rewrite to_Zpos_cat.
         have ->: high (size bs - n) bs = zeros (size bs - n).
         { apply: (high_zeros_le _ Hz). exact: leq_addr. }
@@ -2224,7 +2225,7 @@ Lemma to_nat_take : forall n p, to_nat ((take n) p) = if n < size p then to_nat 
   elim p => [| phd ptl IHm]; first done.
   rewrite to_nat_cons/=.
   case Hlt : (ns.+1 < (size ptl).+1); rewrite ltnS in Hlt.
-  rewrite odd_add odd_double oddb. rewrite (IH ptl) Hlt.
+  rewrite oddD odd_double oddb. rewrite (IH ptl) Hlt.
   case phd; first by rewrite/=uphalf_double.
   by (rewrite/=3!add0n-3!muln2-div.divn2 div.mulnK; last done).
   by rewrite IH Hlt.

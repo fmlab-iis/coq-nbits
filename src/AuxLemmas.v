@@ -104,7 +104,7 @@ Proof.
   rewrite /nat_of_bool. case: b.
   - move=> H. apply: False_ind.
     have: (odd (1 + n * 2) = odd 0)%Z by rewrite H.
-    rewrite odd_add. rewrite muln2 odd_double /=. discriminate.
+    rewrite oddD. rewrite muln2 odd_double /=. discriminate.
   - rewrite add0n => /eqP H. rewrite muln_eq0 in H. by case/orP: H => /eqP H.
 Qed.
 

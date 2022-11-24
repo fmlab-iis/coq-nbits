@@ -226,7 +226,7 @@ Qed.
 Lemma smtlib_bvcomp_eqop bs1 bs2 : 
   0 < size bs1 -> size bs1 = size bs2 -> SMTLIB.bvcomp bs1 bs2 = [:: eq_op bs1 bs2].
 Proof.
-  apply SMTLIB.bvcomp_ind => {bs1 bs2} bs1 bs2 /=.
+  apply SMTLIB.bvcomp_ind => {bs2} bs1 bs2 /=.
   - rewrite leq_eqVlt. case/orP.
     + move/eqP=> Hsz1 _ Hsz2. rewrite Hsz1 in Hsz2. apply Logic.eq_sym in Hsz2. 
       rewrite (size1_msb Hsz1) (size1_msb Hsz2) smtlib_bvxnor_eqop. 

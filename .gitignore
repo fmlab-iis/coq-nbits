@@ -4,4 +4,6 @@
 *.vok
 *.vos
 *.aux
+.Makefile.d
+.lia.cache
 Makefile.conf
